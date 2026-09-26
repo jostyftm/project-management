@@ -1,0 +1,56 @@
+/**
+     * List {{ model }}
+     * 
+     * @param Request $request
+     * @return Collection
+     */
+    public function list(Request $request): Collection | AbstractPaginator
+    {
+    
+    }
+
+    /**
+     * Get {{ model }}
+     * 
+     * @param {{ model }} ${{ variable }}
+     * @return {{ model }}|null
+     */
+    public function get({{ model }} ${{ variable }}): ?{{ model }}
+    {
+        return {{ model }}::findCached(${{ variable }}->id);
+    }
+
+    /**
+     * Save {{ model }}
+     * 
+     * @param Request $request
+     * @param {{ model }} ${{ variable }}
+     * @return void
+     */
+    public function save(Request $request): void
+    {
+        
+    }
+
+    /**
+     * Update {{ model }}
+     * 
+     * @param Request $request
+     * @param {{ model }} ${{ variable }}
+     * @return void
+     */
+    public function update(Request $request, {{ model }} ${{ variable }}): void
+    {
+    
+    }
+
+    /**
+     * Delete {{ model }}
+     * 
+     * @param {{ model }} ${{ variable }}
+     * @return void
+     */
+    public function delete({{ model }} ${{ variable }}): void
+    {
+        ${{ variable }}->delete();
+    }

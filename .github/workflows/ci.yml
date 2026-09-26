@@ -1,0 +1,57 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  backend-tests:
+    name: Backend Tests (Laravel 13 & Pest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite, bcmath
+          coverage: none
+
+      - name: Install Composer Dependencies
+        working-directory: ./apps/api
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run Pest Suite
+        working-directory: ./apps/api
+        run: ./vendor/bin/pest
+
+  frontend-build:
+    name: Frontend Build (Next.js 16 & TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: ./apps/web/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        working-directory: ./apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Build and Typecheck
+        working-directory: ./apps/web
+        run: pnpm build

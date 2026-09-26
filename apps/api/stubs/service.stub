@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\{{ model }};
+use Illuminate\Http\Request;
+use Illuminate\Pagination\AbstractPaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+
+class {{ class }}
+{
+
+    /**
+     * @var string $keyCache
+     */
+    private string $keyCache = '{{ variable }}';
+
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {}
+
+    {{ crud_methods }}
+}
