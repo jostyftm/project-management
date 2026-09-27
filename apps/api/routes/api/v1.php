@@ -1,18 +1,23 @@
 <?php
 
+use App\Http\Controllers\Api\v1\Activity\ActivityController;
 use App\Http\Controllers\Api\v1\Auth\AuthController;
+use App\Http\Controllers\Api\v1\Comment\CommentController;
 use App\Http\Controllers\Api\v1\Cycle\CycleController;
 use App\Http\Controllers\Api\v1\Initiative\InitiativeController;
 use App\Http\Controllers\Api\v1\Milestone\MilestoneController;
 use App\Http\Controllers\Api\v1\Module\ModuleController;
+use App\Http\Controllers\Api\v1\Notification\NotificationController;
 use App\Http\Controllers\Api\v1\Page\PageAnalyticsController;
 use App\Http\Controllers\Api\v1\Page\PageController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
 use App\Http\Controllers\Api\v1\Release\ReleaseController;
 use App\Http\Controllers\Api\v1\Sticky\StickyController;
+use App\Http\Controllers\Api\v1\Stream\StreamController;
 use App\Http\Controllers\Api\v1\Teamspace\TeamspaceController;
 use App\Http\Controllers\Api\v1\User\UserController;
 use App\Http\Controllers\Api\v1\View\ViewController;
+use App\Http\Controllers\Api\v1\Webhook\WebhookController;
 use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemRelationController;
@@ -144,5 +149,27 @@ Route::middleware(['auth.sdi'])->group(function () {
         // Relaciones entre Work Items
         Route::post('work-items/{work_item}/relations', [WorkItemRelationController::class, 'store']);
         Route::delete('work-items/relations/{relation}', [WorkItemRelationController::class, 'destroy']);
+
+        // Notificaciones & Inbox
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+        // Comentarios (en Work Items y Páginas)
+        Route::get('work-items/{work_item}/comments', [CommentController::class, 'indexByWorkItem']);
+        Route::get('pages/{page}/comments', [CommentController::class, 'indexByPage']);
+        Route::post('comments', [CommentController::class, 'store']);
+        Route::delete('comments/{id}', [CommentController::class, 'destroy']);
+
+        // Auditoría & Actividades
+        Route::get('work-items/{work_item}/activities', [ActivityController::class, 'indexByWorkItem']);
+        Route::get('projects/{project}/activities', [ActivityController::class, 'indexByProject']);
+
+        // Server-Sent Events (SSE) Live Stream
+        Route::get('live-stream', [StreamController::class, 'stream']);
+
+        // Webhooks
+        Route::apiResource('webhooks', WebhookController::class)->only(['index', 'store', 'destroy']);
     });
 });

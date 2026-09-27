@@ -18,6 +18,7 @@ import { workItemService } from "@/services/plane/workItemService";
 import { cycleService } from "@/services/plane/cycleService";
 import { moduleService } from "@/services/plane/moduleService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
+import { WorkItemActivityTimeline } from "@/components/plane/comments/WorkItemActivityTimeline";
 import { Project, State, WorkItem, WorkItemType, Cycle, Module } from "@/types/plane-types";
 import {
   CheckSquare,
@@ -429,14 +430,17 @@ export function WorkItemDetailSheet({
               </div>
             )}
 
-            {/* Tabs for Sub-items and Relations */}
+            {/* Tabs for Sub-items, Relations, and Conversation */}
             <Tabs defaultValue="subitems" className="w-full">
-              <TabsList className="grid grid-cols-2 bg-slate-100">
+              <TabsList className="grid grid-cols-3 bg-slate-100">
                 <TabsTrigger value="subitems" className="text-xs">
                   Subtareas ({item.sub_items?.length ?? 0})
                 </TabsTrigger>
                 <TabsTrigger value="relations" className="text-xs">
                   Relaciones ({(item.outward_relations?.length ?? 0) + (item.inward_relations?.length ?? 0)})
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs">
+                  Conversación & Actividad
                 </TabsTrigger>
               </TabsList>
 
@@ -589,6 +593,14 @@ export function WorkItemDetailSheet({
                       </p>
                     )}
                 </div>
+              </TabsContent>
+
+              {/* Activity & Comments Tab */}
+              <TabsContent value="activity" className="pt-3">
+                <WorkItemActivityTimeline
+                  workItemId={item.id}
+                  projectId={project?.id}
+                />
               </TabsContent>
             </Tabs>
           </>

@@ -123,4 +123,16 @@ class WorkItem extends Model
     {
         return $this->hasMany(WorkItemRelation::class, 'target_id');
     }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class)->latest();
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class, 'entity_id')
+            ->where('entity_type', 'WORK_ITEM')
+            ->latest();
+    }
 }

@@ -36,6 +36,8 @@ import {
   Users2,
   Flag,
   Rocket,
+  Inbox,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -76,6 +78,22 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
         {/* Workspace Level Navigation */}
         <SidebarGroup className="p-0">
           <SidebarMenu className="space-y-0.5">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/inbox"}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname === "/inbox" && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/inbox">
+                  <Inbox className="size-4 shrink-0 text-slate-500" />
+                  <span>Inbox (Bandeja)</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
@@ -269,6 +287,22 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Link href={`/projects/${activeProjectId}/pages`}>
                       <BookOpen className="size-4 shrink-0 text-slate-500" />
                       <span>Páginas (Docs)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/activities`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/activities` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/activities`}>
+                      <History className="size-4 shrink-0 text-slate-500" />
+                      <span>Actividades</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

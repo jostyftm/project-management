@@ -369,4 +369,57 @@ export interface Sticky {
   updated_at?: string;
 }
 
+export interface Comment {
+  id: string | number;
+  workspace_id: string | number;
+  project_id?: string | number | null;
+  work_item_id?: string | number | null;
+  page_id?: string | number | null;
+  user_id: string | number;
+  content: string;
+  mentioned_user_ids?: (string | number)[];
+  created_at: string;
+  updated_at?: string;
+  user?: User;
+}
+
+export interface Notification {
+  id: string | number;
+  workspace_id: string | number;
+  recipient_id: string | number;
+  actor_id?: string | number | null;
+  type: 'MENTION' | 'ASSIGNMENT' | 'STATUS_CHANGE' | 'COMMENT' | string;
+  entity_type: 'WORK_ITEM' | 'PAGE' | 'RELEASE' | string;
+  entity_id: string | number;
+  title: string;
+  message: string;
+  target_url?: string | null;
+  is_read: boolean;
+  created_at: string;
+  actor?: User;
+}
+
+export interface Activity {
+  id: string | number;
+  workspace_id: string | number;
+  project_id?: string | number | null;
+  actor_id?: string | number | null;
+  entity_type: string;
+  entity_id: string | number;
+  action: 'CREATED' | 'UPDATED' | 'DELETED' | 'STATE_CHANGED' | 'ASSIGNED' | 'COMMENTED' | string;
+  changes_diff?: Record<string, any> | null;
+  created_at: string;
+  actor?: User;
+}
+
+export interface Webhook {
+  id: string | number;
+  workspace_id: string | number;
+  url: string;
+  secret_token?: string | null;
+  events_subscribed: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
 

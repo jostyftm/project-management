@@ -75,4 +75,9 @@ class Page extends Model
     {
         return $this->hasMany(PageView::class);
     }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class)->latest();
+    }
 }

@@ -8,6 +8,7 @@ import { pageService } from "@/services/plane/pageService";
 import { NotionBlockEditor } from "@/components/plane/editor/NotionBlockEditor";
 import { WikiSidebarTree } from "@/components/plane/wiki/WikiSidebarTree";
 import { PageAnalyticsModal } from "@/components/plane/pages/PageAnalyticsModal";
+import { WorkItemActivityTimeline } from "@/components/plane/comments/WorkItemActivityTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +23,8 @@ import {
   Loader2,
   FileText,
   Sidebar as SidebarIcon,
+  MessageSquare,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,7 @@ export default function PageDetailPage() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
+  const [showComments, setShowComments] = useState(false);
 
   // Debounced save timer
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -214,6 +218,20 @@ export default function PageDetailPage() {
               <span>Analíticas</span>
             </Button>
 
+            {/* Comments Toggle */}
+            <Button
+              variant={showComments ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowComments(!showComments)}
+              className={cn(
+                "h-8 text-xs font-semibold gap-1.5",
+                showComments ? "bg-indigo-600 hover:bg-indigo-500 text-white" : ""
+              )}
+            >
+              <MessageSquare className="size-3.5" />
+              <span>Comentarios</span>
+            </Button>
+
             {/* Publish Toggle */}
             <Button
               variant={page.is_published ? "default" : "outline"}
@@ -282,6 +300,29 @@ export default function PageDetailPage() {
           />
         </div>
       </main>
+
+      {/* Collapsible Right Comments Panel */}
+      {showComments && (
+        <aside className="w-80 border-l border-slate-200 bg-white p-4 shrink-0 overflow-y-auto flex flex-col h-full">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+              <MessageSquare className="size-4 text-indigo-600" />
+              <span>Comentarios</span>
+            </h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-slate-400 hover:text-slate-700"
+              onClick={() => setShowComments(false)}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <WorkItemActivityTimeline pageId={page.id} projectId={page.project_id} />
+          </div>
+        </aside>
+      )}
 
       {/* Analytics Modal */}
       <PageAnalyticsModal

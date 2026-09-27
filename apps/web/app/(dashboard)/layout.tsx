@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LoadingPage from "@/components/common/loadingPage";
 import { PlaneSidebar } from "@/components/plane/PlaneSidebar";
+import { NotificationBell } from "@/components/plane/notifications/NotificationBell";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { LOGIN_ROUTE } from "@/config/constants";
@@ -37,11 +38,17 @@ export default function DashboardLayout({
     <SidebarProvider>
       <PlaneSidebar />
       <SidebarInset className="bg-slate-50 flex flex-col min-h-screen">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
-          <SidebarTrigger className="-ml-1 cursor-pointer text-slate-600 hover:text-slate-900" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-            <span>Plane Workspace</span>
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="-ml-1 cursor-pointer text-slate-600 hover:text-slate-900" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+              <span>Plane Workspace</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <NotificationBell />
           </div>
         </header>
 

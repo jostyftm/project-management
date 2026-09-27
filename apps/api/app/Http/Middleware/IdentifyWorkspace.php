@@ -51,6 +51,8 @@ class IdentifyWorkspace
         // Registrar workspace actual en el contenedor de servicios
         app()->instance('current_workspace_id', $workspace->id);
         app()->instance('current_workspace', $workspace);
+        $request->attributes->set('workspace_id', $workspace->id);
+        $request->attributes->set('workspace', $workspace);
 
         return $next($request);
     }
