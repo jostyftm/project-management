@@ -26,6 +26,10 @@ import {
   Loader2,
   Flag,
   User as UserIcon,
+  CircleDashed,
+  CircleSlash,
+  RefreshCw,
+  LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -309,8 +313,8 @@ export function WorkItemDetailSheet({
             <div className="flex flex-col gap-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 text-xs">
               {/* 1. Estado */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28">
-                  Estado:
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
+                  <CircleDashed className="size-3 text-slate-400" /> Estado:
                 </span>
                 <Select
                   value={stateId}
@@ -337,7 +341,7 @@ export function WorkItemDetailSheet({
 
               {/* 2. Hito */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1">
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
                   <Flag className="size-3 text-slate-400" /> Hito:
                 </span>
                 <Select
@@ -364,8 +368,8 @@ export function WorkItemDetailSheet({
 
               {/* 3. Prioridad */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28">
-                  Prioridad:
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
+                  <CircleSlash className="size-3 text-slate-400" /> Prioridad:
                 </span>
                 <Select
                   value={priority}
@@ -389,8 +393,8 @@ export function WorkItemDetailSheet({
 
               {/* 4. Ciclo */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28">
-                  Ciclo:
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
+                  <RefreshCw className="size-3 text-slate-400" /> Ciclo:
                 </span>
                 <Select
                   value={cycleId}
@@ -416,7 +420,7 @@ export function WorkItemDetailSheet({
 
               {/* 5. Responsable */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1">
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
                   <UserIcon className="size-3 text-slate-400" /> Responsable:
                 </span>
                 <Select
@@ -443,8 +447,8 @@ export function WorkItemDetailSheet({
 
               {/* 6. Módulo */}
               <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-28">
-                  Módulo:
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1.5">
+                  <LayoutGrid className="size-3 text-slate-400" /> Módulo:
                 </span>
                 <Select
                   value={moduleId}
