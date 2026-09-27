@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\v1\Auth\AuthController;
 use App\Http\Controllers\Api\v1\Cycle\CycleController;
 use App\Http\Controllers\Api\v1\Module\ModuleController;
+use App\Http\Controllers\Api\v1\Page\PageAnalyticsController;
+use App\Http\Controllers\Api\v1\Page\PageController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
 use App\Http\Controllers\Api\v1\User\UserController;
 use App\Http\Controllers\Api\v1\View\ViewController;
@@ -55,6 +57,13 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::put('views/{view}', [ViewController::class, 'update']);
         Route::delete('views/{view}', [ViewController::class, 'destroy']);
 
+        // Knowledge Management & Wiki (Pages, Tree, Analytics, Report Generation)
+        Route::get('pages/tree', [PageController::class, 'tree']);
+        Route::post('pages/generate-report', [PageController::class, 'generateReport']);
+        Route::apiResource('pages', PageController::class);
+        Route::post('pages/{page}/view', [PageAnalyticsController::class, 'recordView']);
+        Route::get('pages/{page}/analytics', [PageAnalyticsController::class, 'show']);
+
         // Proyectos
         Route::apiResource('projects', ProjectController::class);
         Route::get('projects/{project}/states', [ProjectController::class, 'states']);
@@ -65,6 +74,11 @@ Route::middleware(['auth.sdi'])->group(function () {
         // Vistas a nivel de Proyecto (solo para el creador)
         Route::get('projects/{project}/views', [ViewController::class, 'index']);
         Route::post('projects/{project}/views', [ViewController::class, 'store']);
+
+        // Páginas a nivel de Proyecto
+        Route::get('projects/{project}/pages', [PageController::class, 'index']);
+        Route::post('projects/{project}/pages', [PageController::class, 'store']);
+        Route::get('projects/{project}/pages/tree', [PageController::class, 'tree']);
 
         // Tipos por Proyecto
         Route::get('projects/{project}/work-item-types', [WorkItemTypeController::class, 'index']);

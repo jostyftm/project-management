@@ -30,6 +30,7 @@ import {
   Sliders,
   ArrowLeft,
   UserCheck,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,22 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 <Link href="/your-work">
                   <UserCheck className="size-4 shrink-0 text-slate-500" />
                   <span>Your Work</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith("/pages")}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname.startsWith("/pages") && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/pages">
+                  <BookOpen className="size-4 shrink-0 text-slate-500" />
+                  <span>Pages & Wiki</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -151,6 +168,22 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Link href={`/projects/${activeProjectId}/modules`}>
                       <Boxes className="size-4 shrink-0 text-slate-500" />
                       <span>Módulos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/pages`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/pages` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/pages`}>
+                      <BookOpen className="size-4 shrink-0 text-slate-500" />
+                      <span>Páginas (Docs)</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

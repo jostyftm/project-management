@@ -212,3 +212,85 @@ export interface WorkItem {
   outward_relations?: WorkItemRelation[];
   inward_relations?: WorkItemRelation[];
 }
+
+export type DocBlockType =
+  | 'paragraph'
+  | 'heading_1'
+  | 'heading_2'
+  | 'heading_3'
+  | 'bullet_list'
+  | 'numbered_list'
+  | 'todo'
+  | 'callout'
+  | 'code'
+  | 'table'
+  | 'quote'
+  | 'divider';
+
+export interface DocBlock {
+  id: string;
+  type: DocBlockType;
+  content: string;
+  checked?: boolean;
+  calloutTone?: 'info' | 'warning' | 'success';
+  language?: string;
+  tableData?: string[][];
+}
+
+export interface DocPage {
+  id: string | number;
+  title: string;
+  content_json: DocBlock[];
+  is_published: boolean;
+  is_locked: boolean;
+  access: 'PUBLIC' | 'WORKSPACE' | 'PRIVATE';
+  icon?: string | null;
+  color?: string | null;
+  order?: number;
+  views_count?: number;
+  parent_id?: string | number | null;
+  project_id?: string | number | null;
+  project?: {
+    id: string | number;
+    name: string;
+    identifier: string;
+  };
+  creator?: User;
+  last_editor?: User;
+  created_at?: string;
+  updated_at?: string;
+  children?: DocPage[];
+}
+
+export interface PageTreeNode {
+  id: string | number;
+  title: string;
+  icon?: string | null;
+  color?: string | null;
+  is_published: boolean;
+  is_locked: boolean;
+  parent_id?: string | number | null;
+  project_id?: string | number | null;
+  order?: number;
+  children?: PageTreeNode[];
+}
+
+export interface PageAnalytics {
+  page_id: string | number;
+  title: string;
+  total_views: number;
+  unique_viewers: number;
+  word_count: number;
+  character_count: number;
+  block_count: number;
+  reading_time_minutes: number;
+  created_at?: string;
+  updated_at?: string;
+  creator?: User | null;
+  last_editor?: User | null;
+  recent_views?: {
+    user: User | null;
+    viewed_at: string;
+  }[];
+}
+
