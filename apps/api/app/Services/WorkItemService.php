@@ -21,7 +21,7 @@ class WorkItemService
     {
         return (new WorkItem)->search(
             request: $request,
-            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'subItems.state', 'cycles', 'modules'],
+            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'cycles', 'modules'],
             callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
 
@@ -36,8 +36,19 @@ class WorkItemService
                         $q->where('modules.id', $request->module_id);
                     });
                 }
+
+                if ($request->has('milestone_id')) {
+                    $builder->where(function ($q) use ($request) {
+                        $q->where('milestone_id', $request->milestone_id)
+                            ->orWhereHas('milestones', fn ($mq) => $mq->where('milestones.id', $request->milestone_id));
+                    });
+                }
+
+                if ($request->has('lead_id')) {
+                    $builder->where('lead_id', $request->lead_id);
+                }
             },
-            filters: ['title', 'state_id', 'type_id', 'priority', 'is_draft'],
+            filters: ['title', 'state_id', 'type_id', 'priority', 'is_draft', 'lead_id', 'milestone_id'],
             sorts: ['created_at', 'sequence_id', 'priority', 'target_date']
         );
     }
@@ -57,6 +68,9 @@ class WorkItemService
             'assignees',
             'labels',
             'creator',
+            'lead',
+            'milestone',
+            'milestones',
             'project',
             'parent',
             'subItems.state',
@@ -103,6 +117,8 @@ class WorkItemService
                 'type_id' => $data['type_id'] ?? null,
                 'priority' => $data['priority'] ?? 'NONE',
                 'parent_id' => $data['parent_id'] ?? null,
+                'lead_id' => $data['lead_id'] ?? null,
+                'milestone_id' => $data['milestone_id'] ?? null,
                 'estimate_points' => $data['estimate_points'] ?? null,
                 'estimate_value' => $data['estimate_value'] ?? null,
                 'start_date' => $data['start_date'] ?? null,
@@ -127,6 +143,10 @@ class WorkItemService
                 $workItem->modules()->syncWithoutDetaching([$data['module_id']]);
             }
 
+            if (! empty($data['milestone_id'])) {
+                $workItem->milestones()->syncWithoutDetaching([$data['milestone_id']]);
+            }
+
             // Registrar auditoría de creación
             Activity::create([
                 'workspace_id' => $project->workspace_id,
@@ -138,7 +158,7 @@ class WorkItemService
                 'changes_diff' => ['title' => $workItem->title],
             ]);
 
-            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'cycles', 'modules']);
+            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'cycles', 'modules']);
         });
     }
 
@@ -183,6 +203,14 @@ class WorkItemService
                 }
             }
 
+            if (array_key_exists('milestone_id', $data)) {
+                if ($data['milestone_id']) {
+                    $workItem->milestones()->sync([$data['milestone_id']]);
+                } else {
+                    $workItem->milestones()->detach();
+                }
+            }
+
             $action = 'UPDATED';
             $changes = $workItem->getChanges();
 
@@ -200,7 +228,7 @@ class WorkItemService
                 'changes_diff' => $changes,
             ]);
 
-            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'subItems.state', 'cycles', 'modules']);
+            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'cycles', 'modules']);
         });
     }
 

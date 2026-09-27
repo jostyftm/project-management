@@ -29,12 +29,28 @@ class WorkItemResource extends JsonResource
                 'start_date' => $this->start_date?->format('Y-m-d'),
                 'target_date' => $this->target_date?->format('Y-m-d'),
                 'is_draft' => $this->is_draft,
+                'lead_id' => $this->lead_id,
+                'milestone_id' => $this->milestone_id ?? $this->whenLoaded('milestones', fn () => $this->milestones->first()?->id),
                 'created_at' => $this->created_at?->toISOString(),
                 'updated_at' => $this->updated_at?->toISOString(),
             ],
             'relationships' => [
                 'state' => new StateResource($this->whenLoaded('state')),
                 'type' => new WorkItemTypeResource($this->whenLoaded('type')),
+                'lead' => [
+                    'data' => $this->lead ? [
+                        'id' => (string) $this->lead->id,
+                        'name' => $this->lead->name,
+                        'email' => $this->lead->email,
+                    ] : null,
+                ],
+                'milestone' => [
+                    'data' => ($this->milestone ?? ($this->relationLoaded('milestones') ? $this->milestones->first() : null)) ? [
+                        'id' => (string) ($this->milestone?->id ?? $this->milestones->first()?->id),
+                        'title' => $this->milestone?->title ?? $this->milestones->first()?->title,
+                        'status' => $this->milestone?->status ?? $this->milestones->first()?->status,
+                    ] : null,
+                ],
                 'project' => [
                     'data' => $project ? [
                         'id' => (string) $project->id,

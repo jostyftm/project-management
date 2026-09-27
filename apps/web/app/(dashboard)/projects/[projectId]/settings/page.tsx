@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Sliders, Loader2, Save, Check } from "lucide-react";
+import { ProjectMembersModal } from "@/components/plane/projects/ProjectMembersModal";
+import { Sliders, Loader2, Save, Check, Users } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,7 @@ export default function ProjectSettingsPage() {
   const [identifier, setIdentifier] = useState("");
   const [description, setDescription] = useState("");
   const [estimateSystem, setEstimateSystem] = useState<string>("FIBONACCI");
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -215,7 +217,36 @@ export default function ProjectSettingsPage() {
             </Button>
           </CardFooter>
         </Card>
+
+        {/* Project Members & Invitations Management */}
+        <Card className="border-slate-200 bg-white">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base font-semibold">Miembros del Proyecto y Colaboradores</CardTitle>
+                <CardDescription>
+                  Administra quiénes tienen acceso al proyecto, cambia sus roles o envía invitaciones por correo con enlaces de acceso.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setMembersModalOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 shrink-0"
+              >
+                <Users className="size-3.5" />
+                Gestionar Miembros e Invitaciones
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
       </form>
+
+      {/* Project Members Dialog */}
+      <ProjectMembersModal
+        projectId={projectId}
+        open={membersModalOpen}
+        onOpenChange={setMembersModalOpen}
+      />
     </div>
   );
 }

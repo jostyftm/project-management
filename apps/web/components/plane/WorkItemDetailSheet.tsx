@@ -4,35 +4,28 @@ import React, { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
-  SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { workItemService } from "@/services/plane/workItemService";
 import { cycleService } from "@/services/plane/cycleService";
 import { moduleService } from "@/services/plane/moduleService";
+import { milestoneService } from "@/services/plane/milestoneService";
+import { projectMemberService, ProjectMemberUser } from "@/services/plane/projectMemberService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { WorkItemActivityTimeline } from "@/components/plane/comments/WorkItemActivityTimeline";
-import { Project, State, WorkItem, WorkItemType, Cycle, Module } from "@/types/plane-types";
+import { NotionBlockEditor } from "@/components/plane/editor/NotionBlockEditor";
+import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone, DocBlock } from "@/types/plane-types";
 import {
-  CheckSquare,
-  Clock,
-  Link as LinkIcon,
   Plus,
   Trash2,
-  AlertCircle,
-  Hash,
   Loader2,
-  ChevronRight,
-  Boxes,
-  Repeat,
-  Check,
+  Flag,
+  User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -63,17 +56,21 @@ export function WorkItemDetailSheet({
   const [types, setTypes] = useState<WorkItemType[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [members, setMembers] = useState<ProjectMemberUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Editable fields
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [docBlocks, setDocBlocks] = useState<DocBlock[]>([]);
   const [stateId, setStateId] = useState<string>("");
   const [typeId, setTypeId] = useState<string>("");
   const [priority, setPriority] = useState<string>("NONE");
   const [estimateValue, setEstimateValue] = useState<string>("");
   const [cycleId, setCycleId] = useState<string>("");
   const [moduleId, setModuleId] = useState<string>("");
+  const [milestoneId, setMilestoneId] = useState<string>("");
+  const [leadId, setLeadId] = useState<string>("");
 
   // Sub-item quick create
   const [newSubItemTitle, setNewSubItemTitle] = useState("");
@@ -90,26 +87,49 @@ export function WorkItemDetailSheet({
     async function loadItem() {
       setIsLoading(true);
       try {
-        const [itemData, typesData, cyclesData, modulesData] = await Promise.all([
+        const [itemData, typesData, cyclesData, modulesData, milestonesData, membersData] = await Promise.all([
           workItemService.get(workItemId!),
           project ? workItemTypeService.list(project.id) : Promise.resolve([]),
           project ? cycleService.list(project.id) : Promise.resolve([]),
           project ? moduleService.list(project.id) : Promise.resolve([]),
+          project ? milestoneService.list(project.id) : Promise.resolve([]),
+          project ? projectMemberService.list(project.id).then((r) => r.members).catch(() => []) : Promise.resolve([]),
         ]);
 
         setItem(itemData);
         setTypes(typesData);
         setCycles(cyclesData);
         setModules(modulesData);
+        setMilestones(milestonesData);
+        setMembers(membersData);
 
         setTitle(itemData.title);
-        setDescription(itemData.description_json?.text || "");
+
+        // Normalize description into Notion doc blocks
+        let initialBlocks: DocBlock[] = [];
+        if (Array.isArray(itemData.description_json) && itemData.description_json.length > 0) {
+          initialBlocks = itemData.description_json;
+        } else if (itemData.description_json && typeof itemData.description_json === "object" && (itemData.description_json as any).text) {
+          initialBlocks = [{ id: "b-init", type: "paragraph", content: (itemData.description_json as any).text }];
+        } else if (typeof itemData.description_json === "string" && itemData.description_json.trim()) {
+          initialBlocks = [{ id: "b-init", type: "paragraph", content: itemData.description_json }];
+        } else {
+          initialBlocks = [{ id: "b-init", type: "paragraph", content: "" }];
+        }
+        setDocBlocks(initialBlocks);
+
         setStateId(String(itemData.state?.id || ""));
         setTypeId(itemData.type?.id ? String(itemData.type.id) : "");
         setPriority(itemData.priority || "NONE");
         setEstimateValue(itemData.estimate_value || (itemData.estimate_points ? String(itemData.estimate_points) : ""));
         setCycleId(itemData.cycles && itemData.cycles.length > 0 ? String(itemData.cycles[0].id) : "");
         setModuleId(itemData.modules && itemData.modules.length > 0 ? String(itemData.modules[0].id) : "");
+
+        const rawMilestoneId = (itemData as any).milestone_id || (itemData as any).milestone?.id || "";
+        setMilestoneId(rawMilestoneId ? String(rawMilestoneId) : "");
+
+        const rawLeadId = (itemData as any).lead_id || (itemData as any).lead?.id || "";
+        setLeadId(rawLeadId ? String(rawLeadId) : "");
       } catch {
         toast.error("Error al cargar los detalles del work item");
       } finally {
@@ -194,7 +214,7 @@ export function WorkItemDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-6 space-y-6">
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6 space-y-6">
         {isLoading || !item ? (
           <div className="flex flex-col items-center justify-center py-24">
             <Loader2 className="size-8 text-indigo-600 animate-spin mb-3" />
@@ -249,8 +269,30 @@ export function WorkItemDetailSheet({
               </div>
             </SheetHeader>
 
-            {/* Quick Properties Grid */}
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs">
+            {/* Notion-style Block Description */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Descripción (Editor en Bloque)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Usa &apos;/&apos; para insertar bloques
+                </span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3 min-h-[140px] focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400/20 transition-all shadow-2xs">
+                <NotionBlockEditor
+                  blocks={docBlocks}
+                  onChange={(newBlocks) => {
+                    setDocBlocks(newBlocks);
+                    handleUpdateField({ description_json: newBlocks });
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Properties Grid: 6 Properties */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs">
+              {/* 1. Estado */}
               <div className="space-y-1">
                 <span className="text-slate-400 font-medium">Estado</span>
                 <Select
@@ -260,7 +302,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ state_id: val });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200">
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -276,6 +318,7 @@ export function WorkItemDetailSheet({
                 </Select>
               </div>
 
+              {/* 2. Prioridad */}
               <div className="space-y-1">
                 <span className="text-slate-400 font-medium">Prioridad</span>
                 <Select
@@ -285,7 +328,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ priority: val as any });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200">
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
                     <SelectValue placeholder="Prioridad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -298,39 +341,97 @@ export function WorkItemDetailSheet({
                 </Select>
               </div>
 
+              {/* 3. Responsable (Lead) */}
               <div className="space-y-1">
-                <span className="text-slate-400 font-medium">Ciclo (Sprint)</span>
+                <span className="text-slate-400 font-medium flex items-center gap-1">
+                  <UserIcon className="size-3" /> Responsable
+                </span>
                 <Select
-                  value={cycleId}
+                  value={leadId}
                   onValueChange={(val) => {
-                    setCycleId(val);
-                    handleUpdateField({ cycle_id: val || null });
+                    const next = val === "none" ? "" : val;
+                    setLeadId(next);
+                    handleUpdateField({ lead_id: next || null });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200">
-                    <SelectValue placeholder="Sin ciclo" />
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                    <SelectValue placeholder="Sin asignar" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sin ciclo</SelectItem>
-                    {cycles.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name} ({c.status})
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {members.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* 4. Hito (Milestone) */}
+              <div className="space-y-1">
+                <span className="text-slate-400 font-medium flex items-center gap-1">
+                  <Flag className="size-3" /> Hito (Milestone)
+                </span>
+                <Select
+                  value={milestoneId}
+                  onValueChange={(val) => {
+                    const next = val === "none" ? "" : val;
+                    setMilestoneId(next);
+                    handleUpdateField({ milestone_id: next || null });
+                  }}
+                >
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                    <SelectValue placeholder="Sin hito" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin hito</SelectItem>
+                    {milestones.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 5. Ciclo (Sprint) */}
+              <div className="space-y-1">
+                <span className="text-slate-400 font-medium">Ciclo (Sprint)</span>
+                <Select
+                  value={cycleId}
+                  onValueChange={(val) => {
+                    const next = val === "none" ? "" : val;
+                    setCycleId(next);
+                    handleUpdateField({ cycle_id: next || null });
+                  }}
+                >
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                    <SelectValue placeholder="Sin ciclo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin ciclo</SelectItem>
+                    {cycles.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 6. Módulo */}
               <div className="space-y-1">
                 <span className="text-slate-400 font-medium">Módulo</span>
                 <Select
                   value={moduleId}
                   onValueChange={(val) => {
-                    setModuleId(val);
-                    handleUpdateField({ module_id: val || null });
+                    const next = val === "none" ? "" : val;
+                    setModuleId(next);
+                    handleUpdateField({ module_id: next || null });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200">
+                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
                     <SelectValue placeholder="Sin módulo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -345,7 +446,7 @@ export function WorkItemDetailSheet({
               </div>
             </div>
 
-            {/* Dynamic Estimate Selector (User Requirement #1) */}
+            {/* Dynamic Estimate Selector */}
             {estimateSystem !== "NONE" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">

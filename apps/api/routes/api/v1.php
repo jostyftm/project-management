@@ -22,6 +22,9 @@ use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemRelationController;
 use App\Http\Controllers\Api\v1\WorkItemType\WorkItemTypeController;
+use App\Http\Controllers\Api\v1\InstanceAdmin\InstanceAdminController;
+use App\Http\Controllers\Api\v1\Invitation\InvitationController;
+use App\Http\Controllers\Api\v1\Project\ProjectMemberController;
 use App\Http\Controllers\Api\v1\YourWork\YourWorkController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,17 +34,32 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Rutas públicas de autenticación
+// Rutas públicas de autenticación e invitaciones
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
 });
+
+Route::get('invitations/{token}', [InvitationController::class, 'show']);
 
 // Rutas protegidas con autenticación
 Route::middleware(['auth.sdi'])->group(function () {
     // Perfil y cierre de sesión
     Route::get('auth/me', [AuthController::class, 'me']);
     Route::post('auth/logout', [AuthController::class, 'logout']);
+
+    // Aceptación de invitaciones
+    Route::post('invitations/{token}/accept', [InvitationController::class, 'accept']);
+
+    // Módulo de Gobernanza / Instance Admin
+    Route::prefix('instance-admin')->group(function () {
+        Route::get('settings', [InstanceAdminController::class, 'getSettings']);
+        Route::put('settings', [InstanceAdminController::class, 'updateSettings']);
+        Route::get('health', [InstanceAdminController::class, 'getHealth']);
+        Route::get('users', [InstanceAdminController::class, 'getUsers']);
+        Route::put('users/{id}/admin-status', [InstanceAdminController::class, 'toggleUserAdmin']);
+        Route::post('test-email', [InstanceAdminController::class, 'testEmail']);
+    });
 
     // Usuarios del sistema
     Route::apiResource('users', UserController::class);
@@ -89,6 +107,13 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::post('projects/{project}/states', [ProjectController::class, 'storeState']);
         Route::get('projects/{project}/labels', [ProjectController::class, 'labels']);
         Route::post('projects/{project}/labels', [ProjectController::class, 'storeLabel']);
+
+        // Miembros e Invitaciones del Proyecto
+        Route::get('projects/{project}/members', [ProjectMemberController::class, 'index']);
+        Route::post('projects/{project}/members', [ProjectMemberController::class, 'store']);
+        Route::put('projects/{project}/members/{user}', [ProjectMemberController::class, 'update']);
+        Route::delete('projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy']);
+        Route::delete('projects/{project}/invitations/{invitation}', [ProjectMemberController::class, 'cancelInvitation']);
 
         // Vistas a nivel de Proyecto (solo para el creador)
         Route::get('projects/{project}/views', [ViewController::class, 'index']);

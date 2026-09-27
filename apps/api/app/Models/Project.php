@@ -62,6 +62,11 @@ class Project extends Model
         return $this->hasMany(ProjectMember::class);
     }
 
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(ProjectInvitation::class);
+    }
+
     public function states(): HasMany
     {
         return $this->hasMany(State::class)->orderBy('sequence');

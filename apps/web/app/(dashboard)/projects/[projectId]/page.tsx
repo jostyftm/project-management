@@ -437,6 +437,7 @@ export default function ProjectWorkItemsPage() {
     try {
       await workItemService.create(projectId, {
         title: newTitle.trim(),
+        description_json: newDescription ? [{ id: "b1", type: "paragraph", content: newDescription }] : undefined,
         priority: newPriority as any,
         state_id: newStateId || (states[0]?.id ? String(states[0].id) : undefined),
         type_id: newTypeId || undefined,

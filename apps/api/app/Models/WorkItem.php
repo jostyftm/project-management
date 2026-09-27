@@ -26,6 +26,7 @@ class WorkItem extends Model
         'priority',
         'parent_id',
         'lead_id',
+        'milestone_id',
         'estimate_points',
         'estimate_value',
         'start_date',
@@ -112,6 +113,16 @@ class WorkItem extends Model
     public function modules(): BelongsToMany
     {
         return $this->belongsToMany(Module::class, 'module_work_items');
+    }
+
+    public function milestone(): BelongsTo
+    {
+        return $this->belongsTo(Milestone::class);
+    }
+
+    public function milestones(): BelongsToMany
+    {
+        return $this->belongsToMany(Milestone::class, 'milestone_work_items')->withTimestamps();
     }
 
     public function outwardRelations(): HasMany

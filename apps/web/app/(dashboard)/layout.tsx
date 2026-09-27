@@ -7,6 +7,8 @@ import { PlaneSidebar } from "@/components/plane/PlaneSidebar";
 import { NotificationBell } from "@/components/plane/notifications/NotificationBell";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { LOGIN_ROUTE } from "@/config/constants";
 import { useAuth } from "@/hooks/use-auth";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store";
@@ -48,6 +50,13 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/instance-admin"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all"
+            >
+              <ShieldCheck className="size-3.5 text-indigo-600" />
+              <span>Gobernanza</span>
+            </Link>
             <NotificationBell />
           </div>
         </header>

@@ -54,6 +54,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_instance_admin',
     ];
 
     /**
@@ -75,9 +76,15 @@ class User extends Authenticatable
     {
         return [
             'user_auth_id' => 'integer',
+            'is_instance_admin' => 'boolean',
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function isInstanceAdmin(): bool
+    {
+        return (bool) $this->is_instance_admin;
     }
 
     public function ownedWorkspaces(): HasMany

@@ -45,6 +45,13 @@ class ProjectUpdateRequest extends FormRequest
              * Líder de proyecto
              */
             'lead_id' => ['nullable', 'exists:users,id'],
+
+            /**
+             * Sistema de estimación de esfuerzo
+             *
+             * @example FIBONACCI
+             */
+            'estimate_system' => ['sometimes', 'string', 'in:FIBONACCI,TSHIRT,NUMERIC,NONE'],
         ];
     }
 }

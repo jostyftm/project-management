@@ -89,6 +89,8 @@ class WorkItemCreateRequest extends FormRequest
              */
             'is_draft' => ['sometimes', 'boolean'],
             'type_id' => ['nullable', 'exists:work_item_types,id'],
+            'lead_id' => ['nullable', 'exists:users,id'],
+            'milestone_id' => ['nullable', 'exists:milestones,id'],
             'estimate_value' => ['nullable', 'string', 'max:20'],
             'cycle_id' => ['nullable', 'exists:cycles,id'],
             'module_id' => ['nullable', 'exists:modules,id'],
