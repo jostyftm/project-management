@@ -31,6 +31,11 @@ import {
   ArrowLeft,
   UserCheck,
   BookOpen,
+  StickyNote,
+  Target,
+  Users2,
+  Flag,
+  Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -102,6 +107,54 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/initiatives"}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname === "/initiatives" && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/initiatives">
+                  <Target className="size-4 shrink-0 text-slate-500" />
+                  <span>Iniciativas</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/teamspaces"}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname === "/teamspaces" && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/teamspaces">
+                  <Users2 className="size-4 shrink-0 text-slate-500" />
+                  <span>Teamspaces</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/stickies"}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname === "/stickies" && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/stickies">
+                  <StickyNote className="size-4 shrink-0 text-slate-500" />
+                  <span>Stickies</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
@@ -168,6 +221,38 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Link href={`/projects/${activeProjectId}/modules`}>
                       <Boxes className="size-4 shrink-0 text-slate-500" />
                       <span>Módulos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/milestones`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/milestones` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/milestones`}>
+                      <Flag className="size-4 shrink-0 text-slate-500" />
+                      <span>Hitos (Milestones)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/releases`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/releases` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/releases`}>
+                      <Rocket className="size-4 shrink-0 text-slate-500" />
+                      <span>Releases</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

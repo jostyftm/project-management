@@ -2,10 +2,15 @@
 
 use App\Http\Controllers\Api\v1\Auth\AuthController;
 use App\Http\Controllers\Api\v1\Cycle\CycleController;
+use App\Http\Controllers\Api\v1\Initiative\InitiativeController;
+use App\Http\Controllers\Api\v1\Milestone\MilestoneController;
 use App\Http\Controllers\Api\v1\Module\ModuleController;
 use App\Http\Controllers\Api\v1\Page\PageAnalyticsController;
 use App\Http\Controllers\Api\v1\Page\PageController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
+use App\Http\Controllers\Api\v1\Release\ReleaseController;
+use App\Http\Controllers\Api\v1\Sticky\StickyController;
+use App\Http\Controllers\Api\v1\Teamspace\TeamspaceController;
 use App\Http\Controllers\Api\v1\User\UserController;
 use App\Http\Controllers\Api\v1\View\ViewController;
 use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
@@ -64,6 +69,15 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::post('pages/{page}/view', [PageAnalyticsController::class, 'recordView']);
         Route::get('pages/{page}/analytics', [PageAnalyticsController::class, 'show']);
 
+        // Strategic Planning: Initiatives & Teamspaces
+        Route::apiResource('initiatives', InitiativeController::class);
+        Route::apiResource('teamspaces', TeamspaceController::class);
+
+        // Stickies (Tablero tipo corcho de notas rápidas)
+        Route::apiResource('stickies', StickyController::class);
+        Route::post('stickies/{sticky}/pin', [StickyController::class, 'togglePin']);
+        Route::post('stickies/{sticky}/privacy', [StickyController::class, 'togglePrivacy']);
+
         // Proyectos
         Route::apiResource('projects', ProjectController::class);
         Route::get('projects/{project}/states', [ProjectController::class, 'states']);
@@ -100,6 +114,23 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::put('modules/{module}', [ModuleController::class, 'update']);
         Route::post('modules/{module}/work-items', [ModuleController::class, 'syncWorkItems']);
         Route::get('modules/{module}/progress', [ModuleController::class, 'progress']);
+
+        // Hitos (Milestones) por Proyecto
+        Route::get('projects/{project}/milestones', [MilestoneController::class, 'index']);
+        Route::post('projects/{project}/milestones', [MilestoneController::class, 'store']);
+        Route::get('milestones/{milestone}', [MilestoneController::class, 'show']);
+        Route::put('milestones/{milestone}', [MilestoneController::class, 'update']);
+        Route::post('milestones/{milestone}/complete', [MilestoneController::class, 'toggleComplete']);
+        Route::delete('milestones/{milestone}', [MilestoneController::class, 'destroy']);
+
+        // Versiones y Releases con Changelog por Proyecto
+        Route::get('projects/{project}/releases', [ReleaseController::class, 'index']);
+        Route::post('projects/{project}/releases', [ReleaseController::class, 'store']);
+        Route::get('releases/{release}', [ReleaseController::class, 'show']);
+        Route::put('releases/{release}', [ReleaseController::class, 'update']);
+        Route::post('releases/{release}/publish', [ReleaseController::class, 'publish']);
+        Route::post('releases/{release}/generate-changelog', [ReleaseController::class, 'generateChangelog']);
+        Route::delete('releases/{release}', [ReleaseController::class, 'destroy']);
 
         // Work Items por Proyecto
         Route::get('projects/{project}/work-items', [WorkItemController::class, 'index']);

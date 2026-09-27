@@ -294,3 +294,79 @@ export interface PageAnalytics {
   }[];
 }
 
+export interface Initiative {
+  id: string | number;
+  title: string;
+  description?: string | null;
+  target_date?: string | null;
+  status: 'PLANNED' | 'IN_PROGRESS' | 'ACHIEVED' | 'CANCELLED';
+  projects?: { id: string | number; name: string; identifier: string }[];
+  creator?: User;
+  metrics?: {
+    total_projects: number;
+    total_work_items: number;
+    completed_work_items: number;
+    progress_percentage: number;
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Teamspace {
+  id: string | number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  projects?: { id: string | number; name: string; identifier: string }[];
+  creator?: User;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Milestone {
+  id: string | number;
+  title: string;
+  description?: string | null;
+  target_date?: string | null;
+  status: 'PENDING' | 'COMPLETED' | 'DELAYED';
+  completed_at?: string | null;
+  total_work_items?: number;
+  completed_work_items?: number;
+  progress_percentage?: number;
+  project?: { id: string | number; name: string; identifier: string };
+  work_items?: WorkItem[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Release {
+  id: string | number;
+  name: string;
+  version: string;
+  description?: string | null;
+  changelog?: string | null;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  published_at?: string | null;
+  project?: { id: string | number; name: string; identifier: string };
+  creator?: User;
+  work_items?: WorkItem[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Sticky {
+  id: string | number;
+  content: string;
+  color: 'yellow' | 'green' | 'blue' | 'pink' | 'purple';
+  is_pinned: boolean;
+  is_private: boolean;
+  position_x: number;
+  position_y: number;
+  is_owner?: boolean;
+  creator?: User;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
