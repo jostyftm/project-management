@@ -16,7 +16,7 @@ import {
 import { projectService } from "@/services/plane/projectService";
 import { workItemService } from "@/services/plane/workItemService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
-import { Project, State, WorkItem, WorkItemType } from "@/types/plane-types";
+import { Project, State, WorkItem, WorkItemType, SavedView } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,25 +24,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WorkItemDetailSheet } from "@/components/plane/WorkItemDetailSheet";
+import { CalendarView } from "@/components/plane/views/CalendarView";
+import { GanttView } from "@/components/plane/views/GanttView";
+import { SavedViewsBar } from "@/components/plane/views/SavedViewsBar";
 import {
   Kanban,
   List as ListIcon,
+  Calendar as CalendarIcon,
+  GanttChart,
   Plus,
   Search,
   Filter,
-  AlertCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Circle,
-  Hash,
-  ChevronRight,
-  Loader2,
   Trash2,
   Calendar,
   Layers,
-  Sparkles,
   GitBranch,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -50,7 +48,7 @@ import { cn } from "@/lib/utils";
 const FIBONACCI_VALUES = ["0", "1", "2", "3", "5", "8", "13", "21"];
 const TSHIRT_VALUES = ["XS", "S", "M", "L", "XL", "XXL"];
 
-// Priority helper
+// Priority helpers
 const getPriorityBadge = (priority: string) => {
   switch (priority) {
     case "URGENT":
@@ -65,6 +63,14 @@ const getPriorityBadge = (priority: string) => {
       return { label: "Ninguna", color: "bg-slate-50 text-slate-600 border-slate-200" };
   }
 };
+
+const PRIORITY_GROUPS = [
+  { id: "URGENT", name: "Urgente", color: "#ef4444" },
+  { id: "HIGH", name: "Alta", color: "#f97316" },
+  { id: "MEDIUM", name: "Media", color: "#f59e0b" },
+  { id: "LOW", name: "Baja", color: "#3b82f6" },
+  { id: "NONE", name: "Ninguna", color: "#94a3b8" },
+];
 
 // Draggable Work Item Card
 function KanbanCard({
@@ -172,16 +178,20 @@ function KanbanCard({
   );
 }
 
-// Droppable Kanban Column
+// Droppable Kanban Column (supports State or Priority grouping)
 function KanbanColumn({
-  state,
+  columnId,
+  title,
+  color,
   items,
   states,
   onStateChange,
   onDelete,
   onCardClick,
 }: {
-  state: State;
+  columnId: string;
+  title: string;
+  color: string;
   items: WorkItem[];
   states: State[];
   onStateChange: (itemId: string | number, newStateId: string | number) => void;
@@ -189,7 +199,7 @@ function KanbanColumn({
   onCardClick: (item: WorkItem) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: String(state.id),
+    id: columnId,
   });
 
   return (
@@ -204,9 +214,9 @@ function KanbanColumn({
         <div className="flex items-center gap-2">
           <span
             className="size-2.5 rounded-full"
-            style={{ backgroundColor: state.color || "#6366f1" }}
+            style={{ backgroundColor: color || "#6366f1" }}
           />
-          <h3 className="font-semibold text-sm text-slate-800">{state.name}</h3>
+          <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
         </div>
         <span className="text-xs font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full shadow-xs">
           {items.length}
@@ -245,8 +255,9 @@ export default function ProjectWorkItemsPage() {
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // View & Filters
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  // View Layout & Display Options
+  const [viewLayout, setViewLayout] = useState<"kanban" | "list" | "calendar" | "gantt">("kanban");
+  const [groupBy, setGroupBy] = useState<"state" | "priority">("state");
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -365,6 +376,25 @@ export default function ProjectWorkItemsPage() {
     }
   };
 
+  const handlePriorityChange = async (itemId: string | number, nextPriority: string) => {
+    setWorkItems((prev) =>
+      prev.map((item) => {
+        if (String(item.id) === String(itemId)) {
+          return { ...item, priority: nextPriority as any };
+        }
+        return item;
+      })
+    );
+
+    try {
+      await workItemService.update(itemId, { priority: nextPriority as WorkItem["priority"] });
+      toast.success(`Prioridad cambiada a "${nextPriority}"`);
+    } catch (err: any) {
+      toast.error("No se pudo actualizar la prioridad");
+      loadData();
+    }
+  };
+
   const handleDeleteItem = async (itemId: string | number) => {
     try {
       await workItemService.delete(itemId);
@@ -380,14 +410,18 @@ export default function ProjectWorkItemsPage() {
     if (!over) return;
 
     const itemId = String(active.id);
-    const targetStateId = String(over.id);
+    const targetColumnId = String(over.id);
 
     const currentItem = workItems.find((w) => String(w.id) === itemId);
-    if (!currentItem || String(currentItem.state?.id) === targetStateId) {
-      return;
-    }
+    if (!currentItem) return;
 
-    handleStateChange(itemId, targetStateId);
+    if (groupBy === "state") {
+      if (String(currentItem.state?.id) === targetColumnId) return;
+      handleStateChange(itemId, targetColumnId);
+    } else {
+      if (currentItem.priority === targetColumnId) return;
+      handlePriorityChange(itemId, targetColumnId);
+    }
   };
 
   const handleOpenDetail = (item: WorkItem) => {
@@ -423,6 +457,33 @@ export default function ProjectWorkItemsPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Saved Views Application & Reset
+  const handleApplyView = (view: SavedView) => {
+    if (view.display_filters?.layout) {
+      setViewLayout(view.display_filters.layout);
+    }
+    if (view.display_filters?.group_by) {
+      setGroupBy(view.display_filters.group_by);
+    }
+    if (view.filters?.priority !== undefined) {
+      setPriorityFilter(view.filters.priority || "ALL");
+    }
+    if (view.filters?.type_id !== undefined) {
+      setTypeFilter(view.filters.type_id || "ALL");
+    }
+    if (view.filters?.search !== undefined) {
+      setSearch(view.filters.search || "");
+    }
+  };
+
+  const handleResetView = () => {
+    setViewLayout("kanban");
+    setGroupBy("state");
+    setPriorityFilter("ALL");
+    setTypeFilter("ALL");
+    setSearch("");
   };
 
   const estimateSystem = project?.estimate_system || "FIBONACCI";
@@ -474,6 +535,18 @@ export default function ProjectWorkItemsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Saved Views Bar */}
+          <SavedViewsBar
+            projectId={projectId}
+            currentLayout={viewLayout}
+            currentGroupBy={groupBy}
+            currentPriority={priorityFilter}
+            currentType={typeFilter}
+            currentSearch={search}
+            onApplyView={handleApplyView}
+            onResetView={handleResetView}
+          />
+
           <Button
             onClick={() => setOpenCreateModal(true)}
             className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
@@ -484,8 +557,8 @@ export default function ProjectWorkItemsPage() {
         </div>
       </div>
 
-      {/* Control bar: Search, Filter, Layout Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+      {/* Control bar: Search, Filter, Display Options & Layout Switcher */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
@@ -525,16 +598,33 @@ export default function ProjectWorkItemsPage() {
               <SelectItem value="NONE">Ninguna</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Group By Selector (Visible in Kanban & List) */}
+          {(viewLayout === "kanban" || viewLayout === "list") && (
+            <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3">
+              <span className="text-xs text-slate-400 font-medium">Agrupar:</span>
+              <Select value={groupBy} onValueChange={(val) => setGroupBy(val as "state" | "priority")}>
+                <SelectTrigger className="w-[115px] h-9 text-xs bg-slate-50 border-slate-200 font-medium">
+                  <Layers className="size-3 mr-1 text-slate-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="state">Por Estado</SelectItem>
+                  <SelectItem value="priority">Por Prioridad</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
-        {/* View Switcher: List vs Kanban */}
+        {/* 4 Layouts Switcher: Kanban, Lista, Calendario, Gantt */}
         <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
           <button
             type="button"
-            onClick={() => setViewMode("kanban")}
+            onClick={() => setViewLayout("kanban")}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-              viewMode === "kanban"
+              viewLayout === "kanban"
                 ? "bg-white text-indigo-600 shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             )}
@@ -544,10 +634,10 @@ export default function ProjectWorkItemsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setViewMode("list")}
+            onClick={() => setViewLayout("list")}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-              viewMode === "list"
+              viewLayout === "list"
                 ? "bg-white text-indigo-600 shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             )}
@@ -555,36 +645,85 @@ export default function ProjectWorkItemsPage() {
             <ListIcon className="size-3.5" />
             <span>Lista</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setViewLayout("calendar")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+              viewLayout === "calendar"
+                ? "bg-white text-indigo-600 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <CalendarIcon className="size-3.5" />
+            <span>Calendario</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewLayout("gantt")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+              viewLayout === "gantt"
+                ? "bg-white text-indigo-600 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <GanttChart className="size-3.5" />
+            <span>Gantt</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Work Items Container */}
-      {viewMode === "kanban" ? (
+      {/* Main Work Items Container: Render according to viewLayout */}
+      {viewLayout === "kanban" && (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-6 pt-1">
-            {states.map((state) => {
-              const columnItems = filteredItems.filter(
-                (item) => String(item.state?.id) === String(state.id)
-              );
-              return (
-                <KanbanColumn
-                  key={state.id}
-                  state={state}
-                  items={columnItems}
-                  states={states}
-                  onStateChange={handleStateChange}
-                  onDelete={handleDeleteItem}
-                  onCardClick={handleOpenDetail}
-                />
-              );
-            })}
+            {groupBy === "state"
+              ? states.map((state) => {
+                  const columnItems = filteredItems.filter(
+                    (item) => String(item.state?.id) === String(state.id)
+                  );
+                  return (
+                    <KanbanColumn
+                      key={state.id}
+                      columnId={String(state.id)}
+                      title={state.name}
+                      color={state.color}
+                      items={columnItems}
+                      states={states}
+                      onStateChange={handleStateChange}
+                      onDelete={handleDeleteItem}
+                      onCardClick={handleOpenDetail}
+                    />
+                  );
+                })
+              : PRIORITY_GROUPS.map((group) => {
+                  const columnItems = filteredItems.filter(
+                    (item) => item.priority === group.id
+                  );
+                  return (
+                    <KanbanColumn
+                      key={group.id}
+                      columnId={group.id}
+                      title={group.name}
+                      color={group.color}
+                      items={columnItems}
+                      states={states}
+                      onStateChange={handleStateChange}
+                      onDelete={handleDeleteItem}
+                      onCardClick={handleOpenDetail}
+                    />
+                  );
+                })}
           </div>
         </DndContext>
-      ) : (
+      )}
+
+      {viewLayout === "list" && (
         /* List View */
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <table className="w-full text-left text-sm">
@@ -596,7 +735,7 @@ export default function ProjectWorkItemsPage() {
                 <th className="px-4 py-3 w-36">Estado</th>
                 <th className="px-4 py-3 w-28">Prioridad</th>
                 <th className="px-4 py-3 w-28">Estimación</th>
-                <th className="px-4 py-3 w-32">Fecha</th>
+                <th className="px-4 py-3 w-32">Fecha Límite</th>
                 <th className="px-4 py-3 w-16 text-right">Acciones</th>
               </tr>
             </thead>
@@ -672,8 +811,8 @@ export default function ProjectWorkItemsPage() {
                       <td className="px-4 py-3 text-xs font-semibold text-slate-600">
                         {item.estimate_value || (item.estimate_points ? `${item.estimate_points} pts` : "-")}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        {item.target_date || "-"}
                       </td>
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -692,6 +831,14 @@ export default function ProjectWorkItemsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewLayout === "calendar" && (
+        <CalendarView items={filteredItems} onCardClick={handleOpenDetail} />
+      )}
+
+      {viewLayout === "gantt" && (
+        <GanttView items={filteredItems} onCardClick={handleOpenDetail} />
       )}
 
       {/* Modal Crear Work Item */}

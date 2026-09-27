@@ -131,6 +131,26 @@ export interface WorkItemRelation {
   };
 }
 
+export interface SavedView {
+  id: string | number;
+  name: string;
+  description?: string | null;
+  filters?: {
+    priority?: string;
+    type_id?: string;
+    search?: string;
+    [key: string]: any;
+  };
+  display_filters?: {
+    layout?: 'kanban' | 'list' | 'calendar' | 'gantt';
+    group_by?: 'state' | 'priority';
+    [key: string]: any;
+  };
+  project_id?: string | number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Project {
   id: string | number;
   name: string;

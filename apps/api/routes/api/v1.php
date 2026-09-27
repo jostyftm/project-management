@@ -5,10 +5,12 @@ use App\Http\Controllers\Api\v1\Cycle\CycleController;
 use App\Http\Controllers\Api\v1\Module\ModuleController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
 use App\Http\Controllers\Api\v1\User\UserController;
+use App\Http\Controllers\Api\v1\View\ViewController;
 use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemRelationController;
 use App\Http\Controllers\Api\v1\WorkItemType\WorkItemTypeController;
+use App\Http\Controllers\Api\v1\YourWork\YourWorkController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,9 +41,19 @@ Route::middleware(['auth.sdi'])->group(function () {
 
     // Rutas con ámbito de Workspace activo (Header X-Workspace-Id)
     Route::middleware(['workspace'])->group(function () {
+        // Your Work (Panel personal por pestañas: asignadas, creadas, borradores)
+        Route::get('your-work', [YourWorkController::class, 'index']);
+
         // Tipos globales de Work Items
         Route::get('work-item-types', [WorkItemTypeController::class, 'index']);
         Route::post('work-item-types', [WorkItemTypeController::class, 'store']);
+
+        // Vistas a nivel de Workspace (solo para el creador)
+        Route::get('views', [ViewController::class, 'index']);
+        Route::post('views', [ViewController::class, 'store']);
+        Route::get('views/{view}', [ViewController::class, 'show']);
+        Route::put('views/{view}', [ViewController::class, 'update']);
+        Route::delete('views/{view}', [ViewController::class, 'destroy']);
 
         // Proyectos
         Route::apiResource('projects', ProjectController::class);
@@ -49,6 +61,10 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::post('projects/{project}/states', [ProjectController::class, 'storeState']);
         Route::get('projects/{project}/labels', [ProjectController::class, 'labels']);
         Route::post('projects/{project}/labels', [ProjectController::class, 'storeLabel']);
+
+        // Vistas a nivel de Proyecto (solo para el creador)
+        Route::get('projects/{project}/views', [ViewController::class, 'index']);
+        Route::post('projects/{project}/views', [ViewController::class, 'store']);
 
         // Tipos por Proyecto
         Route::get('projects/{project}/work-item-types', [WorkItemTypeController::class, 'index']);

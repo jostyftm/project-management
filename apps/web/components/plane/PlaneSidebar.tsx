@@ -29,6 +29,7 @@ import {
   Boxes,
   Sliders,
   ArrowLeft,
+  UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,27 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent className="p-3 space-y-4">
+        {/* Workspace Level Navigation */}
+        <SidebarGroup className="p-0">
+          <SidebarMenu className="space-y-0.5">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/your-work"}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                  pathname === "/your-work" && "bg-indigo-50 text-indigo-700 font-semibold"
+                )}
+              >
+                <Link href="/your-work">
+                  <UserCheck className="size-4 shrink-0 text-slate-500" />
+                  <span>Your Work</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
         {/* If inside an active project, display project workspace navigation */}
         {activeProjectId && activeProjectId !== "new" ? (
           <SidebarGroup>
