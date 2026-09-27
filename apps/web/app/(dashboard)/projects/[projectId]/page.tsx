@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
   useDraggable,
@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkItemDetailSheet } from "@/components/plane/WorkItemDetailSheet";
 import { WorkItemCreateModal } from "@/components/plane/work-items/WorkItemCreateModal";
+import { WorkItemViewMode } from "@/components/plane/work-items/WorkItemViewModeSwitcher";
 import { CalendarView } from "@/components/plane/views/CalendarView";
 import { GanttView } from "@/components/plane/views/GanttView";
 import { SavedViewsBar } from "@/components/plane/views/SavedViewsBar";
@@ -305,6 +306,7 @@ function KanbanColumn({
 
 export default function ProjectWorkItemsPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = String(params.projectId);
 
   const [project, setProject] = useState<Project | null>(null);
@@ -320,15 +322,53 @@ export default function ProjectWorkItemsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
-  // Create Modal
+  // Create Modal & View Mode
   const [openCreateModal, setOpenCreateModal] = useState(false);
+  const [createViewMode, setCreateViewMode] = useState<WorkItemViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_create_view_mode") as WorkItemViewMode;
+      if (saved === "modal" || saved === "sheet" || saved === "page") return saved;
+    }
+    return "modal";
+  });
 
   // Active Drag Item for DragOverlay
   const [activeDragItem, setActiveDragItem] = useState<WorkItem | null>(null);
 
-  // Work Item Detail Sheet
+  // Work Item Detail Sheet & View Mode
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [detailViewMode, setDetailViewMode] = useState<WorkItemViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_detail_view_mode") as WorkItemViewMode;
+      if (saved === "sheet" || saved === "modal" || saved === "page") return saved;
+    }
+    return "sheet";
+  });
+
+  // Check URL parameters for deep-linking
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const openItemId = sp.get("openItem");
+      const dMode = sp.get("detailMode") as WorkItemViewMode;
+      if (openItemId) {
+        setSelectedItemId(openItemId);
+        if (dMode === "sheet" || dMode === "modal") {
+          setDetailViewMode(dMode);
+        }
+        setDetailSheetOpen(true);
+      }
+      const openCreate = sp.get("openCreate");
+      const cMode = sp.get("createMode") as WorkItemViewMode;
+      if (openCreate === "true") {
+        if (cMode === "modal" || cMode === "sheet") {
+          setCreateViewMode(cMode);
+        }
+        setOpenCreateModal(true);
+      }
+    }
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -443,6 +483,20 @@ export default function ProjectWorkItemsPage() {
   };
 
   const handleOpenDetail = (item: WorkItem) => {
+    let preferredMode: WorkItemViewMode = "sheet";
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_detail_view_mode") as WorkItemViewMode;
+      if (saved === "sheet" || saved === "modal" || saved === "page") {
+        preferredMode = saved;
+      }
+    }
+
+    if (preferredMode === "page" && project) {
+      router.push(`/projects/${project.id}/work-items/${item.id}`);
+      return;
+    }
+
+    setDetailViewMode(preferredMode);
     setSelectedItemId(item.id);
     setDetailSheetOpen(true);
   };
@@ -536,8 +590,22 @@ export default function ProjectWorkItemsPage() {
           />
 
           <Button
-            onClick={() => setOpenCreateModal(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+            onClick={() => {
+              let preferredMode: WorkItemViewMode = "modal";
+              if (typeof window !== "undefined") {
+                const saved = localStorage.getItem("plane_work_item_create_view_mode") as WorkItemViewMode;
+                if (saved === "modal" || saved === "sheet" || saved === "page") {
+                  preferredMode = saved;
+                }
+              }
+              if (preferredMode === "page" && project) {
+                router.push(`/projects/${project.id}/work-items/new`);
+                return;
+              }
+              setCreateViewMode(preferredMode);
+              setOpenCreateModal(true);
+            }}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm cursor-pointer"
           >
             <Plus className="mr-2 size-4" />
             Crear Work Item
@@ -842,13 +910,15 @@ export default function ProjectWorkItemsPage() {
         states={states}
         types={types}
         availableItems={workItems}
+        viewMode={createViewMode}
+        onViewModeChange={setCreateViewMode}
         onCreated={(created) => {
           setWorkItems((prev) => [created, ...prev]);
           loadData(true);
         }}
       />
 
-      {/* Work Item Detail Sheet */}
+      {/* Work Item Detail Sheet / Modal */}
       <WorkItemDetailSheet
         workItemId={selectedItemId}
         project={project}
@@ -856,6 +926,8 @@ export default function ProjectWorkItemsPage() {
         availableItems={workItems}
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
+        viewMode={detailViewMode}
+        onViewModeChange={setDetailViewMode}
         onUpdated={(updatedItem?: WorkItem) => {
           if (updatedItem) {
             setWorkItems((prev) =>

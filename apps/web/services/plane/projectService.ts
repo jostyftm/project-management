@@ -70,6 +70,10 @@ export const projectService = {
     }));
   },
 
+  listStates: async (projectId: string | number) => {
+    return projectService.getStates(projectId);
+  },
+
   createState: async (projectId: string | number, payload: { name: string; color: string; group: string; sequence?: number }) => {
     const res = await httpRequestService<{ data: JsonApiItem<State> }>({
       url: `${API_BASE_URL}/projects/${projectId}/states`,
@@ -91,6 +95,10 @@ export const projectService = {
       id: item.id,
       ...item.attributes,
     }));
+  },
+
+  listLabels: async (projectId: string | number) => {
+    return projectService.getLabels(projectId);
   },
 
   createLabel: async (projectId: string | number, payload: { name: string; color: string; description?: string }) => {

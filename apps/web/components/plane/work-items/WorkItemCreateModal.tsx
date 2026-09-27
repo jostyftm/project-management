@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
@@ -60,6 +66,10 @@ import { cycleService } from "@/services/plane/cycleService";
 import { moduleService } from "@/services/plane/moduleService";
 import { projectMemberService, ProjectMemberUser } from "@/services/plane/projectMemberService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
+import {
+  WorkItemViewModeSwitcher,
+  WorkItemViewMode,
+} from "@/components/plane/work-items/WorkItemViewModeSwitcher";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -75,8 +85,8 @@ const PRIORITY_OPTIONS = [
 ];
 
 interface WorkItemCreateModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   project: Project | null;
   projects?: Project[];
   states?: State[];
@@ -84,10 +94,12 @@ interface WorkItemCreateModalProps {
   availableItems?: WorkItem[];
   onCreated?: (item: WorkItem) => void;
   onSelectProject?: (projectId: string | number) => void;
+  viewMode?: WorkItemViewMode;
+  onViewModeChange?: (mode: WorkItemViewMode) => void;
 }
 
 export function WorkItemCreateModal({
-  open,
+  open = true,
   onOpenChange,
   project,
   projects = [],
@@ -96,7 +108,41 @@ export function WorkItemCreateModal({
   availableItems: initialAvailableItems = [],
   onCreated,
   onSelectProject,
+  viewMode: propViewMode,
+  onViewModeChange,
 }: WorkItemCreateModalProps) {
+  const router = useRouter();
+
+  // View Mode preference (default to prop, or localStorage, or 'modal')
+  const [internalMode, setInternalMode] = useState<WorkItemViewMode>(() => {
+    if (propViewMode) return propViewMode;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_create_view_mode") as WorkItemViewMode;
+      if (saved === "modal" || saved === "sheet" || saved === "page") return saved;
+    }
+    return "modal";
+  });
+
+  const activeMode = propViewMode || internalMode;
+
+  const handleModeSwitch = (newMode: WorkItemViewMode) => {
+    setInternalMode(newMode);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("plane_work_item_create_view_mode", newMode);
+      } catch {}
+    }
+    if (onViewModeChange) {
+      onViewModeChange(newMode);
+    }
+    if (newMode === "page" && currentProject) {
+      if (onOpenChange) onOpenChange(false);
+      router.push(`/projects/${currentProject.id}/work-items/new`);
+    } else if (activeMode === "page" && (newMode === "modal" || newMode === "sheet") && currentProject) {
+      router.push(`/projects/${currentProject.id}?openCreate=true&createMode=${newMode}`);
+    }
+  };
+
   // Active Project Context
   const [currentProject, setCurrentProject] = useState<Project | null>(project);
   const [projectList, setProjectList] = useState<Project[]>(projects);
@@ -241,7 +287,10 @@ export function WorkItemCreateModal({
 
   const handleDiscard = () => {
     resetForm();
-    onOpenChange(false);
+    if (onOpenChange) onOpenChange(false);
+    if (activeMode === "page" && currentProject) {
+      router.push(`/projects/${currentProject.id}`);
+    }
   };
 
   const handleSwitchProject = (targetProject: Project) => {
@@ -313,7 +362,10 @@ export function WorkItemCreateModal({
         resetForm();
       } else {
         resetForm();
-        onOpenChange(false);
+        if (onOpenChange) onOpenChange(false);
+        if (activeMode === "page" && currentProject) {
+          router.push(`/projects/${currentProject.id}`);
+        }
       }
     } catch (err: any) {
       toast.error(err?.message || "Error al crear el elemento de trabajo");
@@ -342,20 +394,21 @@ export function WorkItemCreateModal({
 
   const estimateSystem = currentProject?.estimate_system || "FIBONACCI";
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-[800px] w-full p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-visible"
-        showCloseButton={true}
-      >
-        <DialogHeader className="p-0 border-b-0">
-          {/* Header Title */}
-          <DialogTitle className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Crear nuevo elemento de trabajo
-          </DialogTitle>
+  const formContent = (
+    <div className="space-y-4">
+      {/* Header Title & View Mode Switcher */}
+      <div className="flex items-center justify-between gap-2 pb-1">
+        <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+          Crear nuevo elemento de trabajo
+        </h2>
+        <WorkItemViewModeSwitcher
+          currentMode={activeMode}
+          onChangeMode={handleModeSwitch}
+        />
+      </div>
 
-          {/* Breadcrumbs Row with interactive project and type switchers */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-2 text-sm text-slate-600 dark:text-slate-400">
+      {/* Breadcrumbs Row with interactive project and type switchers */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-1 text-sm text-slate-600 dark:text-slate-400">
             {/* Project Switcher */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -420,7 +473,6 @@ export function WorkItemCreateModal({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </DialogHeader>
 
         {/* Form Body */}
         <form onSubmit={handleSave} className="space-y-4 pt-2">
@@ -1024,6 +1076,36 @@ export function WorkItemCreateModal({
             </Button>
           </div>
         </form>
+    </div>
+  );
+
+  if (activeMode === "page") {
+    return (
+      <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        {formContent}
+      </div>
+    );
+  }
+
+  if (activeMode === "sheet") {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6 space-y-6">
+          <SheetTitle className="sr-only">Crear nuevo elemento de trabajo</SheetTitle>
+          {formContent}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-w-[800px] w-full p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-visible"
+        showCloseButton={true}
+      >
+        <DialogTitle className="sr-only">Crear nuevo elemento de trabajo</DialogTitle>
+        {formContent}
       </DialogContent>
     </Dialog>
   );
