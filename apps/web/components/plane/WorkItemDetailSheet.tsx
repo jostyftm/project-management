@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -81,11 +81,23 @@ export function WorkItemDetailSheet({
   const [relationType, setRelationType] = useState<string>("BLOCKS");
   const [isAddingRelation, setIsAddingRelation] = useState(false);
 
+  const loadedItemIdRef = useRef<string | number | null>(null);
+
   useEffect(() => {
-    if (!workItemId || !open) return;
+    if (!open) {
+      setItem(null);
+      loadedItemIdRef.current = null;
+      return;
+    }
+
+    if (!workItemId) return;
+
+    const isInitialLoad = loadedItemIdRef.current !== workItemId || !item;
 
     async function loadItem() {
-      setIsLoading(true);
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
       try {
         const [itemData, typesData, cyclesData, modulesData, milestonesData, membersData] = await Promise.all([
           workItemService.get(workItemId!),
@@ -97,6 +109,7 @@ export function WorkItemDetailSheet({
         ]);
 
         setItem(itemData);
+        loadedItemIdRef.current = workItemId;
         setTypes(typesData);
         setCycles(cyclesData);
         setModules(modulesData);
@@ -133,12 +146,14 @@ export function WorkItemDetailSheet({
       } catch {
         toast.error("Error al cargar los detalles del work item");
       } finally {
-        setIsLoading(false);
+        if (isInitialLoad) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadItem();
-  }, [workItemId, open, project]);
+  }, [workItemId, open, project?.id]);
 
   const handleUpdateField = async (payload: Partial<WorkItem> & Record<string, any>) => {
     if (!item) return;
@@ -215,7 +230,7 @@ export function WorkItemDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6 space-y-6">
-        {isLoading || !item ? (
+        {!item ? (
           <div className="flex flex-col items-center justify-center py-24">
             <Loader2 className="size-8 text-indigo-600 animate-spin mb-3" />
             <p className="text-sm text-slate-500">Cargando detalles...</p>
@@ -290,11 +305,11 @@ export function WorkItemDetailSheet({
               </div>
             </div>
 
-            {/* Quick Properties: 2 Columns of Horizontal Rows */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 text-xs">
+            {/* Quick Properties: 1 Column of Full-Width Horizontal Rows */}
+            <div className="flex flex-col gap-2 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 text-xs">
               {/* 1. Estado */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28">
                   Estado:
                 </span>
                 <Select
@@ -321,8 +336,8 @@ export function WorkItemDetailSheet({
               </div>
 
               {/* 2. Hito */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24 flex items-center gap-1">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1">
                   <Flag className="size-3 text-slate-400" /> Hito:
                 </span>
                 <Select
@@ -348,8 +363,8 @@ export function WorkItemDetailSheet({
               </div>
 
               {/* 3. Prioridad */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28">
                   Prioridad:
                 </span>
                 <Select
@@ -373,8 +388,8 @@ export function WorkItemDetailSheet({
               </div>
 
               {/* 4. Ciclo */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28">
                   Ciclo:
                 </span>
                 <Select
@@ -400,8 +415,8 @@ export function WorkItemDetailSheet({
               </div>
 
               {/* 5. Responsable */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24 flex items-center gap-1">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28 flex items-center gap-1">
                   <UserIcon className="size-3 text-slate-400" /> Responsable:
                 </span>
                 <Select
@@ -427,8 +442,8 @@ export function WorkItemDetailSheet({
               </div>
 
               {/* 6. Módulo */}
-              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
-                <span className="text-slate-500 font-medium shrink-0 w-24">
+              <div className="flex items-center justify-between gap-3 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-28">
                   Módulo:
                 </span>
                 <Select
