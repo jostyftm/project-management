@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -23,9 +23,12 @@ import {
   CheckSquare,
   Plus,
   LogOut,
-  Layers,
   ChevronRight,
   Hash,
+  Repeat,
+  Boxes,
+  Sliders,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,6 +48,17 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
     }
   }, [currentWorkspace, fetchProjects]);
 
+  // Extract active project ID from pathname (e.g., /projects/1, /projects/1/cycles)
+  const activeProjectId = useMemo(() => {
+    const match = pathname.match(/^\/projects\/([^\/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  const activeProject = useMemo(() => {
+    if (!activeProjectId) return null;
+    return projects.find((p) => String(p.id) === String(activeProjectId));
+  }, [projects, activeProjectId]);
+
   return (
     <Sidebar variant="inset" {...props} className="border-r border-slate-200 bg-white">
       <SidebarHeader className="p-3 border-b border-slate-100">
@@ -52,13 +66,107 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent className="p-3 space-y-4">
-        {/* Navigation Group */}
+        {/* If inside an active project, display project workspace navigation */}
+        {activeProjectId && activeProjectId !== "new" ? (
+          <SidebarGroup>
+            <div className="flex items-center gap-2 px-2 py-1 mb-2">
+              <Link href="/projects" className="text-slate-400 hover:text-slate-700">
+                <ArrowLeft className="size-3.5" />
+              </Link>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">
+                  {activeProject?.identifier || "PROJ"}
+                </span>
+                <span className="font-semibold text-xs text-slate-800 truncate">
+                  {activeProject?.name || "Proyecto"}
+                </span>
+              </div>
+            </div>
+
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}`}>
+                      <CheckSquare className="size-4 shrink-0 text-slate-500" />
+                      <span>Work Items</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/cycles`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/cycles` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/cycles`}>
+                      <Repeat className="size-4 shrink-0 text-slate-500" />
+                      <span>Ciclos (Sprints)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/modules`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/modules` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/modules`}>
+                      <Boxes className="size-4 shrink-0 text-slate-500" />
+                      <span>Módulos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === `/projects/${activeProjectId}/settings`}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname === `/projects/${activeProjectId}/settings` && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/settings`}>
+                      <Sliders className="size-4 shrink-0 text-slate-500" />
+                      <span>Configuración</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+
+        {/* General Projects Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-2">
-            General
-          </SidebarGroupLabel>
+          <div className="flex items-center justify-between px-2 mb-1">
+            <SidebarGroupLabel className="text-xs font-semibold text-slate-400 uppercase tracking-wider p-0">
+              Proyectos
+            </SidebarGroupLabel>
+            <Link href="/projects?new=true">
+              <Button variant="ghost" size="icon" className="size-5 text-slate-400 hover:text-slate-600">
+                <Plus className="size-3.5" />
+              </Button>
+            </Link>
+          </div>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
@@ -70,58 +178,37 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 >
                   <Link href="/projects">
                     <FolderKanban className="size-4 shrink-0" />
-                    <span>Proyectos</span>
+                    <span>Todos los Proyectos</span>
                     <span className="ml-auto text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
                       {projects.length}
                     </span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
-        {/* Projects List */}
-        <SidebarGroup>
-          <div className="flex items-center justify-between px-2 mb-1">
-            <SidebarGroupLabel className="text-xs font-semibold text-slate-400 uppercase tracking-wider p-0">
-              Tus Proyectos
-            </SidebarGroupLabel>
-            <Link href="/projects?new=true">
-              <Button variant="ghost" size="icon" className="size-5 text-slate-400 hover:text-slate-600">
-                <Plus className="size-3.5" />
-              </Button>
-            </Link>
-          </div>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-0.5">
-              {projects.length === 0 ? (
-                <p className="text-xs text-slate-400 px-2.5 py-2 italic">Sin proyectos aún</p>
-              ) : (
-                projects.map((proj) => {
-                  const isProjActive = pathname.startsWith(`/projects/${proj.id}`);
-                  return (
-                    <SidebarMenuItem key={proj.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isProjActive}
-                        className={cn(
-                          "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors",
-                          isProjActive && "bg-indigo-50/80 text-indigo-700 font-medium"
-                        )}
-                      >
-                        <Link href={`/projects/${proj.id}`}>
-                          <div className="flex size-5 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">
-                            {proj.identifier || <Hash className="size-3" />}
-                          </div>
-                          <span className="truncate flex-1">{proj.name}</span>
-                          <ChevronRight className="size-3.5 text-slate-300 ml-auto" />
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })
-              )}
+              {projects.map((proj) => {
+                const isProjActive = String(proj.id) === String(activeProjectId);
+                return (
+                  <SidebarMenuItem key={proj.id}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isProjActive}
+                      className={cn(
+                        "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors",
+                        isProjActive && "bg-indigo-50/80 text-indigo-700 font-medium"
+                      )}
+                    >
+                      <Link href={`/projects/${proj.id}`}>
+                        <div className="flex size-5 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">
+                          {proj.identifier || <Hash className="size-3" />}
+                        </div>
+                        <span className="truncate flex-1">{proj.name}</span>
+                        <ChevronRight className="size-3.5 text-slate-300 ml-auto" />
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

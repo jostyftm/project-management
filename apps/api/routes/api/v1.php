@@ -1,10 +1,14 @@
 <?php
 
 use App\Http\Controllers\Api\v1\Auth\AuthController;
+use App\Http\Controllers\Api\v1\Cycle\CycleController;
+use App\Http\Controllers\Api\v1\Module\ModuleController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
 use App\Http\Controllers\Api\v1\User\UserController;
 use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemController;
+use App\Http\Controllers\Api\v1\WorkItem\WorkItemRelationController;
+use App\Http\Controllers\Api\v1\WorkItemType\WorkItemTypeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,12 +39,37 @@ Route::middleware(['auth.sdi'])->group(function () {
 
     // Rutas con ámbito de Workspace activo (Header X-Workspace-Id)
     Route::middleware(['workspace'])->group(function () {
+        // Tipos globales de Work Items
+        Route::get('work-item-types', [WorkItemTypeController::class, 'index']);
+        Route::post('work-item-types', [WorkItemTypeController::class, 'store']);
+
         // Proyectos
         Route::apiResource('projects', ProjectController::class);
         Route::get('projects/{project}/states', [ProjectController::class, 'states']);
         Route::post('projects/{project}/states', [ProjectController::class, 'storeState']);
         Route::get('projects/{project}/labels', [ProjectController::class, 'labels']);
         Route::post('projects/{project}/labels', [ProjectController::class, 'storeLabel']);
+
+        // Tipos por Proyecto
+        Route::get('projects/{project}/work-item-types', [WorkItemTypeController::class, 'index']);
+        Route::post('projects/{project}/work-item-types', [WorkItemTypeController::class, 'store']);
+
+        // Ciclos (Sprints)
+        Route::get('projects/{project}/cycles', [CycleController::class, 'index']);
+        Route::post('projects/{project}/cycles', [CycleController::class, 'store']);
+        Route::get('cycles/{cycle}', [CycleController::class, 'show']);
+        Route::put('cycles/{cycle}', [CycleController::class, 'update']);
+        Route::post('cycles/{cycle}/complete', [CycleController::class, 'complete']);
+        Route::get('cycles/{cycle}/analytics', [CycleController::class, 'analytics']);
+        Route::post('cycles/{cycle}/work-items', [CycleController::class, 'addWorkItems']);
+
+        // Módulos
+        Route::get('projects/{project}/modules', [ModuleController::class, 'index']);
+        Route::post('projects/{project}/modules', [ModuleController::class, 'store']);
+        Route::get('modules/{module}', [ModuleController::class, 'show']);
+        Route::put('modules/{module}', [ModuleController::class, 'update']);
+        Route::post('modules/{module}/work-items', [ModuleController::class, 'syncWorkItems']);
+        Route::get('modules/{module}/progress', [ModuleController::class, 'progress']);
 
         // Work Items por Proyecto
         Route::get('projects/{project}/work-items', [WorkItemController::class, 'index']);
@@ -50,5 +79,9 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::get('work-items/{work_item}', [WorkItemController::class, 'show']);
         Route::put('work-items/{work_item}', [WorkItemController::class, 'update']);
         Route::delete('work-items/{work_item}', [WorkItemController::class, 'destroy']);
+
+        // Relaciones entre Work Items
+        Route::post('work-items/{work_item}/relations', [WorkItemRelationController::class, 'store']);
+        Route::delete('work-items/relations/{relation}', [WorkItemRelationController::class, 'destroy']);
     });
 });

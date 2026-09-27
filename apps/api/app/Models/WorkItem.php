@@ -22,10 +22,12 @@ class WorkItem extends Model
         'title',
         'description_json',
         'state_id',
+        'type_id',
         'priority',
         'parent_id',
         'lead_id',
         'estimate_points',
+        'estimate_value',
         'start_date',
         'target_date',
         'is_draft',
@@ -92,5 +94,33 @@ class WorkItem extends Model
     public function labels(): BelongsToMany
     {
         return $this->belongsToMany(Label::class, 'work_item_labels');
+    }
+
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(WorkItemType::class, 'type_id');
+    }
+
+    public function cycles(): BelongsToMany
+    {
+        return $this->belongsToMany(Cycle::class, 'cycle_work_items')
+            ->using(CycleWorkItem::class)
+            ->withPivot(['status_at_completion', 'transferred_to_cycle_id'])
+            ->withTimestamps();
+    }
+
+    public function modules(): BelongsToMany
+    {
+        return $this->belongsToMany(Module::class, 'module_work_items');
+    }
+
+    public function outwardRelations(): HasMany
+    {
+        return $this->hasMany(WorkItemRelation::class, 'source_id');
+    }
+
+    public function inwardRelations(): HasMany
+    {
+        return $this->hasMany(WorkItemRelation::class, 'target_id');
     }
 }

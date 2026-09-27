@@ -1,0 +1,85 @@
+# ==========================================
+# Etapa 1: Base (Debian Bookworm para estabilidad con OCI8 y Kafka)
+# ==========================================
+FROM php:8.4-fpm-bookworm AS base
+
+# Instalar Nginx, Supervisor y dependencias esenciales (incluyendo libaio1 para Oracle)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    supervisor \
+    git \
+    unzip \
+    curl \
+    libaio1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Descargar el script de instalación de extensiones PHP (mlocati)
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+RUN chmod +x /usr/local/bin/install-php-extensions
+
+# Instalar extensiones (mlocati descarga e instala Oracle Instant Client automáticamente)
+RUN install-php-extensions \
+    pdo_pgsql \
+    pgsql \
+    pdo_mysql \
+    gd \
+    zip \
+    bcmath \
+    pcntl \
+    opcache \
+    redis \
+    rdkafka \
+    opentelemetry \
+    oci8 \
+    pdo_oci
+
+# Configurar OPcache para DESARROLLO (validate_timestamps=1 permite recargar cambios)
+RUN echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.jit=tracing\nopcache.jit_buffer_size=128M\nopcache.validate_timestamps=1" > /usr/local/etc/php/conf.d/opcache-recommended.ini
+
+# ==========================================
+# Etapa 2: Build (Dependencias de Desarrollo)
+# ==========================================
+FROM base AS build
+
+# Copiar Composer desde la imagen oficial
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+# Copiar archivos de dependencias para aprovechar el caché de capas
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts --no-autoloader --prefer-dist --ignore-platform-reqs
+
+# Copiar el resto de la aplicación
+COPY . .
+
+# Generar el autoloader optimizado
+RUN composer dump-autoload --optimize
+
+# ==========================================
+# Etapa 3: Entorno Final (Development)
+# ==========================================
+FROM base AS development
+
+WORKDIR /var/www/html
+
+# Copiar la aplicación compilada desde la etapa de build
+COPY --from=build /var/www/html /var/www/html
+
+# Crear y asegurar directorios de Laravel con permisos correctos
+RUN mkdir -p storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
+
+# Copiar configuraciones de Nginx, Supervisor y PHP
+COPY ./deploy/dev/nginx.conf /etc/nginx/nginx.conf
+COPY ./deploy/dev/supervisord.conf /etc/supervisord.conf
+COPY ./deploy/dev/php.ini /usr/local/etc/php/conf.d/99-custom-limits.ini
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]

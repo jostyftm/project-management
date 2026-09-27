@@ -1,0 +1,16 @@
+services:
+  project_managment_dev:
+    build:
+      context: "."
+      dockerfile: ./deploy/dev/Dockerfile.dev
+    container_name: project_managment_dev
+    ports:
+      - "${APP_PORT:-8087}:80"
+    env_file:
+      - ./.env
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true

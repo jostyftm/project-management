@@ -24,6 +24,7 @@ class Project extends Model
         'is_archived',
         'is_public',
         'lead_id',
+        'estimate_system',
     ];
 
     protected function casts(): array
@@ -74,5 +75,20 @@ class Project extends Model
     public function workItems(): HasMany
     {
         return $this->hasMany(WorkItem::class);
+    }
+
+    public function cycles(): HasMany
+    {
+        return $this->hasMany(Cycle::class);
+    }
+
+    public function modules(): HasMany
+    {
+        return $this->hasMany(Module::class);
+    }
+
+    public function workItemTypes(): HasMany
+    {
+        return $this->hasMany(WorkItemType::class);
     }
 }

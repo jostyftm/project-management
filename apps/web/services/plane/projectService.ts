@@ -47,6 +47,18 @@ export const projectService = {
     };
   },
 
+  update: async (id: string | number, payload: Partial<Project>) => {
+    const res = await httpRequestService<{ data: JsonApiItem<Project> }>({
+      url: `${API_BASE_URL}/projects/${id}`,
+      method: "PUT",
+      data: payload,
+    });
+    return {
+      id: res.data.id,
+      ...res.data.attributes,
+    };
+  },
+
   getStates: async (projectId: string | number) => {
     const res = await httpRequestService<{ data: JsonApiItem<State>[] }>({
       url: `${API_BASE_URL}/projects/${projectId}/states`,

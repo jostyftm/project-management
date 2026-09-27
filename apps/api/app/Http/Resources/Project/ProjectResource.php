@@ -19,6 +19,7 @@ class ProjectResource extends JsonResource
                 'icon' => $this->icon,
                 'is_archived' => $this->is_archived,
                 'is_public' => $this->is_public,
+                'estimate_system' => $this->estimate_system ?? 'FIBONACCI',
                 'created_at' => $this->created_at?->toISOString(),
                 'updated_at' => $this->updated_at?->toISOString(),
             ],

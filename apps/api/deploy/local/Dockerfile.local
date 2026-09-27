@@ -1,0 +1,77 @@
+FROM php:8.4-cli-bookworm
+
+LABEL maintainer="Taylor Otwell"
+
+ARG WWWGROUP
+ARG NODE_VERSION=24
+ARG MYSQL_CLIENT="mariadb-client"
+ARG POSTGRES_VERSION=16
+
+WORKDIR /var/www/html
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+ENV LANG=C.UTF-8
+ENV SUPERVISOR_PHP_COMMAND="/usr/local/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80"
+ENV SUPERVISOR_PHP_USER="sail"
+ENV PLAYWRIGHT_BROWSERS_PATH=0
+
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Instalar dependencias del sistema operativo base
+RUN apt-get update && apt-get upgrade -y \
+    && mkdir -p /etc/apt/keyrings \
+    && apt-get install -y gnupg gosu curl ca-certificates zip unzip git supervisor sqlite3 libcap2-bin libpng-dev python3 dnsutils librsvg2-bin fswatch ffmpeg nano build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar el script mágico de mlocati para compilar extensiones de PHP sin dolores de cabeza
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+RUN chmod +x /usr/local/bin/install-php-extensions
+
+# Instalar todas las extensiones de PHP requeridas (incluyendo OpenTelemetry, Swoole, OCI8 y PDO_OCI)
+RUN install-php-extensions \
+    gd pgsql pdo_pgsql pdo_sqlite pdo_mysql curl mongodb imap mbstring xml zip bcmath soap intl readline ldap msgpack igbinary redis swoole memcached pcov imagick xdebug opentelemetry oci8 pdo_oci
+
+# Instalar Composer
+RUN curl -sLS https://getcomposer.org/installer | php -- --install-dir=/usr/bin/ --filename=composer
+
+# Instalar Node.js, NPM, PNPM, Bun y Playwright
+RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_VERSION.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y nodejs \
+    && npm install -g npm \
+    && npm install -g pnpm \
+    && npm install -g bun \
+    && npx playwright install-deps \
+    && corepack enable \
+    && corepack prepare yarn@stable --activate \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar Cliente de PostgreSQL y MySQL
+RUN curl -sS https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/keyrings/pgdg.gpg >/dev/null \
+    && echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y $MYSQL_CLIENT postgresql-client-$POSTGRES_VERSION \
+    && apt-get -y autoremove \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Permisos de red para PHP
+RUN setcap "cap_net_bind_service=+ep" /usr/local/bin/php
+
+# Configurar el usuario Sail
+RUN groupadd --force -g $WWWGROUP sail
+RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail
+RUN git config --global --add safe.directory /var/www/html
+
+COPY start-container /usr/local/bin/start-container
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY php.ini /usr/local/etc/php/conf.d/99-sail.ini
+RUN chmod +x /usr/local/bin/start-container
+
+EXPOSE 80/tcp
+
+ENTRYPOINT ["start-container"]

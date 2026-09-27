@@ -15,13 +15,15 @@ import {
 } from "@dnd-kit/core";
 import { projectService } from "@/services/plane/projectService";
 import { workItemService } from "@/services/plane/workItemService";
-import { Project, State, WorkItem } from "@/types/plane-types";
+import { workItemTypeService } from "@/services/plane/workItemTypeService";
+import { Project, State, WorkItem, WorkItemType } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { WorkItemDetailSheet } from "@/components/plane/WorkItemDetailSheet";
 import {
   Kanban,
   List as ListIcon,
@@ -39,9 +41,14 @@ import {
   Trash2,
   Calendar,
   Layers,
+  Sparkles,
+  GitBranch,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const FIBONACCI_VALUES = ["0", "1", "2", "3", "5", "8", "13", "21"];
+const TSHIRT_VALUES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 // Priority helper
 const getPriorityBadge = (priority: string) => {
@@ -60,11 +67,18 @@ const getPriorityBadge = (priority: string) => {
 };
 
 // Draggable Work Item Card
-function KanbanCard({ item, states, onStateChange, onDelete }: {
+function KanbanCard({
+  item,
+  states,
+  onStateChange,
+  onDelete,
+  onClick,
+}: {
   item: WorkItem;
   states: State[];
   onStateChange: (itemId: string | number, newStateId: string | number) => void;
   onDelete: (itemId: string | number) => void;
+  onClick: (item: WorkItem) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(item.id),
@@ -86,15 +100,26 @@ function KanbanCard({ item, states, onStateChange, onDelete }: {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={() => onClick(item)}
       className={cn(
-        "group relative bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing",
+        "group relative bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer",
         isDragging && "opacity-60 ring-2 ring-indigo-500 shadow-lg"
       )}
     >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-          {item.identifier}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+            {item.identifier}
+          </span>
+          {item.type && (
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.2 rounded"
+              style={{ backgroundColor: `${item.type.color}15`, color: item.type.color }}
+            >
+              {item.type.name}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border", priorityInfo.color)}>
             {priorityInfo.label}
@@ -119,17 +144,29 @@ function KanbanCard({ item, states, onStateChange, onDelete }: {
 
       <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100">
         <div className="flex items-center gap-2">
-          {item.estimate_points ? (
+          {item.estimate_value ? (
+            <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
+              {item.estimate_value}
+            </span>
+          ) : item.estimate_points ? (
             <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
               {item.estimate_points} pts
             </span>
           ) : null}
-          {item.created_at ? (
-            <span className="text-[11px] text-slate-400">
-              {new Date(item.created_at).toLocaleDateString()}
+
+          {item.sub_items && item.sub_items.length > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+              <GitBranch className="size-2.5" />
+              {item.sub_items.length}
             </span>
-          ) : null}
+          )}
         </div>
+
+        {item.created_at && (
+          <span className="text-[11px] text-slate-400">
+            {new Date(item.created_at).toLocaleDateString()}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -142,12 +179,14 @@ function KanbanColumn({
   states,
   onStateChange,
   onDelete,
+  onCardClick,
 }: {
   state: State;
   items: WorkItem[];
   states: State[];
   onStateChange: (itemId: string | number, newStateId: string | number) => void;
   onDelete: (itemId: string | number) => void;
+  onCardClick: (item: WorkItem) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: String(state.id),
@@ -187,6 +226,7 @@ function KanbanColumn({
               states={states}
               onStateChange={onStateChange}
               onDelete={onDelete}
+              onClick={onCardClick}
             />
           ))
         )}
@@ -201,6 +241,7 @@ export default function ProjectWorkItemsPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [states, setStates] = useState<State[]>([]);
+  const [types, setTypes] = useState<WorkItemType[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -208,15 +249,21 @@ export default function ProjectWorkItemsPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
-  // Create Modal
+  // Create Modal & Draft Persistence
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPriority, setNewPriority] = useState<string>("NONE");
+  const [newTypeId, setNewTypeId] = useState<string>("");
   const [newStateId, setNewStateId] = useState<string>("");
-  const [newEstimate, setNewEstimate] = useState<string>("");
+  const [newEstimateValue, setNewEstimateValue] = useState<string>("");
+
+  // Work Item Detail Sheet
+  const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -226,20 +273,65 @@ export default function ProjectWorkItemsPage() {
     })
   );
 
+  // Restore draft from localStorage
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      const saved = localStorage.getItem(`plane_draft_${projectId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.title) setNewTitle(parsed.title);
+        if (parsed.description) setNewDescription(parsed.description);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [projectId]);
+
+  // Persist draft on change
+  const handleTitleChange = (val: string) => {
+    setNewTitle(val);
+    try {
+      localStorage.setItem(
+        `plane_draft_${projectId}`,
+        JSON.stringify({ title: val, description: newDescription })
+      );
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleDescChange = (val: string) => {
+    setNewDescription(val);
+    try {
+      localStorage.setItem(
+        `plane_draft_${projectId}`,
+        JSON.stringify({ title: newTitle, description: val })
+      );
+    } catch {
+      // Ignore
+    }
+  };
+
   const loadData = useCallback(async () => {
     if (!projectId) return;
     setIsLoading(true);
     try {
-      const [projData, statesData, itemsData] = await Promise.all([
+      const [projData, statesData, itemsData, typesData] = await Promise.all([
         projectService.get(projectId),
         projectService.getStates(projectId),
         workItemService.list(projectId),
+        workItemTypeService.list(projectId),
       ]);
       setProject(projData);
       setStates(statesData);
       setWorkItems(itemsData);
+      setTypes(typesData);
       if (statesData.length > 0 && !newStateId) {
         setNewStateId(String(statesData[0].id));
+      }
+      if (typesData.length > 0 && !newTypeId) {
+        setNewTypeId(String(typesData[0].id));
       }
     } catch (err: any) {
       toast.error("Error al cargar la información del proyecto");
@@ -253,7 +345,6 @@ export default function ProjectWorkItemsPage() {
   }, [loadData]);
 
   const handleStateChange = async (itemId: string | number, nextStateId: string | number) => {
-    // Optimistic UI update
     setWorkItems((prev) =>
       prev.map((item) => {
         if (String(item.id) === String(itemId)) {
@@ -299,6 +390,11 @@ export default function ProjectWorkItemsPage() {
     handleStateChange(itemId, targetStateId);
   };
 
+  const handleOpenDetail = (item: WorkItem) => {
+    setSelectedItemId(item.id);
+    setDetailSheetOpen(true);
+  };
+
   const handleCreateWorkItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
@@ -309,14 +405,17 @@ export default function ProjectWorkItemsPage() {
         title: newTitle.trim(),
         priority: newPriority as any,
         state_id: newStateId || (states[0]?.id ? String(states[0].id) : undefined),
-        estimate_points: newEstimate ? Number(newEstimate) : undefined,
+        type_id: newTypeId || undefined,
+        estimate_value: newEstimateValue || undefined,
+        estimate_points: newEstimateValue && !isNaN(Number(newEstimateValue)) ? Number(newEstimateValue) : undefined,
       });
 
-      toast.success("Work item creado");
+      toast.success("Work item creado exitosamente");
       setNewTitle("");
       setNewDescription("");
       setNewPriority("NONE");
-      setNewEstimate("");
+      setNewEstimateValue("");
+      localStorage.removeItem(`plane_draft_${projectId}`);
       setOpenCreateModal(false);
       loadData();
     } catch (err: any) {
@@ -326,6 +425,8 @@ export default function ProjectWorkItemsPage() {
     }
   };
 
+  const estimateSystem = project?.estimate_system || "FIBONACCI";
+
   // Filtered items
   const filteredItems = useMemo(() => {
     return workItems.filter((item) => {
@@ -333,9 +434,10 @@ export default function ProjectWorkItemsPage() {
         item.title.toLowerCase().includes(search.toLowerCase()) ||
         item.identifier.toLowerCase().includes(search.toLowerCase());
       const matchPriority = priorityFilter === "ALL" || item.priority === priorityFilter;
-      return matchSearch && matchPriority;
+      const matchType = typeFilter === "ALL" || String(item.type?.id) === typeFilter;
+      return matchSearch && matchPriority && matchType;
     });
-  }, [workItems, search, priorityFilter]);
+  }, [workItems, search, priorityFilter, typeFilter]);
 
   if (isLoading) {
     return (
@@ -384,8 +486,8 @@ export default function ProjectWorkItemsPage() {
 
       {/* Control bar: Search, Filter, Layout Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <Input
               placeholder="Buscar por título o ID..."
@@ -395,13 +497,27 @@ export default function ProjectWorkItemsPage() {
             />
           </div>
 
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[130px] h-9 text-xs bg-slate-50 border-slate-200">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos los tipos</SelectItem>
+              {types.map((t) => (
+                <SelectItem key={t.id} value={String(t.id)}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-            <SelectTrigger className="w-[140px] h-9 text-xs bg-slate-50 border-slate-200">
+            <SelectTrigger className="w-[130px] h-9 text-xs bg-slate-50 border-slate-200">
               <Filter className="mr-1.5 size-3.5 text-slate-400" />
               <SelectValue placeholder="Prioridad" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Todas</SelectItem>
+              <SelectItem value="ALL">Todas las prioridades</SelectItem>
               <SelectItem value="URGENT">Urgente</SelectItem>
               <SelectItem value="HIGH">Alta</SelectItem>
               <SelectItem value="MEDIUM">Media</SelectItem>
@@ -462,6 +578,7 @@ export default function ProjectWorkItemsPage() {
                   states={states}
                   onStateChange={handleStateChange}
                   onDelete={handleDeleteItem}
+                  onCardClick={handleOpenDetail}
                 />
               );
             })}
@@ -473,11 +590,12 @@ export default function ProjectWorkItemsPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
               <tr>
-                <th className="px-4 py-3 w-28">ID</th>
+                <th className="px-4 py-3 w-24">ID</th>
                 <th className="px-4 py-3">Título</th>
-                <th className="px-4 py-3 w-40">Estado</th>
-                <th className="px-4 py-3 w-32">Prioridad</th>
-                <th className="px-4 py-3 w-24">Puntos</th>
+                <th className="px-4 py-3 w-32">Tipo</th>
+                <th className="px-4 py-3 w-36">Estado</th>
+                <th className="px-4 py-3 w-28">Prioridad</th>
+                <th className="px-4 py-3 w-28">Estimación</th>
                 <th className="px-4 py-3 w-32">Fecha</th>
                 <th className="px-4 py-3 w-16 text-right">Acciones</th>
               </tr>
@@ -485,7 +603,7 @@ export default function ProjectWorkItemsPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
                     No hay work items que coincidan con los filtros.
                   </td>
                 </tr>
@@ -493,7 +611,11 @@ export default function ProjectWorkItemsPage() {
                 filteredItems.map((item) => {
                   const priority = getPriorityBadge(item.priority);
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr
+                      key={item.id}
+                      onClick={() => handleOpenDetail(item)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                    >
                       <td className="px-4 py-3 font-mono font-semibold text-xs text-slate-500">
                         {item.identifier}
                       </td>
@@ -501,6 +623,19 @@ export default function ProjectWorkItemsPage() {
                         {item.title}
                       </td>
                       <td className="px-4 py-3">
+                        {item.type && (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded"
+                            style={{
+                              backgroundColor: `${item.type.color}15`,
+                              color: item.type.color,
+                            }}
+                          >
+                            {item.type.name}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={String(item.state?.id || "")}
                           onValueChange={(val) => handleStateChange(item.id, val)}
@@ -535,12 +670,12 @@ export default function ProjectWorkItemsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                        {item.estimate_points ? `${item.estimate_points} pts` : "-"}
+                        {item.estimate_value || (item.estimate_points ? `${item.estimate_points} pts` : "-")}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-400">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : "-"}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -568,7 +703,7 @@ export default function ProjectWorkItemsPage() {
               Nuevo Work Item
             </DialogTitle>
             <DialogDescription>
-              Crea una tarea, incidencia o historia de usuario para {project?.name}.
+              Crea una tarea, bug, historia o épica para {project?.name}.
             </DialogDescription>
           </DialogHeader>
 
@@ -579,17 +714,33 @@ export default function ProjectWorkItemsPage() {
                 id="wi-title"
                 placeholder="Ej. Implementar autenticación OAuth"
                 value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
+                onChange={(e) => handleTitleChange(e.target.value)}
                 required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={newTypeId} onValueChange={setNewTypeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {types.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="wi-state">Estado</Label>
                 <Select value={newStateId} onValueChange={setNewStateId}>
                   <SelectTrigger id="wi-state">
-                    <SelectValue placeholder="Seleccionar estado" />
+                    <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
                     {states.map((st) => (
@@ -624,18 +775,61 @@ export default function ProjectWorkItemsPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="wi-estimate">Puntos de Estimación (Opcional)</Label>
-              <Input
-                id="wi-estimate"
-                type="number"
-                min={0}
-                max={100}
-                placeholder="Ej. 3"
-                value={newEstimate}
-                onChange={(e) => setNewEstimate(e.target.value)}
-              />
-            </div>
+            {/* Estimate Selector in Creation Modal */}
+            {estimateSystem !== "NONE" && (
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">
+                  Estimación ({estimateSystem === "TSHIRT" ? "Tallas de Camiseta" : "Puntos Fibonacci"})
+                </Label>
+                {estimateSystem === "FIBONACCI" && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {FIBONACCI_VALUES.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setNewEstimateValue(newEstimateValue === v ? "" : v)}
+                        className={cn(
+                          "px-2.5 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer",
+                          newEstimateValue === v
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                        )}
+                      >
+                        {v} pts
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {estimateSystem === "TSHIRT" && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {TSHIRT_VALUES.map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setNewEstimateValue(newEstimateValue === v ? "" : v)}
+                        className={cn(
+                          "px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer",
+                          newEstimateValue === v
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                        )}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {estimateSystem === "NUMERIC" && (
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Ej. 5"
+                    value={newEstimateValue}
+                    onChange={(e) => setNewEstimateValue(e.target.value)}
+                  />
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="wi-desc">Descripción (Opcional)</Label>
@@ -643,7 +837,7 @@ export default function ProjectWorkItemsPage() {
                 id="wi-desc"
                 placeholder="Detalles sobre los requerimientos, criterios de aceptación..."
                 value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
+                onChange={(e) => handleDescChange(e.target.value)}
                 rows={3}
               />
             </div>
@@ -660,6 +854,17 @@ export default function ProjectWorkItemsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Work Item Detail Sheet */}
+      <WorkItemDetailSheet
+        workItemId={selectedItemId}
+        project={project}
+        states={states}
+        availableItems={workItems}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+        onUpdated={loadData}
+      />
     </div>
   );
 }

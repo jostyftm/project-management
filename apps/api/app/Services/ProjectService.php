@@ -109,7 +109,10 @@ class ProjectService
                 ]));
             }
 
-            return $project->load(['states', 'labels', 'lead']);
+            // Crear tipos de work items por defecto (Tarea, Bug, Historia, Épica)
+            (new WorkItemTypeService)->seedDefaultTypes($project);
+
+            return $project->load(['states', 'labels', 'lead', 'workItemTypes']);
         });
     }
 

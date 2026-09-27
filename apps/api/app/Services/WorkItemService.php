@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\Project;
 use App\Models\State;
 use App\Models\WorkItem;
+use App\Models\WorkItemRelation;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -14,17 +15,29 @@ use Illuminate\Support\Facades\DB;
 class WorkItemService
 {
     /**
-     * Lista work items pertenecientes a un proyecto.
+     * Lista los work items de un proyecto con filtros y ordenamientos.
      */
     public function list(Request $request, Project $project): Collection|AbstractPaginator
     {
         return (new WorkItem)->search(
             request: $request,
-            relationships: ['state', 'assignees', 'labels', 'creator', 'project'],
-            callback: function ($builder) use ($project) {
+            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'subItems.state', 'cycles', 'modules'],
+            callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
+
+                if ($request->has('cycle_id')) {
+                    $builder->whereHas('cycles', function ($q) use ($request) {
+                        $q->where('cycles.id', $request->cycle_id);
+                    });
+                }
+
+                if ($request->has('module_id')) {
+                    $builder->whereHas('modules', function ($q) use ($request) {
+                        $q->where('modules.id', $request->module_id);
+                    });
+                }
             },
-            filters: ['title', 'state_id', 'priority', 'is_draft'],
+            filters: ['title', 'state_id', 'type_id', 'priority', 'is_draft'],
             sorts: ['created_at', 'sequence_id', 'priority', 'target_date']
         );
     }
@@ -38,7 +51,20 @@ class WorkItemService
             abort(404);
         }
 
-        return $workItem->load(['state', 'assignees', 'labels', 'creator', 'project', 'parent', 'subItems']);
+        return $workItem->load([
+            'state',
+            'type',
+            'assignees',
+            'labels',
+            'creator',
+            'project',
+            'parent',
+            'subItems.state',
+            'cycles',
+            'modules',
+            'outwardRelations.target.state',
+            'inwardRelations.source.state',
+        ]);
     }
 
     /**
@@ -74,9 +100,11 @@ class WorkItemService
                 'title' => $data['title'],
                 'description_json' => $data['description_json'] ?? null,
                 'state_id' => $stateId,
+                'type_id' => $data['type_id'] ?? null,
                 'priority' => $data['priority'] ?? 'NONE',
                 'parent_id' => $data['parent_id'] ?? null,
                 'estimate_points' => $data['estimate_points'] ?? null,
+                'estimate_value' => $data['estimate_value'] ?? null,
                 'start_date' => $data['start_date'] ?? null,
                 'target_date' => $data['target_date'] ?? null,
                 'is_draft' => $data['is_draft'] ?? false,
@@ -91,6 +119,14 @@ class WorkItemService
                 $workItem->labels()->sync($data['label_ids']);
             }
 
+            if (! empty($data['cycle_id'])) {
+                $workItem->cycles()->syncWithoutDetaching([$data['cycle_id']]);
+            }
+
+            if (! empty($data['module_id'])) {
+                $workItem->modules()->syncWithoutDetaching([$data['module_id']]);
+            }
+
             // Registrar auditoría de creación
             Activity::create([
                 'workspace_id' => $project->workspace_id,
@@ -102,7 +138,7 @@ class WorkItemService
                 'changes_diff' => ['title' => $workItem->title],
             ]);
 
-            return $workItem->load(['state', 'assignees', 'labels', 'creator', 'project']);
+            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'cycles', 'modules']);
         });
     }
 
@@ -131,6 +167,22 @@ class WorkItemService
                 $workItem->labels()->sync($data['label_ids'] ?? []);
             }
 
+            if (array_key_exists('cycle_id', $data)) {
+                if ($data['cycle_id']) {
+                    $workItem->cycles()->sync([$data['cycle_id']]);
+                } else {
+                    $workItem->cycles()->detach();
+                }
+            }
+
+            if (array_key_exists('module_id', $data)) {
+                if ($data['module_id']) {
+                    $workItem->modules()->sync([$data['module_id']]);
+                } else {
+                    $workItem->modules()->detach();
+                }
+            }
+
             $action = 'UPDATED';
             $changes = $workItem->getChanges();
 
@@ -138,41 +190,50 @@ class WorkItemService
                 $action = 'STATE_CHANGED';
             }
 
-            // Registrar auditoría de actualización
             Activity::create([
                 'workspace_id' => $workItem->workspace_id,
                 'project_id' => $workItem->project_id,
-                'actor_id' => $user?->id,
+                'actor_id' => $user->id,
                 'entity_type' => 'WORK_ITEM',
                 'entity_id' => $workItem->id,
                 'action' => $action,
                 'changes_diff' => $changes,
             ]);
 
-            return $workItem->load(['state', 'assignees', 'labels', 'creator', 'project']);
+            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'project', 'parent', 'subItems.state', 'cycles', 'modules']);
         });
     }
 
     /**
-     * Elimina el work item y registra auditoría.
+     * Añade una relación de dependencia entre work items.
      */
-    public function delete(WorkItem $workItem, Request $request): void
+    public function addRelation(WorkItem $source, int $targetId, string $relationType = 'RELATES_TO'): WorkItemRelation
+    {
+        return WorkItemRelation::create([
+            'workspace_id' => $source->workspace_id,
+            'source_id' => $source->id,
+            'target_id' => $targetId,
+            'relation_type' => $relationType,
+        ]);
+    }
+
+    /**
+     * Elimina una relación.
+     */
+    public function removeRelation(int $relationId): void
+    {
+        $relation = WorkItemRelation::findOrFail($relationId);
+        $relation->delete();
+    }
+
+    /**
+     * Elimina un work item.
+     */
+    public function delete(WorkItem $workItem): void
     {
         if (app()->has('current_workspace_id') && $workItem->workspace_id !== app('current_workspace_id')) {
             abort(404);
         }
-
-        $user = $request->user();
-
-        Activity::create([
-            'workspace_id' => $workItem->workspace_id,
-            'project_id' => $workItem->project_id,
-            'actor_id' => $user?->id,
-            'entity_type' => 'WORK_ITEM',
-            'entity_id' => $workItem->id,
-            'action' => 'DELETED',
-            'changes_diff' => ['title' => $workItem->title],
-        ]);
 
         $workItem->delete();
     }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "integration": "next dev --turbo -p 3009"
+    "integration": "next dev --turbo -p 3010"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
