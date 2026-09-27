@@ -218,15 +218,20 @@ class WorkItemService
                 $action = 'STATE_CHANGED';
             }
 
-            Activity::create([
-                'workspace_id' => $workItem->workspace_id,
-                'project_id' => $workItem->project_id,
-                'actor_id' => $user->id,
-                'entity_type' => 'WORK_ITEM',
-                'entity_id' => $workItem->id,
-                'action' => $action,
-                'changes_diff' => $changes,
-            ]);
+            // Excluir description_json y updated_at del historial de actividades
+            $relevantChanges = collect($changes)->except(['description_json', 'updated_at'])->all();
+
+            if (! empty($relevantChanges)) {
+                Activity::create([
+                    'workspace_id' => $workItem->workspace_id,
+                    'project_id' => $workItem->project_id,
+                    'actor_id' => $user->id,
+                    'entity_type' => 'WORK_ITEM',
+                    'entity_id' => $workItem->id,
+                    'action' => $action,
+                    'changes_diff' => $relevantChanges,
+                ]);
+            }
 
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'cycles', 'modules']);
         });

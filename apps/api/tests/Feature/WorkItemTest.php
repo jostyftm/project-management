@@ -152,3 +152,35 @@ it('prevents cross-tenant access to work items', function () {
 
     $response->assertStatus(404);
 });
+
+it('does not create activity log when only work item description is updated', function () {
+    $workItem = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 1,
+        'title' => 'Test Task Description',
+        'state_id' => $this->stateTodo->id,
+        'priority' => 'LOW',
+        'created_by' => $this->user->id,
+    ]);
+
+    $initialActivitiesCount = \App\Models\Activity::where('entity_id', $workItem->id)->count();
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->putJson("/api/v1/work-items/{$workItem->id}", [
+        'description_json' => [
+            'type' => 'doc',
+            'content' => [
+                ['type' => 'paragraph', 'text' => 'Updated content without activity noise'],
+            ],
+        ],
+    ]);
+
+    $response->assertStatus(200);
+
+    $newActivitiesCount = \App\Models\Activity::where('entity_id', $workItem->id)->count();
+    expect($newActivitiesCount)->toBe($initialActivitiesCount);
+});
+

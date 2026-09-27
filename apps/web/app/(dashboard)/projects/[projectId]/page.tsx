@@ -8,6 +8,8 @@ import {
   useDraggable,
   useDroppable,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
@@ -22,8 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WorkItemDetailSheet } from "@/components/plane/WorkItemDetailSheet";
+import { WorkItemCreateModal } from "@/components/plane/work-items/WorkItemCreateModal";
 import { CalendarView } from "@/components/plane/views/CalendarView";
 import { GanttView } from "@/components/plane/views/GanttView";
 import { SavedViewsBar } from "@/components/plane/views/SavedViewsBar";
@@ -86,31 +88,29 @@ function KanbanCard({
   onDelete: (itemId: string | number) => void;
   onClick: (item: WorkItem) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: String(item.id),
     data: { item },
   });
 
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: isDragging ? 50 : undefined,
-      }
-    : undefined;
-
   const priorityInfo = getPriorityBadge(item.priority);
+
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        className="h-28 rounded-lg border-2 border-dashed border-indigo-400 bg-indigo-50/40 opacity-40 transition-all pointer-events-none"
+      />
+    );
+  }
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...listeners}
       {...attributes}
       onClick={() => onClick(item)}
-      className={cn(
-        "group relative bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer",
-        isDragging && "opacity-60 ring-2 ring-indigo-500 shadow-lg"
-      )}
+      className="group relative bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all cursor-grab active:cursor-grabbing select-none"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5">
@@ -137,11 +137,69 @@ function KanbanCard({
               e.stopPropagation();
               onDelete(item.id);
             }}
-            className="size-5 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="size-5 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
           >
             <Trash2 className="size-3" />
           </Button>
         </div>
+      </div>
+
+      <h4 className="text-sm font-medium text-slate-900 line-clamp-2 mb-3">
+        {item.title}
+      </h4>
+
+      <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-2">
+          {item.estimate_value ? (
+            <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
+              {item.estimate_value}
+            </span>
+          ) : item.estimate_points ? (
+            <span className="bg-indigo-50 text-indigo-700 font-semibold px-1.5 py-0.5 rounded text-[10px]">
+              {item.estimate_points} pts
+            </span>
+          ) : null}
+
+          {item.sub_items && item.sub_items.length > 0 && (
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+              <GitBranch className="size-2.5" />
+              {item.sub_items.length}
+            </span>
+          )}
+        </div>
+
+        {item.created_at && (
+          <span className="text-[11px] text-slate-400">
+            {new Date(item.created_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KanbanCardPreview({ item }: { item: WorkItem }) {
+  const priorityInfo = getPriorityBadge(item.priority);
+
+  return (
+    <div className="w-[280px] bg-white border-2 border-indigo-500 rounded-lg p-3.5 shadow-2xl rotate-1 scale-105 pointer-events-none cursor-grabbing z-[9999]">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-mono font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+            {item.identifier}
+          </span>
+          {item.type && (
+            <span
+              className="text-[10px] font-bold px-1.5 py-0.2 rounded"
+              style={{ backgroundColor: `${item.type.color}15`, color: item.type.color }}
+            >
+              {item.type.name}
+            </span>
+          )}
+        </div>
+        <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border", priorityInfo.color)}>
+          {priorityInfo.label}
+        </span>
       </div>
 
       <h4 className="text-sm font-medium text-slate-900 line-clamp-2 mb-3">
@@ -262,15 +320,11 @@ export default function ProjectWorkItemsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
 
-  // Create Modal & Draft Persistence
+  // Create Modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newPriority, setNewPriority] = useState<string>("NONE");
-  const [newTypeId, setNewTypeId] = useState<string>("");
-  const [newStateId, setNewStateId] = useState<string>("");
-  const [newEstimateValue, setNewEstimateValue] = useState<string>("");
+
+  // Active Drag Item for DragOverlay
+  const [activeDragItem, setActiveDragItem] = useState<WorkItem | null>(null);
 
   // Work Item Detail Sheet
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
@@ -284,49 +338,9 @@ export default function ProjectWorkItemsPage() {
     })
   );
 
-  // Restore draft from localStorage
-  useEffect(() => {
+  const loadData = useCallback(async (silent = false) => {
     if (!projectId) return;
-    try {
-      const saved = localStorage.getItem(`plane_draft_${projectId}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.title) setNewTitle(parsed.title);
-        if (parsed.description) setNewDescription(parsed.description);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [projectId]);
-
-  // Persist draft on change
-  const handleTitleChange = (val: string) => {
-    setNewTitle(val);
-    try {
-      localStorage.setItem(
-        `plane_draft_${projectId}`,
-        JSON.stringify({ title: val, description: newDescription })
-      );
-    } catch {
-      // Ignore
-    }
-  };
-
-  const handleDescChange = (val: string) => {
-    setNewDescription(val);
-    try {
-      localStorage.setItem(
-        `plane_draft_${projectId}`,
-        JSON.stringify({ title: newTitle, description: val })
-      );
-    } catch {
-      // Ignore
-    }
-  };
-
-  const loadData = useCallback(async () => {
-    if (!projectId) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     try {
       const [projData, statesData, itemsData, typesData] = await Promise.all([
         projectService.get(projectId),
@@ -338,16 +352,10 @@ export default function ProjectWorkItemsPage() {
       setStates(statesData);
       setWorkItems(itemsData);
       setTypes(typesData);
-      if (statesData.length > 0 && !newStateId) {
-        setNewStateId(String(statesData[0].id));
-      }
-      if (typesData.length > 0 && !newTypeId) {
-        setNewTypeId(String(typesData[0].id));
-      }
     } catch (err: any) {
       toast.error("Error al cargar la información del proyecto");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [projectId]);
 
@@ -372,7 +380,7 @@ export default function ProjectWorkItemsPage() {
       toast.success(`Estado cambiado a "${targetState?.name ?? 'Nuevo estado'}"`);
     } catch (err: any) {
       toast.error("No se pudo actualizar el estado");
-      loadData();
+      loadData(true);
     }
   };
 
@@ -391,7 +399,7 @@ export default function ProjectWorkItemsPage() {
       toast.success(`Prioridad cambiada a "${nextPriority}"`);
     } catch (err: any) {
       toast.error("No se pudo actualizar la prioridad");
-      loadData();
+      loadData(true);
     }
   };
 
@@ -405,7 +413,13 @@ export default function ProjectWorkItemsPage() {
     }
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const item = workItems.find((w) => String(w.id) === String(event.active.id));
+    setActiveDragItem(item || null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragItem(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -424,40 +438,13 @@ export default function ProjectWorkItemsPage() {
     }
   };
 
+  const handleDragCancel = () => {
+    setActiveDragItem(null);
+  };
+
   const handleOpenDetail = (item: WorkItem) => {
     setSelectedItemId(item.id);
     setDetailSheetOpen(true);
-  };
-
-  const handleCreateWorkItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-
-    setIsSubmitting(true);
-    try {
-      await workItemService.create(projectId, {
-        title: newTitle.trim(),
-        description_json: newDescription ? [{ id: "b1", type: "paragraph", content: newDescription }] : undefined,
-        priority: newPriority as any,
-        state_id: newStateId || (states[0]?.id ? String(states[0].id) : undefined),
-        type_id: newTypeId || undefined,
-        estimate_value: newEstimateValue || undefined,
-        estimate_points: newEstimateValue && !isNaN(Number(newEstimateValue)) ? Number(newEstimateValue) : undefined,
-      });
-
-      toast.success("Work item creado exitosamente");
-      setNewTitle("");
-      setNewDescription("");
-      setNewPriority("NONE");
-      setNewEstimateValue("");
-      localStorage.removeItem(`plane_draft_${projectId}`);
-      setOpenCreateModal(false);
-      loadData();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Error al crear el work item");
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   // Saved Views Application & Reset
@@ -680,7 +667,9 @@ export default function ProjectWorkItemsPage() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
           <div className="flex gap-4 overflow-x-auto pb-6 pt-1">
             {groupBy === "state"
@@ -721,6 +710,9 @@ export default function ProjectWorkItemsPage() {
                   );
                 })}
           </div>
+          <DragOverlay dropAnimation={null}>
+            {activeDragItem ? <KanbanCardPreview item={activeDragItem} /> : null}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -843,165 +835,18 @@ export default function ProjectWorkItemsPage() {
       )}
 
       {/* Modal Crear Work Item */}
-      <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <Plus className="size-5 text-indigo-600" />
-              Nuevo Work Item
-            </DialogTitle>
-            <DialogDescription>
-              Crea una tarea, bug, historia o épica para {project?.name}.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleCreateWorkItem} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="wi-title">Título *</Label>
-              <Input
-                id="wi-title"
-                placeholder="Ej. Implementar autenticación OAuth"
-                value={newTitle}
-                onChange={(e) => handleTitleChange(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Tipo</Label>
-                <Select value={newTypeId} onValueChange={setNewTypeId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {types.map((t) => (
-                      <SelectItem key={t.id} value={String(t.id)}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="wi-state">Estado</Label>
-                <Select value={newStateId} onValueChange={setNewStateId}>
-                  <SelectTrigger id="wi-state">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {states.map((st) => (
-                      <SelectItem key={st.id} value={String(st.id)}>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="size-2 rounded-full"
-                            style={{ backgroundColor: st.color || "#6366f1" }}
-                          />
-                          <span>{st.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="wi-priority">Prioridad</Label>
-                <Select value={newPriority} onValueChange={setNewPriority}>
-                  <SelectTrigger id="wi-priority">
-                    <SelectValue placeholder="Prioridad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="URGENT">Urgente</SelectItem>
-                    <SelectItem value="HIGH">Alta</SelectItem>
-                    <SelectItem value="MEDIUM">Media</SelectItem>
-                    <SelectItem value="LOW">Baja</SelectItem>
-                    <SelectItem value="NONE">Ninguna</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Estimate Selector in Creation Modal */}
-            {estimateSystem !== "NONE" && (
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">
-                  Estimación ({estimateSystem === "TSHIRT" ? "Tallas de Camiseta" : "Puntos Fibonacci"})
-                </Label>
-                {estimateSystem === "FIBONACCI" && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {FIBONACCI_VALUES.map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setNewEstimateValue(newEstimateValue === v ? "" : v)}
-                        className={cn(
-                          "px-2.5 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer",
-                          newEstimateValue === v
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
-                        )}
-                      >
-                        {v} pts
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {estimateSystem === "TSHIRT" && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {TSHIRT_VALUES.map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setNewEstimateValue(newEstimateValue === v ? "" : v)}
-                        className={cn(
-                          "px-3 py-1 text-xs font-bold rounded-md border transition-all cursor-pointer",
-                          newEstimateValue === v
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
-                        )}
-                      >
-                        {v}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {estimateSystem === "NUMERIC" && (
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="Ej. 5"
-                    value={newEstimateValue}
-                    onChange={(e) => setNewEstimateValue(e.target.value)}
-                  />
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="wi-desc">Descripción (Opcional)</Label>
-              <Textarea
-                id="wi-desc"
-                placeholder="Detalles sobre los requerimientos, criterios de aceptación..."
-                value={newDescription}
-                onChange={(e) => handleDescChange(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenCreateModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Guardar Work Item
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <WorkItemCreateModal
+        open={openCreateModal}
+        onOpenChange={setOpenCreateModal}
+        project={project}
+        states={states}
+        types={types}
+        availableItems={workItems}
+        onCreated={(created) => {
+          setWorkItems((prev) => [created, ...prev]);
+          loadData(true);
+        }}
+      />
 
       {/* Work Item Detail Sheet */}
       <WorkItemDetailSheet
@@ -1011,7 +856,14 @@ export default function ProjectWorkItemsPage() {
         availableItems={workItems}
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
-        onUpdated={loadData}
+        onUpdated={(updatedItem?: WorkItem) => {
+          if (updatedItem) {
+            setWorkItems((prev) =>
+              prev.map((item) => (String(item.id) === String(updatedItem.id) ? updatedItem : item))
+            );
+          }
+          loadData(true);
+        }}
       />
     </div>
   );

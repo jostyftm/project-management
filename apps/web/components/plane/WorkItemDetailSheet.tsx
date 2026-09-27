@@ -40,7 +40,7 @@ interface Props {
   availableItems: WorkItem[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdated: () => void;
+  onUpdated: (updatedItem?: WorkItem) => void;
 }
 
 export function WorkItemDetailSheet({
@@ -143,10 +143,10 @@ export function WorkItemDetailSheet({
   const handleUpdateField = async (payload: Partial<WorkItem> & Record<string, any>) => {
     if (!item) return;
     try {
-      await workItemService.update(item.id, payload);
-      onUpdated();
-      const updated = await workItemService.get(item.id);
+      const updated = await workItemService.update(item.id, payload);
       setItem(updated);
+      toast.success("Tarea actualizada correctamente");
+      onUpdated(updated);
     } catch {
       toast.error("Error al actualizar");
     }
@@ -290,11 +290,13 @@ export function WorkItemDetailSheet({
               </div>
             </div>
 
-            {/* Quick Properties Grid: 6 Properties */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs">
+            {/* Quick Properties: 2 Columns of Horizontal Rows */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 text-xs">
               {/* 1. Estado */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium">Estado</span>
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24">
+                  Estado:
+                </span>
                 <Select
                   value={stateId}
                   onValueChange={(val) => {
@@ -302,7 +304,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ state_id: val });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
@@ -318,60 +320,10 @@ export function WorkItemDetailSheet({
                 </Select>
               </div>
 
-              {/* 2. Prioridad */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium">Prioridad</span>
-                <Select
-                  value={priority}
-                  onValueChange={(val) => {
-                    setPriority(val);
-                    handleUpdateField({ priority: val as any });
-                  }}
-                >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
-                    <SelectValue placeholder="Prioridad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="URGENT">Urgente</SelectItem>
-                    <SelectItem value="HIGH">Alta</SelectItem>
-                    <SelectItem value="MEDIUM">Media</SelectItem>
-                    <SelectItem value="LOW">Baja</SelectItem>
-                    <SelectItem value="NONE">Ninguna</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 3. Responsable (Lead) */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium flex items-center gap-1">
-                  <UserIcon className="size-3" /> Responsable
-                </span>
-                <Select
-                  value={leadId}
-                  onValueChange={(val) => {
-                    const next = val === "none" ? "" : val;
-                    setLeadId(next);
-                    handleUpdateField({ lead_id: next || null });
-                  }}
-                >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
-                    <SelectValue placeholder="Sin asignar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    {members.map((u) => (
-                      <SelectItem key={u.id} value={String(u.id)}>
-                        {u.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 4. Hito (Milestone) */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium flex items-center gap-1">
-                  <Flag className="size-3" /> Hito (Milestone)
+              {/* 2. Hito */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24 flex items-center gap-1">
+                  <Flag className="size-3 text-slate-400" /> Hito:
                 </span>
                 <Select
                   value={milestoneId}
@@ -381,7 +333,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ milestone_id: next || null });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
                     <SelectValue placeholder="Sin hito" />
                   </SelectTrigger>
                   <SelectContent>
@@ -395,9 +347,36 @@ export function WorkItemDetailSheet({
                 </Select>
               </div>
 
-              {/* 5. Ciclo (Sprint) */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium">Ciclo (Sprint)</span>
+              {/* 3. Prioridad */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24">
+                  Prioridad:
+                </span>
+                <Select
+                  value={priority}
+                  onValueChange={(val) => {
+                    setPriority(val);
+                    handleUpdateField({ priority: val as any });
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
+                    <SelectValue placeholder="Prioridad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="URGENT">Urgente</SelectItem>
+                    <SelectItem value="HIGH">Alta</SelectItem>
+                    <SelectItem value="MEDIUM">Media</SelectItem>
+                    <SelectItem value="LOW">Baja</SelectItem>
+                    <SelectItem value="NONE">Ninguna</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 4. Ciclo */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24">
+                  Ciclo:
+                </span>
                 <Select
                   value={cycleId}
                   onValueChange={(val) => {
@@ -406,7 +385,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ cycle_id: next || null });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
                     <SelectValue placeholder="Sin ciclo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -420,9 +399,38 @@ export function WorkItemDetailSheet({
                 </Select>
               </div>
 
+              {/* 5. Responsable */}
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24 flex items-center gap-1">
+                  <UserIcon className="size-3 text-slate-400" /> Responsable:
+                </span>
+                <Select
+                  value={leadId}
+                  onValueChange={(val) => {
+                    const next = val === "none" ? "" : val;
+                    setLeadId(next);
+                    handleUpdateField({ lead_id: next || null });
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {members.map((u) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* 6. Módulo */}
-              <div className="space-y-1">
-                <span className="text-slate-400 font-medium">Módulo</span>
+              <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg border border-slate-200/70 shadow-2xs">
+                <span className="text-slate-500 font-medium shrink-0 w-24">
+                  Módulo:
+                </span>
                 <Select
                   value={moduleId}
                   onValueChange={(val) => {
@@ -431,7 +439,7 @@ export function WorkItemDetailSheet({
                     handleUpdateField({ module_id: next || null });
                   }}
                 >
-                  <SelectTrigger className="h-8 bg-white border-slate-200 text-xs">
+                  <SelectTrigger className="h-8 flex-1 bg-slate-50/50 border-slate-200 text-xs">
                     <SelectValue placeholder="Sin módulo" />
                   </SelectTrigger>
                   <SelectContent>
