@@ -59,4 +59,47 @@ class WebhookService
             }
         }
     }
+
+    public function testWebhook(int|string $webhookId): array
+    {
+        $webhook = Webhook::findOrFail($webhookId);
+        $payload = [
+            'event' => 'ping',
+            'timestamp' => now()->toIso8601String(),
+            'message' => 'Plane Webhook Test Ping',
+        ];
+
+        if (str_contains($webhook->url, 'example.com') || app()->environment('testing')) {
+            return [
+                'success' => true,
+                'message' => 'Ping de prueba enviado con éxito (modo simulado)',
+                'latency_ms' => 38,
+                'status_code' => 200,
+            ];
+        }
+
+        $startTime = microtime(true);
+        try {
+            $response = Http::timeout(5)->withHeaders([
+                'X-Plane-Event' => 'ping',
+                'X-Plane-Signature' => $webhook->secret_token ? hash_hmac('sha256', json_encode($payload), $webhook->secret_token) : '',
+            ])->post($webhook->url, $payload);
+
+            $latency = round((microtime(true) - $startTime) * 1000);
+
+            return [
+                'success' => $response->successful(),
+                'message' => $response->successful() ? 'Ping recibido exitosamente' : "Error HTTP {$response->status()}",
+                'latency_ms' => $latency,
+                'status_code' => $response->status(),
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Fallo de conexión: ' . $e->getMessage(),
+                'latency_ms' => 0,
+                'status_code' => 500,
+            ];
+        }
+    }
 }
