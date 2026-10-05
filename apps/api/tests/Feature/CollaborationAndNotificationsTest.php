@@ -1,11 +1,18 @@
 <?php
 
+use App\Jobs\SendNotificationEmailJob;
+use App\Mail\CycleCompletedMail;
+use App\Mail\UserMentionedMail;
+use App\Mail\WorkItemAssignedMail;
+use App\Mail\WorkItemStatusChangedMail;
 use App\Models\Page;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WorkItem;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->user = User::factory()->create(['name' => 'Alice']);
@@ -273,3 +280,152 @@ test('it streams server-sent events for live collaboration', function () {
     $response->assertOk();
     expect($response->headers->get('Content-Type'))->toContain('text/event-stream');
 });
+
+test('it streams server-sent events authenticating via token in query string without authorization header', function () {
+    $token = $this->user->createToken('sse-token')->plainTextToken;
+
+    $response = $this->get("/api/v1/live-stream?token={$token}&workspace_id={$this->workspace->id}");
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Type'))->toContain('text/event-stream');
+});
+
+test('it rejects live-stream when unauthenticated without token', function () {
+    $response = $this->withHeader('X-Force-Unauthenticated', '1')
+        ->getJson('/api/v1/live-stream');
+
+    $response->assertStatus(401);
+});
+
+test('it enqueues SendNotificationEmailJob and creates in-app notification when work item is assigned', function () {
+    Queue::fake();
+
+    $token = $this->user->createToken('admin-token')->plainTextToken;
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson("/api/v1/projects/{$this->project->id}/work-items", [
+        'title' => 'Assigned Task Feature',
+        'lead_id' => $this->otherUser->id,
+        'assignee_ids' => [$this->otherUser->id],
+    ]);
+
+    $response->assertStatus(201);
+
+    // Verifica que se haya encolado el Job asíncrono para enviar el correo sin bloquear la UI
+    Queue::assertPushed(SendNotificationEmailJob::class, function ($job) {
+        return $job->recipientEmail === $this->otherUser->email
+            && $job->mailable instanceof WorkItemAssignedMail;
+    });
+
+    // Verifica que se haya registrado la notificación en BD
+    $this->assertDatabaseHas('notifications', [
+        'workspace_id' => $this->workspace->id,
+        'recipient_id' => $this->otherUser->id,
+        'type' => 'ASSIGNMENT',
+    ]);
+});
+
+test('it enqueues SendNotificationEmailJob when work item status changes', function () {
+    Queue::fake();
+
+    $token = $this->user->createToken('admin-token')->plainTextToken;
+
+    // Crear un segundo estado
+    $doneState = \App\Models\State::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Done',
+        'group' => 'COMPLETED',
+        'sequence' => 2,
+    ]);
+
+    // Asignar al otro usuario
+    $this->workItem->update(['lead_id' => $this->otherUser->id]);
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->patchJson("/api/v1/work-items/{$this->workItem->id}", [
+        'state_id' => $doneState->id,
+    ]);
+
+    $response->assertOk();
+
+    Queue::assertPushed(SendNotificationEmailJob::class, function ($job) {
+        return $job->recipientEmail === $this->otherUser->email
+            && $job->mailable instanceof WorkItemStatusChangedMail;
+    });
+
+    $this->assertDatabaseHas('notifications', [
+        'workspace_id' => $this->workspace->id,
+        'recipient_id' => $this->otherUser->id,
+        'type' => 'STATE_CHANGED',
+    ]);
+});
+
+test('it enqueues SendNotificationEmailJob when comment mentions a user', function () {
+    Queue::fake();
+
+    $token = $this->user->createToken('admin-token')->plainTextToken;
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson('/api/v1/comments', [
+        'work_item_id' => $this->workItem->id,
+        'content' => "Hey @{$this->otherUser->name} please review this!",
+    ]);
+
+    $response->assertStatus(201);
+
+    Queue::assertPushed(SendNotificationEmailJob::class, function ($job) {
+        return $job->recipientEmail === $this->otherUser->email
+            && $job->mailable instanceof UserMentionedMail;
+    });
+});
+
+test('it enqueues SendNotificationEmailJob when cycle is completed', function () {
+    Queue::fake();
+
+    $token = $this->user->createToken('admin-token')->plainTextToken;
+
+    // Crear ciclo
+    $cycle = \App\Models\Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Sprint 1',
+        'status' => 'CURRENT',
+        'start_date' => now()->subDays(7),
+        'end_date' => now()->addDays(7),
+        'owned_by' => $this->user->id,
+    ]);
+
+    // Añadir miembro al proyecto
+    \App\Models\ProjectMember::create([
+        'project_id' => $this->project->id,
+        'user_id' => $this->otherUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson("/api/v1/cycles/{$cycle->id}/complete");
+
+    $response->assertOk();
+
+    Queue::assertPushed(SendNotificationEmailJob::class, function ($job) {
+        return $job->recipientEmail === $this->otherUser->email
+            && $job->mailable instanceof CycleCompletedMail;
+    });
+
+    $this->assertDatabaseHas('notifications', [
+        'workspace_id' => $this->workspace->id,
+        'recipient_id' => $this->otherUser->id,
+        'type' => 'CYCLE_COMPLETED',
+    ]);
+});
+
+

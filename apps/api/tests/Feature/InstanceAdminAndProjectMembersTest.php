@@ -1,14 +1,21 @@
 <?php
 
+use App\Mail\ProjectInvitationMail;
+use App\Mail\ProjectMemberAddedMail;
 use App\Models\InstanceSetting;
 use App\Models\Milestone;
+use App\Models\Notification;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Jobs\SendNotificationEmailJob;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+
 
 beforeEach(function () {
     $this->superAdmin = User::factory()->create([
@@ -134,7 +141,9 @@ it('persists project estimate system on update', function () {
     expect($this->project->fresh()->estimate_system)->toBe('FIBONACCI');
 });
 
-it('can add existing user to project', function () {
+it('can add existing user to project and sends mail plus in-app notification', function () {
+    Queue::fake();
+
     $newUser = User::factory()->create(['email' => 'colleague@example.com']);
 
     $response = $this->withHeaders([
@@ -149,9 +158,20 @@ it('can add existing user to project', function () {
         ->assertJsonPath('data.type', 'MEMBER_ADDED');
 
     expect(ProjectMember::where('project_id', $this->project->id)->where('user_id', $newUser->id)->exists())->toBeTrue();
+
+    // Verifica que se haya despachado el job de correo notificando que fue añadido
+    Queue::assertPushed(SendNotificationEmailJob::class);
+
+    // Verifica que se haya registrado notificación in-app
+    expect(Notification::where('recipient_id', $newUser->id)
+        ->where('type', 'PROJECT_INVITATION')
+        ->where('entity_id', $this->project->id)
+        ->exists())->toBeTrue();
 });
 
 it('creates invitation with token for unregistered email and allows acceptance', function () {
+    Queue::fake();
+
     $inviteEmail = 'external_freelancer@test.org';
 
     $response = $this->withHeaders([
@@ -166,6 +186,8 @@ it('creates invitation with token for unregistered email and allows acceptance',
         ->assertJsonPath('data.type', 'INVITATION_SENT')
         ->assertJsonPath('data.invitation.email', $inviteEmail);
 
+    Queue::assertPushed(SendNotificationEmailJob::class);
+
     $token = $response->json('data.invitation.token');
     expect($token)->not->toBeEmpty();
 
@@ -173,6 +195,7 @@ it('creates invitation with token for unregistered email and allows acceptance',
     $publicResp = $this->getJson("/api/v1/invitations/{$token}");
     $publicResp->assertOk()
         ->assertJsonPath('data.email', $inviteEmail)
+        ->assertJsonPath('data.user_exists', false)
         ->assertJsonPath('data.project.id', (string) $this->project->id);
 
     // Usuario recién registrado acepta la invitación
@@ -184,6 +207,65 @@ it('creates invitation with token for unregistered email and allows acceptance',
     $acceptResp->assertOk();
 
     expect(ProjectMember::where('project_id', $this->project->id)->where('user_id', $acceptUser->id)->first()?->role)->toBe('VIEWER');
+
+    // Notificación in-app de bienvenida al unirse
+    expect(Notification::where('recipient_id', $acceptUser->id)
+        ->where('type', 'PROJECT_INVITATION')
+        ->exists())->toBeTrue();
+});
+
+it('allows unregistered user to complete onboarding and auto-accept invitation', function () {
+    Mail::fake();
+
+    $inviteEmail = 'onboarding_guest@test.org';
+
+    // 1. Invitar al usuario no registrado
+    $invResp = $this->withHeaders([
+        'Authorization' => "Bearer {$this->adminToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson("/api/v1/projects/{$this->project->id}/members", [
+        'email' => $inviteEmail,
+        'role' => 'MEMBER',
+    ]);
+
+    $token = $invResp->json('data.invitation.token');
+
+    // 2. Ejecutar onboarding con creación de cuenta
+    $onboardResp = $this->postJson("/api/v1/invitations/{$token}/onboard", [
+        'name'     => 'Carlos Invitado',
+        'password' => 'secretPassword123',
+    ]);
+
+    $onboardResp->assertStatus(201)
+        ->assertJsonStructure(['token', 'user', 'current_workspace', 'data' => ['project']])
+        ->assertJsonPath('user.email', $inviteEmail)
+        ->assertJsonPath('user.name', 'Carlos Invitado')
+        ->assertJsonPath('data.project.id', (string) $this->project->id);
+
+    $createdUser = User::where('email', $inviteEmail)->first();
+    expect($createdUser)->not->toBeNull();
+
+    // 3. Verificar membresía creada en workspace y proyecto
+    expect(WorkspaceMember::where('workspace_id', $this->workspace->id)->where('user_id', $createdUser->id)->exists())->toBeTrue();
+    expect(ProjectMember::where('project_id', $this->project->id)->where('user_id', $createdUser->id)->first()?->role)->toBe('MEMBER');
+
+    // 4. Verificar notificación in-app de bienvenida creada
+    expect(Notification::where('recipient_id', $createdUser->id)
+        ->where('type', 'PROJECT_INVITATION')
+        ->exists())->toBeTrue();
+});
+
+it('allows superadmin to test SMTP email configuration', function () {
+    Mail::fake();
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->adminToken}",
+    ])->postJson('/api/v1/instance-admin/test-email', [
+        'email' => 'smtp_target@example.org',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true);
 });
 
 it('allows work item to assign lead and milestone', function () {

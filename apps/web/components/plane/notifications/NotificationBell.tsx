@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, ExternalLink, Inbox, MessageSquare, AtSign, CheckCircle2, Loader2 } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Inbox, MessageSquare, AtSign, CheckCircle2, Loader2, Users, UserCheck, ArrowRightLeft, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -46,24 +46,47 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Initial fetch and polling fallback
+  // Initial fetch and real-time SSE stream
   useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 15000); // 15s polling fallback
+    const interval = setInterval(fetchCount, 30000); // 30s polling fallback
 
-    // Attempt Server-Sent Events (SSE) live stream connection
+    // Attempt Server-Sent Events (SSE) live stream connection with auth in query string
     let eventSource: EventSource | null = null;
     try {
       const token = storage.get(ACCESS_TOKEN);
-      if (token && typeof window !== "undefined") {
-        // SSE connection
-        eventSource = new EventSource(`${API_BASE_URL}/live-stream`);
+      const currentWs = storage.get("current_workspace") as { id?: number | string } | null;
+      if (typeof token === "string" && token && typeof window !== "undefined") {
+        const streamUrl = new URL(`${API_BASE_URL}/live-stream`);
+        streamUrl.searchParams.set("token", token);
+        if (currentWs?.id) {
+          streamUrl.searchParams.set("workspace_id", String(currentWs.id));
+        }
+
+        eventSource = new EventSource(streamUrl.toString());
+
+        eventSource.addEventListener("connected", () => {
+          // Live stream connected successfully
+        });
+
         eventSource.addEventListener("notification_count", (e) => {
           try {
             const data = JSON.parse(e.data);
-            if (typeof data.unread_count === "number") {
-              setUnreadCount(data.unread_count);
+            const count = data.unread_count ?? data.count;
+            if (typeof count === "number") {
+              setUnreadCount(count);
             }
+          } catch {}
+        });
+
+        eventSource.addEventListener("notification", (e) => {
+          try {
+            const notif: Notification = JSON.parse(e.data);
+            setNotifications((prev) => [notif, ...prev.filter((n) => String(n.id) !== String(notif.id))].slice(0, 6));
+            setUnreadCount((prev) => prev + 1);
+            toast.info(notif.title || "Nueva notificación", {
+              description: notif.message,
+            });
           } catch {}
         });
       }
@@ -185,6 +208,22 @@ export function NotificationBell() {
                   ) : n.type === "COMMENT" ? (
                     <div className="flex size-7 items-center justify-center rounded-full bg-blue-100 text-blue-700">
                       <MessageSquare className="size-3.5" />
+                    </div>
+                  ) : n.type === "ASSIGNMENT" ? (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <UserCheck className="size-3.5" />
+                    </div>
+                  ) : n.type === "STATE_CHANGED" ? (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+                      <ArrowRightLeft className="size-3.5" />
+                    </div>
+                  ) : n.type === "CYCLE_COMPLETED" ? (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                      <Flag className="size-3.5" />
+                    </div>
+                  ) : n.type === "PROJECT_INVITATION" || n.type === "PROJECT_MEMBER_ADDED" ? (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+                      <Users className="size-3.5" />
                     </div>
                   ) : (
                     <div className="flex size-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
