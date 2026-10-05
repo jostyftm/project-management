@@ -130,10 +130,19 @@ const COMMAND_ITEMS: SlashCommandItem[] = [
   },
 ];
 
+const sanitizeBlocks = (blks?: DocBlock[]): DocBlock[] => {
+  if (!blks || blks.length === 0) {
+    return [{ id: "b-init", type: "paragraph", content: "" }];
+  }
+  return blks.map((b) => ({
+    ...b,
+    content: b?.content ?? "",
+  }));
+};
+
 export function NotionBlockEditor({ blocks, onChange, isLocked = false }: NotionBlockEditorProps) {
   const [internalBlocks, setInternalBlocks] = useState<DocBlock[]>(() => {
-    if (blocks && blocks.length > 0) return blocks;
-    return [{ id: "b-init", type: "paragraph", content: "" }];
+    return sanitizeBlocks(blocks);
   });
 
   // Slash menu state
@@ -145,7 +154,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
   // Sync internal state with external blocks prop
   useEffect(() => {
     if (blocks && blocks.length > 0) {
-      setInternalBlocks(blocks);
+      setInternalBlocks(sanitizeBlocks(blocks));
     }
   }, [blocks]);
 
@@ -342,7 +351,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
   });
 
   return (
-    <div className="relative w-full max-w-4xl mx-auto space-y-2 py-4">
+    <div className="relative w-full space-y-2 py-4">
       {internalBlocks.map((block, index) => {
         const isCurrentSlash = activeSlashIndex === index;
 
@@ -401,7 +410,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
               {block.type === "paragraph" && (
                 <Textarea
                   id={`block-input-${index}`}
-                  value={block.content}
+                  value={block.content ?? ""}
                   disabled={isLocked}
                   placeholder={index === 0 ? "Escribe algo o pulsa '/' para comandos..." : "Escribe o usa '/'..."}
                   onChange={(e) => handleContentChange(index, e.target.value)}
@@ -414,7 +423,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
               {block.type === "heading_1" && (
                 <Input
                   id={`block-input-${index}`}
-                  value={block.content}
+                  value={block.content ?? ""}
                   disabled={isLocked}
                   placeholder="Encabezado 1..."
                   onChange={(e) => handleContentChange(index, e.target.value)}
@@ -426,7 +435,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
               {block.type === "heading_2" && (
                 <Input
                   id={`block-input-${index}`}
-                  value={block.content}
+                  value={block.content ?? ""}
                   disabled={isLocked}
                   placeholder="Encabezado 2..."
                   onChange={(e) => handleContentChange(index, e.target.value)}
@@ -438,7 +447,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
               {block.type === "heading_3" && (
                 <Input
                   id={`block-input-${index}`}
-                  value={block.content}
+                  value={block.content ?? ""}
                   disabled={isLocked}
                   placeholder="Encabezado 3..."
                   onChange={(e) => handleContentChange(index, e.target.value)}
@@ -462,7 +471,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                   />
                   <Input
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="Tarea pendiente..."
                     onChange={(e) => handleContentChange(index, e.target.value)}
@@ -480,7 +489,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                   <span className="size-1.5 rounded-full bg-slate-400 mt-2 shrink-0" />
                   <Input
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="Elemento de lista..."
                     onChange={(e) => handleContentChange(index, e.target.value)}
@@ -497,7 +506,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                   </span>
                   <Input
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="Elemento numerado..."
                     onChange={(e) => handleContentChange(index, e.target.value)}
@@ -521,7 +530,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                   <AlertCircle className="size-5 shrink-0 mt-0.5 text-indigo-600" />
                   <Textarea
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="Escribe una nota importante o alerta..."
                     onChange={(e) => handleContentChange(index, e.target.value)}
@@ -542,7 +551,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(block.content);
+                        navigator.clipboard.writeText(block.content ?? "");
                         toast.success("Código copiado al portapapeles");
                       }}
                       className="h-6 text-[10px] text-slate-400 hover:text-white"
@@ -553,7 +562,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                   </div>
                   <Textarea
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="// Código fuente..."
                     onChange={(e) => handleContentChange(index, e.target.value)}
@@ -574,7 +583,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                               <td key={cIdx} className="p-2 border-r border-slate-100">
                                 <input
                                   type="text"
-                                  value={cell}
+                                  value={cell ?? ""}
                                   disabled={isLocked}
                                   onChange={(e) => handleTableCellChange(index, rIdx, cIdx, e.target.value)}
                                   className="w-full bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 rounded px-1"
@@ -603,7 +612,7 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                 <div className="border-l-4 border-indigo-500 pl-3 py-1 my-1">
                   <Textarea
                     id={`block-input-${index}`}
-                    value={block.content}
+                    value={block.content ?? ""}
                     disabled={isLocked}
                     placeholder="Escribe una cita textual..."
                     onChange={(e) => handleContentChange(index, e.target.value)}

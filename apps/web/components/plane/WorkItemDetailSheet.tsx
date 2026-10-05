@@ -24,6 +24,7 @@ import { cycleService } from "@/services/plane/cycleService";
 import { moduleService } from "@/services/plane/moduleService";
 import { milestoneService } from "@/services/plane/milestoneService";
 import { projectMemberService, ProjectMemberUser } from "@/services/plane/projectMemberService";
+import { projectService } from "@/services/plane/projectService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { WorkItemActivityTimeline } from "@/components/plane/comments/WorkItemActivityTimeline";
 import { NotionBlockEditor } from "@/components/plane/editor/NotionBlockEditor";
@@ -31,6 +32,8 @@ import {
   WorkItemViewModeSwitcher,
   WorkItemViewMode,
 } from "@/components/plane/work-items/WorkItemViewModeSwitcher";
+import { WorkItemGitHubWidget } from "@/components/plane/work-items/WorkItemGitHubWidget";
+import { WorkItemSubtasksSection } from "@/components/plane/work-items/WorkItemSubtasksSection";
 import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone, DocBlock } from "@/types/plane-types";
 import {
   Plus,
@@ -43,7 +46,9 @@ import {
   RefreshCw,
   LayoutGrid,
   Check,
+  GitBranch,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -52,26 +57,28 @@ const TSHIRT_VALUES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 interface Props {
   workItemId: string | number | null;
-  project: Project | null;
-  states: State[];
-  availableItems: WorkItem[];
+  project?: Project | null;
+  states?: State[];
+  availableItems?: WorkItem[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onUpdated: (updatedItem?: WorkItem) => void;
   viewMode?: WorkItemViewMode;
   onViewModeChange?: (mode: WorkItemViewMode) => void;
+  isNestedModal?: boolean;
 }
 
 export function WorkItemDetailSheet({
   workItemId,
-  project,
-  states,
-  availableItems,
+  project = null,
+  states = [],
+  availableItems = [],
   open = true,
   onOpenChange,
   onUpdated,
   viewMode: propViewMode,
   onViewModeChange,
+  isNestedModal = false,
 }: Props) {
   const router = useRouter();
 
@@ -88,6 +95,8 @@ export function WorkItemDetailSheet({
   const activeMode = propViewMode || internalMode;
 
   const [item, setItem] = useState<WorkItem | null>(null);
+  const [internalProject, setInternalProject] = useState<Project | null>(null);
+  const [internalStates, setInternalStates] = useState<State[]>([]);
   const [types, setTypes] = useState<WorkItemType[]>([]);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
@@ -106,10 +115,8 @@ export function WorkItemDetailSheet({
   const [moduleId, setModuleId] = useState<string>("");
   const [milestoneId, setMilestoneId] = useState<string>("");
   const [leadId, setLeadId] = useState<string>("");
+  const [selectedSubItemId, setSelectedSubItemId] = useState<string | number | null>(null);
 
-  // Sub-item quick create
-  const [newSubItemTitle, setNewSubItemTitle] = useState("");
-  const [isCreatingSubItem, setIsCreatingSubItem] = useState(false);
 
   // New relation
   const [relationTargetId, setRelationTargetId] = useState<string>("");
@@ -179,14 +186,26 @@ export function WorkItemDetailSheet({
         setIsLoading(true);
       }
       try {
-        const [itemData, typesData, cyclesData, modulesData, milestonesData, membersData] = await Promise.all([
-          workItemService.get(workItemId!),
-          project ? workItemTypeService.list(project.id) : Promise.resolve([]),
-          project ? cycleService.list(project.id) : Promise.resolve([]),
-          project ? moduleService.list(project.id) : Promise.resolve([]),
-          project ? milestoneService.list(project.id) : Promise.resolve([]),
-          project ? projectMemberService.list(project.id).then((r) => r.members).catch(() => []) : Promise.resolve([]),
+        const itemData = await workItemService.get(workItemId!);
+        const currentProj = project || itemData.project;
+        const currentProjId = currentProj?.id;
+
+        const [projData, typesData, cyclesData, modulesData, milestonesData, membersData, statesData] = await Promise.all([
+          !project && currentProjId ? projectService.get(currentProjId).catch(() => null) : Promise.resolve(null),
+          currentProjId ? workItemTypeService.list(currentProjId).catch(() => []) : Promise.resolve([]),
+          currentProjId ? cycleService.list(currentProjId).catch(() => []) : Promise.resolve([]),
+          currentProjId ? moduleService.list(currentProjId).catch(() => []) : Promise.resolve([]),
+          currentProjId ? milestoneService.list(currentProjId).catch(() => []) : Promise.resolve([]),
+          currentProjId ? projectMemberService.list(currentProjId).then((r) => r.members).catch(() => []) : Promise.resolve([]),
+          (!states || states.length === 0) && currentProjId ? projectService.getStates(currentProjId).catch(() => []) : Promise.resolve([]),
         ]);
+
+        if (projData) {
+          setInternalProject(projData);
+        }
+        if (statesData && statesData.length > 0) {
+          setInternalStates(statesData);
+        }
 
         setItem(itemData);
         loadedItemIdRef.current = workItemId;
@@ -201,9 +220,12 @@ export function WorkItemDetailSheet({
         // Normalize description into Notion doc blocks
         let initialBlocks: DocBlock[] = [];
         if (Array.isArray(itemData.description_json) && itemData.description_json.length > 0) {
-          initialBlocks = itemData.description_json;
+          initialBlocks = itemData.description_json.map((b: any) => ({
+            ...b,
+            content: b?.content ?? "",
+          }));
         } else if (itemData.description_json && typeof itemData.description_json === "object" && (itemData.description_json as any).text) {
-          initialBlocks = [{ id: "b-init", type: "paragraph", content: (itemData.description_json as any).text }];
+          initialBlocks = [{ id: "b-init", type: "paragraph", content: (itemData.description_json as any).text ?? "" }];
         } else if (typeof itemData.description_json === "string" && itemData.description_json.trim()) {
           initialBlocks = [{ id: "b-init", type: "paragraph", content: itemData.description_json }];
         } else {
@@ -237,12 +259,52 @@ export function WorkItemDetailSheet({
     loadItem();
   }, [workItemId, open, project?.id, activeMode]);
 
+  const { user } = useAuth();
+  const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+
+  const effectiveProject: Project | null = project || internalProject || (item?.project as unknown as Project) || null;
+  const effectiveStates = states && states.length > 0 ? states : internalStates;
+
+  const isAdmin = Boolean(
+    effectiveProject?.current_user_role?.toUpperCase() === "ADMIN" ||
+    user?.is_instance_admin ||
+    Boolean((effectiveProject as any)?.workspace && (effectiveProject as any).workspace.owner_id === user?.id)
+  );
+  const isCreator = !!user && (
+    String((item as any)?.created_by) === String(user.id) ||
+    String((item as any)?.creator?.id) === String(user.id)
+  );
+  const isLead = !!user && (
+    String(item?.lead_id) === String(user.id) ||
+    String((item as any)?.lead?.id) === String(user.id)
+  );
+  const isAssignee = !!user && (
+    isLead ||
+    item?.assignees?.some((a) => String(a.id) === String(user.id))
+  );
+  const isProjectMember = Boolean(
+    effectiveProject?.current_user_role?.toUpperCase() === "MEMBER" ||
+    effectiveProject?.current_user_role?.toUpperCase() === "ADMIN"
+  );
+
+  // Allow admins, assignees, leads, creators, project members, or users in personal views (no fixed project prop) to change state
+  const canChangeState = isAdmin || isAssignee || isCreator || isProjectMember || !project;
+
   // Quick update helper for structured properties (shows toast)
   const handleUpdateField = async (payload: Partial<WorkItem> & Record<string, any>) => {
     if (!item) return;
+    const isStateOnly = Object.keys(payload).length === 1 && "state_id" in payload;
+    if (!isAdmin && (!canChangeState || !isStateOnly)) return;
+
     try {
       const updated = await workItemService.update(item.id, payload);
-      setItem(updated);
+      setItem((prev) => ({
+        ...prev,
+        ...updated,
+        sub_items: updated.sub_items?.length ? updated.sub_items : (prev?.sub_items ?? []),
+        cycles: updated.cycles?.length ? updated.cycles : (prev?.cycles ?? []),
+        modules: updated.modules?.length ? updated.modules : (prev?.modules ?? []),
+      }));
       toast.success("Tarea actualizada correctamente");
       onUpdated(updated);
     } catch {
@@ -252,11 +314,17 @@ export function WorkItemDetailSheet({
 
   // Debounced and silent description saving (NO toast on success)
   const performSaveDescription = async (blocks: DocBlock[]) => {
-    if (!item) return;
+    if (!isAdmin || !item) return;
     try {
       setSaveStatus("saving");
       const updated = await workItemService.update(item.id, { description_json: blocks });
-      setItem(updated);
+      setItem((prev) => ({
+        ...prev,
+        ...updated,
+        sub_items: updated.sub_items?.length ? updated.sub_items : (prev?.sub_items ?? []),
+        cycles: updated.cycles?.length ? updated.cycles : (prev?.cycles ?? []),
+        modules: updated.modules?.length ? updated.modules : (prev?.modules ?? []),
+      }));
       isDirtyRef.current = false;
       setSaveStatus("saved");
       onUpdated(updated);
@@ -270,6 +338,7 @@ export function WorkItemDetailSheet({
   };
 
   const handleDescriptionChange = (newBlocks: DocBlock[]) => {
+    if (!isAdmin) return;
     setDocBlocks(newBlocks);
     latestBlocksRef.current = newBlocks;
     isDirtyRef.current = true;
@@ -286,32 +355,18 @@ export function WorkItemDetailSheet({
     }, 1000);
   };
 
-  const handleCreateSubItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newSubItemTitle.trim() || !project || !item) return;
-
-    setIsCreatingSubItem(true);
+  const handleRefreshWorkItem = async () => {
+    if (!item) return;
     try {
-      await workItemService.create(project.id, {
-        title: newSubItemTitle.trim(),
-        parent_id: item.id,
-        state_id: states[0]?.id,
-      });
-      toast.success("Subtarea agregada");
-      setNewSubItemTitle("");
-      onUpdated();
       const updated = await workItemService.get(item.id);
       setItem(updated);
-    } catch {
-      toast.error("Error al crear subtarea");
-    } finally {
-      setIsCreatingSubItem(false);
-    }
+      onUpdated(updated);
+    } catch {}
   };
 
   const handleAddRelation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!relationTargetId || !item) return;
+    if (!isAdmin || !relationTargetId || !item) return;
 
     setIsAddingRelation(true);
     try {
@@ -332,7 +387,7 @@ export function WorkItemDetailSheet({
   };
 
   const handleDeleteRelation = async (relId: string | number) => {
-    if (!item) return;
+    if (!isAdmin || !item) return;
     try {
       await workItemService.deleteRelation(relId);
       toast.success("Relación eliminada");
@@ -344,7 +399,7 @@ export function WorkItemDetailSheet({
     }
   };
 
-  const estimateSystem = project?.estimate_system || "FIBONACCI";
+  const estimateSystem = effectiveProject?.estimate_system || "FIBONACCI";
 
   // Inner form content reused across Sheet, Modal, and Page
   const renderInnerContent = () => {
@@ -370,12 +425,13 @@ export function WorkItemDetailSheet({
               {/* Work Item Type Selector */}
               <Select
                 value={typeId}
+                disabled={!isAdmin}
                 onValueChange={(val) => {
                   setTypeId(val);
                   handleUpdateField({ type_id: val });
                 }}
               >
-                <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 disabled:opacity-75 disabled:cursor-not-allowed">
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -391,8 +447,21 @@ export function WorkItemDetailSheet({
               </Select>
             </div>
 
-            {/* View Mode Switcher (Sheet, Modal, Page) */}
+            {/* View Mode Switcher and Git Branch Modal Button */}
             <div className="flex items-center gap-2">
+              {(canChangeState || isAdmin) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsGitModalOpen(true)}
+                  className="h-7 text-xs px-2.5 font-mono gap-1.5 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                  title="Abrir modal para crear rama o copiar comando Git para terminal local"
+                >
+                  <GitBranch className="size-3 text-indigo-600 dark:text-indigo-400" />
+                  <span>Rama Git</span>
+                </Button>
+              )}
               <WorkItemViewModeSwitcher
                 currentMode={activeMode}
                 onChangeMode={handleModeSwitch}
@@ -404,6 +473,7 @@ export function WorkItemDetailSheet({
           <div className="pt-2">
             <Input
               value={title}
+              disabled={!isAdmin}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => {
                 if (title !== item.title) {
@@ -415,7 +485,7 @@ export function WorkItemDetailSheet({
                   (e.target as HTMLInputElement).blur();
                 }
               }}
-              className="text-lg font-bold border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus-visible:border-indigo-500 px-1 py-1"
+              className="text-lg font-bold border-transparent hover:border-slate-200 dark:hover:border-slate-700 focus-visible:border-indigo-500 px-1 py-1 disabled:opacity-90 disabled:cursor-default"
             />
           </div>
         </div>
@@ -437,18 +507,33 @@ export function WorkItemDetailSheet({
                   <Check className="size-3" /> Guardado
                 </span>
               )}
-              <span className="text-[11px] text-slate-400">
-                Usa &apos;/&apos; para insertar bloques
-              </span>
+              {isAdmin && (
+                <span className="text-[11px] text-slate-400">
+                  Usa &apos;/&apos; para insertar bloques
+                </span>
+              )}
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 min-h-[140px] focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400/20 transition-all shadow-2xs">
             <NotionBlockEditor
               blocks={docBlocks}
               onChange={handleDescriptionChange}
+              isLocked={!isAdmin}
             />
           </div>
         </div>
+
+        {/* Subtareas Section (Collapsible with (n/m) counter and modal opening) */}
+        <WorkItemSubtasksSection
+          item={item}
+          project={effectiveProject}
+          states={effectiveStates}
+          members={members}
+          isAdmin={isAdmin}
+          currentUser={user}
+          onRefreshParent={handleRefreshWorkItem}
+          onOpenSubItemDetail={(subId) => setSelectedSubItemId(subId)}
+        />
 
         {/* Quick Properties: 1 Column of Full-Width Horizontal Rows */}
         <div className="flex flex-col gap-2 bg-slate-50/80 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
@@ -459,16 +544,17 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={stateId}
+              disabled={!canChangeState}
               onValueChange={(val) => {
                 setStateId(val);
                 handleUpdateField({ state_id: val });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
-                {states.map((s) => (
+                {effectiveStates.map((s) => (
                   <SelectItem key={s.id} value={String(s.id)}>
                     <div className="flex items-center gap-1.5">
                       <span className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
@@ -487,13 +573,14 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={milestoneId}
+              disabled={!isAdmin}
               onValueChange={(val) => {
                 const next = val === "none" ? "" : val;
                 setMilestoneId(next);
                 handleUpdateField({ milestone_id: next || null });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Sin hito" />
               </SelectTrigger>
               <SelectContent>
@@ -514,12 +601,13 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={priority}
+              disabled={!isAdmin}
               onValueChange={(val) => {
                 setPriority(val);
                 handleUpdateField({ priority: val as any });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Prioridad" />
               </SelectTrigger>
               <SelectContent>
@@ -539,13 +627,14 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={cycleId}
+              disabled={!isAdmin}
               onValueChange={(val) => {
                 const next = val === "none" ? "" : val;
                 setCycleId(next);
                 handleUpdateField({ cycle_id: next || null });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Sin ciclo" />
               </SelectTrigger>
               <SelectContent>
@@ -566,13 +655,14 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={leadId}
+              disabled={!isAdmin}
               onValueChange={(val) => {
                 const next = val === "none" ? "" : val;
                 setLeadId(next);
                 handleUpdateField({ lead_id: next || null });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Sin asignar" />
               </SelectTrigger>
               <SelectContent>
@@ -593,13 +683,14 @@ export function WorkItemDetailSheet({
             </span>
             <Select
               value={moduleId}
+              disabled={!isAdmin}
               onValueChange={(val) => {
                 const next = val === "none" ? "" : val;
                 setModuleId(next);
                 handleUpdateField({ module_id: next || null });
               }}
             >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs">
+              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
                 <SelectValue placeholder="Sin módulo" />
               </SelectTrigger>
               <SelectContent>
@@ -632,6 +723,7 @@ export function WorkItemDetailSheet({
                     <button
                       key={val}
                       type="button"
+                      disabled={!isAdmin}
                       onClick={() => {
                         const next = isSelected ? "" : val;
                         setEstimateValue(next);
@@ -641,7 +733,8 @@ export function WorkItemDetailSheet({
                         });
                       }}
                       className={cn(
-                        "px-3 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer",
+                        "px-3 py-1 text-xs font-semibold rounded-lg border transition-all",
+                        !isAdmin ? "cursor-not-allowed opacity-75" : "cursor-pointer",
                         isSelected
                           ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
                           : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-slate-50"
@@ -662,6 +755,7 @@ export function WorkItemDetailSheet({
                     <button
                       key={val}
                       type="button"
+                      disabled={!isAdmin}
                       onClick={() => {
                         const next = isSelected ? "" : val;
                         setEstimateValue(next);
@@ -671,7 +765,8 @@ export function WorkItemDetailSheet({
                         });
                       }}
                       className={cn(
-                        "px-3 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer",
+                        "px-3 py-1 text-xs font-semibold rounded-lg border transition-all",
+                        !isAdmin ? "cursor-not-allowed opacity-75" : "cursor-pointer",
                         isSelected
                           ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
                           : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:bg-slate-50"
@@ -686,12 +781,30 @@ export function WorkItemDetailSheet({
           </div>
         )}
 
-        {/* Tabs: Sub-items, Relations, Activity & Comments */}
-        <Tabs defaultValue="subitems" className="w-full">
-          <TabsList className="w-full grid grid-cols-3 bg-slate-100 dark:bg-slate-800">
-            <TabsTrigger value="subitems" className="text-xs">
-              Subtareas ({item.sub_items?.length || 0})
-            </TabsTrigger>
+        {/* GitHub Integration Widget (Multi-Repo, Branches, PRs & Dokploy Previews) */}
+        {effectiveProject && item && (
+          <WorkItemGitHubWidget
+            workItemId={item.id}
+            identifier={item.identifier}
+            title={item.title}
+            projectId={effectiveProject.id}
+            isBranchModalOpen={isGitModalOpen}
+            onBranchModalOpenChange={setIsGitModalOpen}
+            onWorkItemUpdated={() => {
+              if (onUpdated) onUpdated();
+              if (workItemId) {
+                workItemService.get(workItemId).then((updated: WorkItem) => {
+                  setItem(updated);
+                  if (updated.state?.id) setStateId(String(updated.state.id));
+                }).catch(() => {});
+              }
+            }}
+          />
+        )}
+
+        {/* Tabs: Relations, Activity & Comments */}
+        <Tabs defaultValue="relations" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 bg-slate-100 dark:bg-slate-800">
             <TabsTrigger value="relations" className="text-xs">
               Relaciones ({((item.outward_relations?.length || 0) + (item.inward_relations?.length || 0))})
             </TabsTrigger>
@@ -700,84 +813,45 @@ export function WorkItemDetailSheet({
             </TabsTrigger>
           </TabsList>
 
-          {/* Sub-items Tab */}
-          <TabsContent value="subitems" className="space-y-3 pt-3">
-            <form onSubmit={handleCreateSubItem} className="flex gap-2">
-              <Input
-                placeholder="Añadir nueva subtarea..."
-                value={newSubItemTitle}
-                onChange={(e) => setNewSubItemTitle(e.target.value)}
-                className="h-8 text-xs"
-              />
-              <Button type="submit" size="sm" disabled={isCreatingSubItem || !newSubItemTitle.trim()} className="h-8 text-xs">
-                {isCreatingSubItem ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3 mr-1" />}
-                Añadir
-              </Button>
-            </form>
-
-            <div className="space-y-1 max-h-56 overflow-y-auto">
-              {item.sub_items && item.sub_items.length > 0 ? (
-                item.sub_items.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className="flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-slate-400 font-semibold">{sub.identifier}</span>
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{sub.title}</span>
-                    </div>
-                    {sub.state && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                        {sub.state.name}
-                      </span>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-400 italic py-3 text-center">
-                  No hay subtareas todavía.
-                </p>
-              )}
-            </div>
-          </TabsContent>
-
           {/* Relations Tab */}
           <TabsContent value="relations" className="space-y-3 pt-3">
-            <form onSubmit={handleAddRelation} className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Añadir nueva relación</span>
-              <div className="flex gap-2">
-                <Select value={relationType} onValueChange={setRelationType}>
-                  <SelectTrigger className="h-8 w-32 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BLOCKS">Bloquea a</SelectItem>
-                    <SelectItem value="BLOCKED_BY">Bloqueado por</SelectItem>
-                    <SelectItem value="RELATION">Relacionado con</SelectItem>
-                    <SelectItem value="DUPLICATE_OF">Duplicado de</SelectItem>
-                  </SelectContent>
-                </Select>
+            {isAdmin && (
+              <form onSubmit={handleAddRelation} className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Añadir nueva relación</span>
+                <div className="flex gap-2">
+                  <Select value={relationType} onValueChange={setRelationType}>
+                    <SelectTrigger className="h-8 w-32 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BLOCKS">Bloquea a</SelectItem>
+                      <SelectItem value="BLOCKED_BY">Bloqueado por</SelectItem>
+                      <SelectItem value="RELATION">Relacionado con</SelectItem>
+                      <SelectItem value="DUPLICATE_OF">Duplicado de</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                <Select value={relationTargetId} onValueChange={setRelationTargetId}>
-                  <SelectTrigger className="h-8 flex-1 text-xs">
-                    <SelectValue placeholder="Seleccionar tarea..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableItems
-                      .filter((i) => i.id !== item.id)
-                      .map((i) => (
-                        <SelectItem key={i.id} value={String(i.id)}>
-                          {i.identifier} - {i.title}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={relationTargetId} onValueChange={setRelationTargetId}>
+                    <SelectTrigger className="h-8 flex-1 text-xs">
+                      <SelectValue placeholder="Seleccionar tarea..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableItems
+                        .filter((i) => i.id !== item.id)
+                        .map((i) => (
+                          <SelectItem key={i.id} value={String(i.id)}>
+                            {i.identifier} - {i.title}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
 
-                <Button type="submit" size="sm" disabled={isAddingRelation || !relationTargetId} className="h-8 text-xs">
-                  {isAddingRelation ? <Loader2 className="size-3 animate-spin" /> : "Vincular"}
-                </Button>
-              </div>
-            </form>
+                  <Button type="submit" size="sm" disabled={isAddingRelation || !relationTargetId} className="h-8 text-xs">
+                    {isAddingRelation ? <Loader2 className="size-3 animate-spin" /> : "Vincular"}
+                  </Button>
+                </div>
+              </form>
+            )}
 
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {item.outward_relations?.map((rel) => (
@@ -792,14 +866,16 @@ export function WorkItemDetailSheet({
                     <span className="font-mono text-slate-500 font-semibold">{rel.target?.identifier}</span>
                     <span className="text-slate-800 dark:text-slate-200 truncate">{rel.target?.title}</span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteRelation(rel.id)}
-                    className="size-6 text-slate-300 hover:text-red-600"
-                  >
-                    <Trash2 className="size-3" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteRelation(rel.id)}
+                      className="size-6 text-slate-300 hover:text-red-600"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
 
@@ -815,14 +891,16 @@ export function WorkItemDetailSheet({
                     <span className="font-mono text-slate-500 font-semibold">{rel.source?.identifier}</span>
                     <span className="text-slate-800 dark:text-slate-200 truncate">{rel.source?.title}</span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteRelation(rel.id)}
-                    className="size-6 text-slate-300 hover:text-red-600"
-                  >
-                    <Trash2 className="size-3" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteRelation(rel.id)}
+                      className="size-6 text-slate-300 hover:text-red-600"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  )}
                 </div>
               ))}
 
@@ -839,10 +917,37 @@ export function WorkItemDetailSheet({
           <TabsContent value="activity" className="pt-3">
             <WorkItemActivityTimeline
               workItemId={item.id}
-              projectId={project?.id}
+              projectId={effectiveProject?.id}
+              availableMembers={members.map((m) => ({
+                id: m.id,
+                name: m.name,
+                email: m.email,
+                avatar_url: m.avatar_url,
+                role: m.role,
+              }))}
             />
           </TabsContent>
         </Tabs>
+
+        {/* Nested Subtask Detail Modal */}
+        {selectedSubItemId && (
+          <WorkItemDetailSheet
+            workItemId={selectedSubItemId}
+            project={effectiveProject}
+            states={effectiveStates}
+            availableItems={availableItems}
+            open={!!selectedSubItemId}
+            onOpenChange={(isOpen) => {
+              if (!isOpen) setSelectedSubItemId(null);
+            }}
+            viewMode="modal"
+            isNestedModal={true}
+            onUpdated={() => {
+              handleRefreshWorkItem();
+              if (onUpdated) onUpdated();
+            }}
+          />
+        )}
       </div>
     );
   };
@@ -850,16 +955,23 @@ export function WorkItemDetailSheet({
   // Render according to activeMode:
   if (activeMode === "page") {
     return (
-      <div className="w-full max-w-5xl mx-auto p-4 sm:p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="w-full p-4 sm:p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {renderInnerContent()}
       </div>
     );
   }
 
   if (activeMode === "modal") {
+    const modalZIndex = isNestedModal ? "z-[70]" : "z-[60]";
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl">
+        <DialogContent
+          className={cn(
+            "w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl",
+            modalZIndex
+          )}
+          overlayClassName={modalZIndex}
+        >
           <DialogTitle className="sr-only">Detalle de {item?.identifier || "Work Item"}</DialogTitle>
           {renderInnerContent()}
         </DialogContent>

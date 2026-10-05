@@ -48,15 +48,20 @@ function DialogOverlay({
 
 function DialogContent({
   className,
+  overlayClassName,
   children,
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  overlayClassName?: string
 }) {
+  const zIndexMatch = className?.match(/\bz-\[?[a-zA-Z0-9_-]+\]?/);
+  const effectiveOverlayClass = overlayClassName || (zIndexMatch ? zIndexMatch[0] : undefined);
+
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={effectiveOverlayClass} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

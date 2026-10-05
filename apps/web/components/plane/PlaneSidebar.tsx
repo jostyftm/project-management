@@ -38,14 +38,21 @@ import {
   Rocket,
   Inbox,
   History,
+  Zap,
+  LayoutDashboard,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
-  const { currentWorkspace, projects, fetchProjects, fetchWorkspaces } = useWorkspaceStore();
+  const { currentWorkspace, projects, currentProject, fetchProjects, fetchWorkspaces } = useWorkspaceStore();
   const { user, logout } = useAuth();
+
+  const isWorkspaceOwner = Boolean(
+    currentWorkspace && user && (Number(currentWorkspace.owner_id) === Number(user.id) || user.is_instance_admin)
+  );
 
   useEffect(() => {
     fetchWorkspaces();
@@ -65,8 +72,11 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   const activeProject = useMemo(() => {
     if (!activeProjectId) return null;
-    return projects.find((p) => String(p.id) === String(activeProjectId));
-  }, [projects, activeProjectId]);
+    if (currentProject && String(currentProject.id) === String(activeProjectId)) {
+      return currentProject;
+    }
+    return projects.find((p) => String(p.id) === String(activeProjectId)) || null;
+  }, [projects, currentProject, activeProjectId]);
 
   return (
     <Sidebar variant="inset" {...props} className="border-r border-slate-200 bg-white">
@@ -105,7 +115,7 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
               >
                 <Link href="/your-work">
                   <UserCheck className="size-4 shrink-0 text-slate-500" />
-                  <span>Your Work</span>
+                  <span>Tu trabajo</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -173,6 +183,42 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+            {isWorkspaceOwner && (
+              <>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith("/workspace-reports")}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname.startsWith("/workspace-reports") && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href="/workspace-reports">
+                      <FileSpreadsheet className="size-4 shrink-0 text-slate-500" />
+                      <span>Reportes Dinámicos</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith("/workspace/settings")}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname.startsWith("/workspace/settings") && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href="/workspace/settings">
+                      <Sliders className="size-4 shrink-0 text-slate-500" />
+                      <span>Ajustes del Workspace</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
+            )}
           </SidebarMenu>
         </SidebarGroup>
 
@@ -198,13 +244,29 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === `/projects/${activeProjectId}`}
+                    isActive={pathname === `/projects/${activeProjectId}` || pathname === `/projects/${activeProjectId}/overview`}
                     className={cn(
                       "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
-                      pathname === `/projects/${activeProjectId}` && "bg-indigo-50 text-indigo-700 font-semibold"
+                      (pathname === `/projects/${activeProjectId}` || pathname === `/projects/${activeProjectId}/overview`) && "bg-indigo-50 text-indigo-700 font-semibold"
                     )}
                   >
                     <Link href={`/projects/${activeProjectId}`}>
+                      <LayoutDashboard className="size-4 shrink-0 text-slate-500" />
+                      <span>Overview</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(`/projects/${activeProjectId}/work-items`)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname.startsWith(`/projects/${activeProjectId}/work-items`) && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/work-items`}>
                       <CheckSquare className="size-4 shrink-0 text-slate-500" />
                       <span>Work Items</span>
                     </Link>
@@ -291,37 +353,58 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === `/projects/${activeProjectId}/activities`}
-                    className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
-                      pathname === `/projects/${activeProjectId}/activities` && "bg-indigo-50 text-indigo-700 font-semibold"
-                    )}
-                  >
-                    <Link href={`/projects/${activeProjectId}/activities`}>
-                      <History className="size-4 shrink-0 text-slate-500" />
-                      <span>Actividades</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {/* Actividades, Automatizaciones y Configuración (Exclusivo para ADMIN) */}
+                {activeProject?.current_user_role === "ADMIN" && (
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/projects/${activeProjectId}/activities`}
+                        className={cn(
+                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                          pathname === `/projects/${activeProjectId}/activities` && "bg-indigo-50 text-indigo-700 font-semibold"
+                        )}
+                      >
+                        <Link href={`/projects/${activeProjectId}/activities`}>
+                          <History className="size-4 shrink-0 text-slate-500" />
+                          <span>Actividades</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === `/projects/${activeProjectId}/settings`}
-                    className={cn(
-                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
-                      pathname === `/projects/${activeProjectId}/settings` && "bg-indigo-50 text-indigo-700 font-semibold"
-                    )}
-                  >
-                    <Link href={`/projects/${activeProjectId}/settings`}>
-                      <Sliders className="size-4 shrink-0 text-slate-500" />
-                      <span>Configuración</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/projects/${activeProjectId}/automations`}
+                        className={cn(
+                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                          pathname === `/projects/${activeProjectId}/automations` && "bg-indigo-50 text-indigo-700 font-semibold"
+                        )}
+                      >
+                        <Link href={`/projects/${activeProjectId}/automations`}>
+                          <Zap className="size-4 shrink-0 text-slate-500" />
+                          <span>Automatizaciones</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/projects/${activeProjectId}/settings`}
+                        className={cn(
+                          "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                          pathname === `/projects/${activeProjectId}/settings` && "bg-indigo-50 text-indigo-700 font-semibold"
+                        )}
+                      >
+                        <Link href={`/projects/${activeProjectId}/settings`}>
+                          <Sliders className="size-4 shrink-0 text-slate-500" />
+                          <span>Configuración</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

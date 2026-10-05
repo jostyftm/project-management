@@ -46,10 +46,26 @@ export const cycleService = {
       url: `${API_BASE_URL}/cycles/${cycleId}`,
       method: "GET",
     });
+    const rawWorkItems = res.data.relationships?.work_items ?? [];
+    const workItems = Array.isArray(rawWorkItems)
+      ? rawWorkItems.map((item: any) => ({
+          id: item.id,
+          ...item.attributes,
+          state: item.relationships?.state?.attributes
+            ? { id: item.relationships.state.id, ...item.relationships.state.attributes }
+            : undefined,
+          type: item.relationships?.type?.attributes
+            ? { id: item.relationships.type.id, ...item.relationships.type.attributes }
+            : undefined,
+          assignees: item.relationships?.assignees ?? [],
+          labels: item.relationships?.labels ?? [],
+        }))
+      : [];
+
     return {
       id: res.data.id,
       ...res.data.attributes,
-      work_items: res.data.relationships?.work_items ?? [],
+      work_items: workItems,
     };
   },
 
@@ -86,6 +102,20 @@ export const cycleService = {
       url: `${API_BASE_URL}/cycles/${cycleId}/work-items`,
       method: "POST",
       data: { work_item_ids: workItemIds },
+    });
+  },
+
+  removeWorkItem: async (cycleId: string | number, workItemId: string | number) => {
+    return httpRequestService({
+      url: `${API_BASE_URL}/cycles/${cycleId}/work-items/${workItemId}`,
+      method: "DELETE",
+    });
+  },
+
+  delete: async (cycleId: string | number) => {
+    return httpRequestService<{ message: string }>({
+      url: `${API_BASE_URL}/cycles/${cycleId}`,
+      method: "DELETE",
     });
   },
 };

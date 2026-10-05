@@ -34,8 +34,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import { NotFoundView } from "@/components/common/NotFoundView";
 
 export default function InstanceAdminPage() {
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [settings, setSettings] = useState<InstanceSettings | null>(null);
   const [health, setHealth] = useState<SystemHealthData | null>(null);
   const [users, setUsers] = useState<InstanceUser[]>([]);
@@ -72,8 +75,14 @@ export default function InstanceAdminPage() {
   };
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    if (!isAuthLoading) {
+      if (user?.is_instance_admin) {
+        loadAll();
+      } else {
+        setIsLoading(false);
+      }
+    }
+  }, [isAuthLoading, user]);
 
   const handleRefreshHealth = async () => {
     setIsRefreshingHealth(true);
@@ -135,6 +144,26 @@ export default function InstanceAdminPage() {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-28">
+        <Loader2 className="size-8 text-indigo-600 animate-spin mb-3" />
+        <p className="text-sm text-slate-500 font-medium">Validando permisos de acceso...</p>
+      </div>
+    );
+  }
+
+  if (!user?.is_instance_admin) {
+    return (
+      <NotFoundView
+        title="Página no encontrada"
+        description="La consola de gobernanza no existe o no cuentas con los privilegios de administrador necesarios para acceder a ella."
+        actionText="Volver al Home"
+        actionHref="/overview"
+      />
+    );
+  }
+
   if (isLoading || !settings) {
     return (
       <div className="flex flex-col items-center justify-center py-28">
@@ -145,7 +174,7 @@ export default function InstanceAdminPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>

@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store";
 import { workspaceService } from "@/services/plane/workspaceService";
-import { Building2, Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
+import { Building2, Check, ChevronsUpDown, Plus, Loader2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -110,6 +110,16 @@ export function WorkspaceSwitcher() {
               </div>
 
               <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={() => router.push("/workspace/settings")}
+                className="flex items-center gap-2 px-2 py-2 cursor-pointer text-slate-700 font-medium text-sm hover:bg-slate-100"
+              >
+                <div className="flex size-7 items-center justify-center rounded border border-slate-200 text-slate-500">
+                  <Settings className="size-4" />
+                </div>
+                <span>Ajustes e Integraciones</span>
+              </DropdownMenuItem>
 
               <DropdownMenuItem
                 onClick={() => setOpenModal(true)}

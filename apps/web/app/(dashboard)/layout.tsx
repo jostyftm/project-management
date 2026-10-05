@@ -50,20 +50,24 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
-            <Link
-              href="/instance-admin"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all"
-            >
-              <ShieldCheck className="size-3.5 text-indigo-600" />
-              <span>Gobernanza</span>
-            </Link>
+            {user?.is_instance_admin && (
+              <Link
+                href="/instance-admin"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 rounded-lg transition-all cursor-pointer"
+              >
+                <ShieldCheck className="size-3.5 text-indigo-600" />
+                <span>Gobernanza</span>
+              </Link>
+            )}
             <NotificationBell />
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {children}
-        </div>
+        <main className="flex-1 overflow-y-auto py-6">
+          <div className="w-[95%] mx-auto">
+            {children}
+          </div>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

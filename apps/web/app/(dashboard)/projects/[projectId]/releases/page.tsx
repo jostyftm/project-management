@@ -133,6 +133,8 @@ export default function ProjectReleasesPage() {
     );
   };
 
+  const isAdmin = project?.current_user_role === "ADMIN";
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb Header */}
@@ -159,13 +161,15 @@ export default function ProjectReleasesPage() {
           </div>
         </div>
 
-        <Button
-          onClick={() => setOpenCreateModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs font-semibold h-9 shadow-sm"
-        >
-          <Plus className="size-4" />
-          <span>Nuevo Release</span>
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={() => setOpenCreateModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs font-semibold h-9 shadow-sm"
+          >
+            <Plus className="size-4" />
+            <span>Nuevo Release</span>
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -180,9 +184,11 @@ export default function ProjectReleasesPage() {
           <p className="text-sm text-slate-500 max-w-sm mt-1">
             Empaqueta entregables, vincula work items y genera notas de versión estructuradas automáticamente.
           </p>
-          <Button onClick={() => setOpenCreateModal(true)} className="mt-4 bg-indigo-600 text-white text-xs">
-            <Plus className="size-4 mr-1.5" /> Crear Release
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setOpenCreateModal(true)} className="mt-4 bg-indigo-600 text-white text-xs">
+              <Plus className="size-4 mr-1.5" /> Crear Release
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -247,24 +253,28 @@ export default function ProjectReleasesPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0 self-end md:self-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenPublishModal(rel)}
-                    className="h-8 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200"
-                  >
-                    <Sparkles className="size-3.5 text-indigo-600" />
-                    <span>{isPublished ? "Ver Changelog" : "Publicar / Changelog"}</span>
-                  </Button>
+                  {(isPublished || isAdmin) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenPublishModal(rel)}
+                      className="h-8 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200"
+                    >
+                      <Sparkles className="size-3.5 text-indigo-600" />
+                      <span>{isPublished ? "Ver Changelog" : "Publicar / Changelog"}</span>
+                    </Button>
+                  )}
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(rel.id)}
-                    className="size-8 text-slate-400 hover:text-red-600 cursor-pointer"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(rel.id)}
+                      className="size-8 text-slate-400 hover:text-red-600 cursor-pointer"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             );

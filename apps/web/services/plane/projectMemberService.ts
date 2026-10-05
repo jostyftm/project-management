@@ -6,6 +6,7 @@ export interface ProjectMemberUser {
   name: string;
   email: string;
   role: "ADMIN" | "MEMBER" | "VIEWER";
+  avatar_url?: string | null;
   joined_at?: string;
 }
 
@@ -63,6 +64,7 @@ export interface PublicInvitationDetails {
       name: string;
       email: string;
     } | null;
+    user_exists?: boolean;
     expires_at: string;
   };
 }
@@ -142,5 +144,44 @@ export const projectMemberService = {
     });
 
     return res.data;
+  },
+
+  onboardAndAccept: async (
+    token: string,
+    payload: { name: string; password: string }
+  ): Promise<{
+    token: string;
+    user: any;
+    current_workspace: any;
+    data: {
+      project: {
+        id: string;
+        name: string;
+        identifier: string;
+        workspace_slug: string;
+      };
+    };
+    message: string;
+  }> => {
+    const res = await httpRequestService<{
+      token: string;
+      user: any;
+      current_workspace: any;
+      data: {
+        project: {
+          id: string;
+          name: string;
+          identifier: string;
+          workspace_slug: string;
+        };
+      };
+      message: string;
+    }>({
+      url: `${API_BASE_URL}/invitations/${token}/onboard`,
+      method: "POST",
+      data: payload,
+    });
+
+    return res;
   },
 };

@@ -14,6 +14,7 @@ export interface UserLoggedCompat {
   name: string;
   email: string;
   avatar_url?: string | null;
+  is_instance_admin?: boolean;
   attributes: {
     name: string;
     username: string;
@@ -45,6 +46,7 @@ export function useAuth() {
         name: userData.name,
         email: userData.email,
         avatar_url: userData.avatar_url,
+        is_instance_admin: Boolean(userData.is_instance_admin),
         attributes: {
           name: userData.name,
           username: userData.name,
@@ -70,7 +72,7 @@ export function useAuth() {
     loadMe();
   }, [loadMe]);
 
-  const login = async (payload: { email: string; password: string }) => {
+  const login = async (payload: { email: string; password: string }, redirectUrl?: string) => {
     setIsLoading(true);
     try {
       const res = await authService.login(payload);
@@ -86,6 +88,7 @@ export function useAuth() {
         name: userData.name,
         email: userData.email,
         avatar_url: userData.avatar_url,
+        is_instance_admin: Boolean(userData.is_instance_admin),
         attributes: {
           name: userData.name,
           username: userData.name,
@@ -98,7 +101,7 @@ export function useAuth() {
       setUser(compatUser);
       setIsLoading(false);
       toast.success("¡Bienvenido!");
-      router.push(DASHBOARD_ROUTE);
+      router.push(redirectUrl || DASHBOARD_ROUTE);
       return res;
     } catch (error: any) {
       setIsLoading(false);
@@ -108,7 +111,10 @@ export function useAuth() {
     }
   };
 
-  const register = async (payload: { name: string; email: string; password: string; workspace_name?: string }) => {
+  const register = async (
+    payload: { name: string; email: string; password: string; workspace_name?: string },
+    redirectUrl?: string
+  ) => {
     setIsLoading(true);
     try {
       const res = await authService.register(payload);
@@ -124,6 +130,7 @@ export function useAuth() {
         name: userData.name,
         email: userData.email,
         avatar_url: userData.avatar_url,
+        is_instance_admin: Boolean(userData.is_instance_admin),
         attributes: {
           name: userData.name,
           username: userData.name,
@@ -136,7 +143,7 @@ export function useAuth() {
       setUser(compatUser);
       setIsLoading(false);
       toast.success("Cuenta creada exitosamente");
-      router.push(DASHBOARD_ROUTE);
+      router.push(redirectUrl || DASHBOARD_ROUTE);
       return res;
     } catch (error: any) {
       setIsLoading(false);

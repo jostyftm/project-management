@@ -55,9 +55,9 @@ export default function WorkItemDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 p-4 sm:p-6 lg:p-8 space-y-4">
+    <div className="w-full space-y-4">
       {/* Top Navigation & Breadcrumbs Bar */}
-      <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+      <div className="w-full flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
           <Button
             variant="ghost"

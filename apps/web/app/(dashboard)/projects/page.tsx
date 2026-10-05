@@ -79,7 +79,7 @@ export default function ProjectsPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -121,11 +121,13 @@ export default function ProjectsPage() {
           <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 mb-4">
             <FolderKanban className="size-6" />
           </div>
-          <h3 className="text-base font-semibold text-slate-900">No hay proyectos</h3>
-          <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+          <h3 className="text-base font-semibold text-slate-900">
+            {search ? "No se encontraron proyectos" : "Sin proyectos disponibles"}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500 max-w-md mx-auto">
             {search
               ? "No se encontraron proyectos que coincidan con la búsqueda."
-              : "Comienza creando tu primer proyecto para organizar work items, ciclos y sprints."}
+              : "No perteneces a ningún proyecto en este workspace o aún no se han creado proyectos. Crea uno nuevo o solicita al administrador que te invite."}
           </p>
           {!search && (
             <Button
@@ -150,9 +152,28 @@ export default function ProjectsPage() {
                     <Hash className="size-3 text-slate-400" />
                     <span>{proj.identifier}</span>
                   </div>
-                  <span className="text-xs text-slate-400">
-                    {proj.work_items_count ?? 0} items
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {proj.current_user_role && (
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                          proj.current_user_role === "ADMIN"
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            : proj.current_user_role === "MEMBER"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}
+                      >
+                        {proj.current_user_role === "ADMIN"
+                          ? "Admin"
+                          : proj.current_user_role === "MEMBER"
+                          ? "Miembro"
+                          : "Visualizador"}
+                      </span>
+                    )}
+                    <span className="text-xs text-slate-400">
+                      {proj.work_items_count ?? 0} items
+                    </span>
+                  </div>
                 </div>
                 <CardTitle className="text-lg font-semibold text-slate-900 line-clamp-1">
                   {proj.name}
@@ -168,7 +189,7 @@ export default function ProjectsPage() {
                   className="w-full justify-between text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium text-sm group"
                 >
                   <Link href={`/projects/${proj.id}`}>
-                    <span>Ver Work Items</span>
+                    <span>Abrir Proyecto</span>
                     <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>

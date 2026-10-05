@@ -1081,7 +1081,7 @@ export function WorkItemCreateModal({
 
   if (activeMode === "page") {
     return (
-      <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="w-full p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {formContent}
       </div>
     );

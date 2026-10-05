@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { cycleService } from "@/services/plane/cycleService";
 import { projectService } from "@/services/plane/projectService";
-import { Cycle, CycleAnalytics, Project } from "@/types/plane-types";
+import { Cycle, CycleAnalytics, Project, State } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CycleDetailView } from "@/components/plane/cycles/CycleDetailView";
 import {
   Repeat,
   Plus,
@@ -26,7 +27,17 @@ import {
   Loader2,
   BarChart3,
   Undo2,
+  MoreHorizontal,
+  Edit2,
+  Trash2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -36,23 +47,40 @@ export default function CyclesPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [states, setStates] = useState<State[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<"current" | "upcoming" | "completed">("current");
 
-  // Create Cycle Modal
+  // Create / Edit Cycle Modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
+  const [editingCycleId, setEditingCycleId] = useState<string | number | null>(null);
   const [cycleName, setCycleName] = useState("");
   const [cycleDesc, setCycleDesc] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Edit Date Range Modal
+  const [openEditDatesModal, setOpenEditDatesModal] = useState(false);
+  const [cycleToEditDates, setCycleToEditDates] = useState<Cycle | null>(null);
+  const [datesStartDate, setDatesStartDate] = useState("");
+  const [datesEndDate, setDatesEndDate] = useState("");
+  const [isSavingDates, setIsSavingDates] = useState(false);
+
   // Complete Cycle Modal
   const [openCompleteModal, setOpenCompleteModal] = useState(false);
   const [cycleToComplete, setCycleToComplete] = useState<Cycle | null>(null);
+  const [incompleteItemsCount, setIncompleteItemsCount] = useState<number>(0);
+  const [nextCycleCandidate, setNextCycleCandidate] = useState<Cycle | null>(null);
   const [transferTarget, setTransferTarget] = useState<"BACKLOG" | "CYCLE">("BACKLOG");
   const [targetCycleId, setTargetCycleId] = useState<string>("");
+  const [isLoadingCheck, setIsLoadingCheck] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+
+  // Delete Cycle Modal
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  const [cycleToDelete, setCycleToDelete] = useState<Cycle | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Analytics Modal
   const [openAnalyticsModal, setOpenAnalyticsModal] = useState(false);
@@ -62,12 +90,14 @@ export default function CyclesPage() {
   const loadCycles = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [projData, cyclesData] = await Promise.all([
+      const [projData, cyclesData, statesData] = await Promise.all([
         projectService.get(projectId),
         cycleService.list(projectId),
+        projectService.getStates(projectId),
       ]);
       setProject(projData);
       setCycles(cyclesData);
+      setStates(statesData);
     } catch {
       toast.error("Error al cargar los ciclos");
     } finally {
@@ -83,20 +113,31 @@ export default function CyclesPage() {
   const upcomingCycles = cycles.filter((c) => c.status === "UPCOMING" || c.status === "DRAFT");
   const completedCycles = cycles.filter((c) => c.status === "COMPLETED");
 
-  const handleCreateCycle = async (e: React.FormEvent) => {
+  const handleCreateOrUpdateCycle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cycleName.trim()) return;
 
     setIsSubmitting(true);
     try {
-      await cycleService.create(projectId, {
-        name: cycleName.trim(),
-        description: cycleDesc.trim() || undefined,
-        start_date: startDate || undefined,
-        end_date: endDate || undefined,
-        status: currentCycles.length === 0 ? "CURRENT" : "UPCOMING",
-      });
-      toast.success("Ciclo creado exitosamente");
+      if (editingCycleId) {
+        await cycleService.update(editingCycleId, {
+          name: cycleName.trim(),
+          description: cycleDesc.trim() || undefined,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        });
+        toast.success("Ciclo actualizado exitosamente");
+      } else {
+        await cycleService.create(projectId, {
+          name: cycleName.trim(),
+          description: cycleDesc.trim() || undefined,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+          status: currentCycles.length === 0 ? "CURRENT" : "UPCOMING",
+        });
+        toast.success("Ciclo creado exitosamente");
+      }
+      setEditingCycleId(null);
       setCycleName("");
       setCycleDesc("");
       setStartDate("");
@@ -104,7 +145,7 @@ export default function CyclesPage() {
       setOpenCreateModal(false);
       loadCycles();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Error al crear el ciclo");
+      toast.error(err?.response?.data?.message || "Error al procesar el ciclo");
     } finally {
       setIsSubmitting(false);
     }
@@ -120,11 +161,61 @@ export default function CyclesPage() {
     }
   };
 
-  const handleOpenCompleteModal = (cycle: Cycle) => {
+  const handleOpenEditDates = (cycle: Cycle) => {
+    setCycleToEditDates(cycle);
+    setDatesStartDate(cycle.start_date || "");
+    setDatesEndDate(cycle.end_date || "");
+    setOpenEditDatesModal(true);
+  };
+
+  const handleSaveCycleDates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cycleToEditDates) return;
+
+    setIsSavingDates(true);
+    try {
+      await cycleService.update(cycleToEditDates.id, {
+        start_date: datesStartDate || undefined,
+        end_date: datesEndDate || undefined,
+      });
+      toast.success(`Rango de fechas de "${cycleToEditDates.name}" actualizado`);
+      setOpenEditDatesModal(false);
+      loadCycles();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Error al actualizar las fechas");
+    } finally {
+      setIsSavingDates(false);
+    }
+  };
+
+  const handleOpenCompleteModal = async (cycle: Cycle) => {
     setCycleToComplete(cycle);
-    setTransferTarget("BACKLOG");
-    setTargetCycleId("");
+    setIsLoadingCheck(true);
     setOpenCompleteModal(true);
+
+    // Encontrar candidato al siguiente ciclo
+    const next = upcomingCycles.find((c) => String(c.id) !== String(cycle.id)) || null;
+    setNextCycleCandidate(next);
+    if (next) {
+      setTransferTarget("CYCLE");
+      setTargetCycleId(String(next.id));
+    } else {
+      setTransferTarget("BACKLOG");
+      setTargetCycleId("");
+    }
+
+    try {
+      const detailed = await cycleService.get(cycle.id);
+      const items = detailed.work_items || [];
+      const incomplete = items.filter(
+        (item) => item.state?.group !== "COMPLETED" && item.state?.group !== "CANCELLED"
+      );
+      setIncompleteItemsCount(incomplete.length);
+    } catch {
+      setIncompleteItemsCount(0);
+    } finally {
+      setIsLoadingCheck(false);
+    }
   };
 
   const handleCompleteCycle = async () => {
@@ -135,13 +226,45 @@ export default function CyclesPage() {
         transfer_target: transferTarget,
         target_cycle_id: transferTarget === "CYCLE" && targetCycleId ? targetCycleId : undefined,
       });
-      toast.success(`Ciclo "${cycleToComplete.name}" completado. Items pendientes regresados al backlog.`);
+      if (incompleteItemsCount > 0) {
+        if (transferTarget === "CYCLE" && nextCycleCandidate) {
+          toast.success(
+            `Ciclo "${cycleToComplete.name}" completado. ${incompleteItemsCount} tareas pendientes trasladadas a "${nextCycleCandidate.name}".`
+          );
+        } else {
+          toast.success(
+            `Ciclo "${cycleToComplete.name}" completado. ${incompleteItemsCount} tareas pendientes desvinculadas y regresadas al backlog.`
+          );
+        }
+      } else {
+        toast.success(`Ciclo "${cycleToComplete.name}" completado exitosamente.`);
+      }
       setOpenCompleteModal(false);
       loadCycles();
     } catch (err: any) {
-      toast.error("Error al finalizar el ciclo");
+      toast.error(err?.response?.data?.message || "Error al finalizar el ciclo");
     } finally {
       setIsCompleting(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (cycle: Cycle) => {
+    setCycleToDelete(cycle);
+    setOpenDeleteModal(true);
+  };
+
+  const handleDeleteCycle = async () => {
+    if (!cycleToDelete) return;
+    setIsDeleting(true);
+    try {
+      await cycleService.delete(cycleToDelete.id);
+      toast.success(`Ciclo "${cycleToDelete.name}" y sus work items asociados fueron eliminados.`);
+      setOpenDeleteModal(false);
+      loadCycles();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Error al eliminar el ciclo");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -167,8 +290,10 @@ export default function CyclesPage() {
     );
   }
 
+  const isAdmin = project?.current_user_role === "ADMIN";
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -181,169 +306,151 @@ export default function CyclesPage() {
           </p>
         </div>
 
-        <Button
-          onClick={() => setOpenCreateModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-        >
-          <Plus className="mr-2 size-4" />
-          Nuevo Ciclo
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={() => setOpenCreateModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+          >
+            <Plus className="mr-2 size-4" />
+            Nuevo Ciclo
+          </Button>
+        )}
       </div>
 
-      {/* Tabs */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
-        <TabsList className="bg-slate-100 p-1 rounded-xl">
-          <TabsTrigger value="current" className="data-[state=active]:bg-white data-[state=active]:text-indigo-600 font-medium">
-            En Curso ({currentCycles.length})
-          </TabsTrigger>
-          <TabsTrigger value="upcoming" className="data-[state=active]:bg-white data-[state=active]:text-indigo-600 font-medium">
-            Próximos ({upcomingCycles.length})
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="data-[state=active]:bg-white data-[state=active]:text-indigo-600 font-medium">
-            Completados ({completedCycles.length})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Current Cycle Tab */}
-        <TabsContent value="current" className="mt-6 space-y-4">
-          {currentCycles.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <Repeat className="size-8 text-slate-400 mx-auto mb-2" />
-              <h3 className="font-semibold text-slate-900">No hay ningún ciclo activo</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Puedes iniciar uno de tus ciclos planificados o crear uno nuevo.
-              </p>
-              {upcomingCycles.length > 0 && (
-                <Button
-                  onClick={() => setTab("upcoming")}
-                  variant="outline"
-                  className="mt-4"
-                >
-                  Ver ciclos próximos
-                </Button>
-              )}
-            </div>
-          ) : (
-            currentCycles.map((cycle) => {
-              const total = cycle.total_items ?? 0;
-              const completed = cycle.completed_items ?? 0;
-              const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-              return (
-                <Card key={cycle.id} className="border-indigo-200 bg-white shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <CardTitle className="text-xl text-slate-900">{cycle.name}</CardTitle>
-                        <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
-                          Activo
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Calendar className="size-3.5" />
-                        <span>{cycle.start_date || "Inicio"} — {cycle.end_date || "Fin"}</span>
-                      </div>
-                    </div>
-                    {cycle.description && (
-                      <CardDescription className="mt-1 text-slate-600">{cycle.description}</CardDescription>
-                    )}
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    {/* Progress bar */}
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1.5">
-                        <span>Progreso del ciclo</span>
-                        <span>{progress}% ({completed} de {total} items completados)</span>
-                      </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div
-                          className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-
-                  <CardFooter className="border-t border-slate-100 pt-3 flex items-center justify-between">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenAnalytics(cycle)}
-                      className="text-slate-600 hover:text-indigo-600"
-                    >
-                      <BarChart3 className="size-4 mr-1.5" />
-                      Analíticas y Burn-down
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenCompleteModal(cycle)}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white"
-                    >
-                      <CheckCircle2 className="size-4 mr-1.5" />
-                      Completar Ciclo
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        {/* Upcoming Cycles Tab */}
-        <TabsContent value="upcoming" className="mt-6 space-y-4">
-          {upcomingCycles.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
-              No hay ciclos planificados próximos.
-            </div>
-          ) : (
-            upcomingCycles.map((cycle) => (
-              <Card key={cycle.id} className="border-slate-200 bg-white">
-                <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base font-semibold text-slate-900">{cycle.name}</CardTitle>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                      <Calendar className="size-3.5" />
-                      <span>{cycle.start_date || "Fecha por definir"} — {cycle.end_date || "Fecha por definir"}</span>
-                    </div>
-                  </div>
-
+      {/* Cycle Detail View (Activo / Próximo / Completado) */}
+      <CycleDetailView
+        cycle={currentCycles[0] || null}
+        projectId={projectId}
+        project={project}
+        states={states}
+        onCycleUpdated={loadCycles}
+        activeTab={tab === "current" ? "active" : tab}
+        onTabChange={(newTab) => setTab(newTab === "active" ? "current" : newTab)}
+        onCompleteCycle={(c) => handleOpenCompleteModal(c)}
+        onEditDates={(c) => handleOpenEditDates(c)}
+        onDeleteCycle={(c) => handleOpenDeleteModal(c)}
+        onEditCycle={(c) => {
+          setEditingCycleId(c.id);
+          setCycleName(c.name);
+          setCycleDesc(c.description || "");
+          setStartDate(c.start_date || "");
+          setEndDate(c.end_date || "");
+          setOpenCreateModal(true);
+        }}
+        upcomingContent={
+          <div className="space-y-4">
+            {upcomingCycles.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-500">
+                <Repeat className="size-8 text-slate-400 mx-auto mb-2" />
+                <p className="font-medium text-slate-800 dark:text-slate-200">No hay ciclos planificados próximos</p>
+                <p className="text-xs text-slate-500 mt-1">Crea un nuevo ciclo para la siguiente iteración.</p>
+                {isAdmin && (
                   <Button
-                    size="sm"
+                    onClick={() => {
+                      setEditingCycleId(null);
+                      setCycleName("");
+                      setCycleDesc("");
+                      setStartDate("");
+                      setEndDate("");
+                      setOpenCreateModal(true);
+                    }}
                     variant="outline"
-                    onClick={() => handleStartCycle(cycle)}
-                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    size="sm"
+                    className="mt-4"
                   >
-                    <Play className="size-3.5 mr-1.5" />
-                    Iniciar Ciclo
+                    <Plus className="size-3.5 mr-1.5" />
+                    Crear Próximo Ciclo
                   </Button>
-                </CardHeader>
-              </Card>
-            ))
-          )}
-        </TabsContent>
+                )}
+              </div>
+            ) : (
+              upcomingCycles.map((cycle) => (
+                <Card key={cycle.id} className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">{cycle.name}</CardTitle>
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                        <Calendar className="size-3.5" />
+                        <span>{cycle.start_date || "Fecha por definir"} — {cycle.end_date || "Fecha por definir"}</span>
+                      </div>
+                    </div>
 
-        {/* Completed Cycles Tab */}
-        <TabsContent value="completed" className="mt-6 space-y-4">
-          {completedCycles.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
-              No hay ciclos completados aún.
-            </div>
-          ) : (
-            completedCycles.map((cycle) => {
-              const total = cycle.total_items ?? 0;
-              const completed = cycle.completed_items ?? 0;
-              const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStartCycle(cycle)}
+                            className="border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
+                          >
+                            <Play className="size-3.5 mr-1.5" />
+                            Iniciar Ciclo
+                          </Button>
 
-              return (
-                <Card key={cycle.id} className="border-slate-200 bg-white">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 text-slate-500 hover:text-slate-800"
+                              >
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 text-xs">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingCycleId(cycle.id);
+                                  setCycleName(cycle.name);
+                                  setCycleDesc(cycle.description || "");
+                                  setStartDate(cycle.start_date || "");
+                                  setEndDate(cycle.end_date || "");
+                                  setOpenCreateModal(true);
+                                }}
+                              >
+                                <Edit2 className="size-3.5 mr-2 text-slate-500" />
+                                <span>Editar ciclo</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenEditDates(cycle)}>
+                                <Calendar className="size-3.5 mr-2 text-indigo-600" />
+                                <span>Editar rango de fechas</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleOpenDeleteModal(cycle)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash2 className="size-3.5 mr-2" />
+                                <span>Eliminar ciclo</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </>
+                      )}
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))
+            )}
+          </div>
+        }
+        completedContent={
+          <div className="space-y-4">
+            {completedCycles.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-500">
+                <CheckCircle2 className="size-8 text-slate-400 mx-auto mb-2" />
+                <p className="font-medium text-slate-800 dark:text-slate-200">No hay ciclos completados aún</p>
+                <p className="text-xs text-slate-500 mt-1">Los ciclos finalizados y sus métricas históricas aparecerán aquí.</p>
+              </div>
+            ) : (
+              completedCycles.map((cycle) => (
+                <Card key={cycle.id} className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <CardHeader className="pb-3 flex flex-row items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-base font-semibold text-slate-900">{cycle.name}</CardTitle>
-                        <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-medium">
+                        <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">{cycle.name}</CardTitle>
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs px-2 py-0.5 rounded-full font-medium">
                           Completado
                         </span>
                       </div>
@@ -352,37 +459,69 @@ export default function CyclesPage() {
                       </p>
                     </div>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenAnalytics(cycle)}
-                      className="text-slate-600 hover:text-indigo-600"
-                    >
-                      <BarChart3 className="size-4 mr-1.5" />
-                      Ver Estadísticas
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenAnalytics(cycle)}
+                        className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                      >
+                        <BarChart3 className="size-4 mr-1.5" />
+                        Ver Estadísticas
+                      </Button>
+
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-slate-500 hover:text-slate-800"
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48 text-xs">
+                            <DropdownMenuItem onClick={() => handleOpenEditDates(cycle)}>
+                              <Calendar className="size-3.5 mr-2 text-indigo-600" />
+                              <span>Editar rango de fechas</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDeleteModal(cycle)}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash2 className="size-3.5 mr-2" />
+                              <span>Eliminar ciclo</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </CardHeader>
                 </Card>
-              );
-            })
-          )}
-        </TabsContent>
-      </Tabs>
+              ))
+            )}
+          </div>
+        }
+      />
 
-      {/* Modal Crear Ciclo */}
+      {/* Modal Crear / Editar Ciclo */}
       <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Repeat className="size-5 text-indigo-600" />
-              Nuevo Ciclo (Sprint)
+              {editingCycleId ? "Editar Ciclo" : "Nuevo Ciclo (Sprint)"}
             </DialogTitle>
             <DialogDescription>
-              Define el periodo de tiempo y los objetivos para este ciclo.
+              {editingCycleId
+                ? "Modifica el nombre, descripción y fechas del ciclo."
+                : "Define el periodo de tiempo y los objetivos para este ciclo."}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreateCycle} className="space-y-4 py-2">
+          <form onSubmit={handleCreateOrUpdateCycle} className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="cycle-name">Nombre del Ciclo *</Label>
               <Input
@@ -427,79 +566,169 @@ export default function CyclesPage() {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenCreateModal(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpenCreateModal(false);
+                  setEditingCycleId(null);
+                }}
+              >
                 Cancelar
               </Button>
               <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Crear Ciclo
+                {editingCycleId ? "Guardar Cambios" : "Crear Ciclo"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Modal Completar Ciclo (Regla de negocio acordada con el usuario) */}
+      {/* Modal Editar Rango de Fechas */}
+      <Dialog open={openEditDatesModal} onOpenChange={setOpenEditDatesModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="size-5 text-indigo-600" />
+              Editar Rango de Fechas
+            </DialogTitle>
+            <DialogDescription>
+              Ajusta las fechas de inicio y fin para el ciclo &quot;{cycleToEditDates?.name}&quot;.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveCycleDates} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-dates-start">Fecha de Inicio</Label>
+              <Input
+                id="edit-dates-start"
+                type="date"
+                value={datesStartDate}
+                onChange={(e) => setDatesStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-dates-end">Fecha de Fin</Label>
+              <Input
+                id="edit-dates-end"
+                type="date"
+                value={datesEndDate}
+                onChange={(e) => setDatesEndDate(e.target.value)}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpenEditDatesModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                disabled={isSavingDates}
+              >
+                {isSavingDates ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+                Guardar Fechas
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Completar Ciclo (con verificación de tareas pendientes) */}
       <Dialog open={openCompleteModal} onOpenChange={setOpenCompleteModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <CheckCircle2 className="size-5 text-indigo-600" />
-              Finalizar {cycleToComplete?.name}
+              Finalizar Ciclo: {cycleToComplete?.name}
             </DialogTitle>
             <DialogDescription>
-              Al completar este ciclo, los work items pendientes se transferirán de acuerdo con la política seleccionada.
+              Revisa el estado de las tareas antes de completar la iteración.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3.5 flex items-start gap-3">
-              <AlertTriangle className="size-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-800">
-                <p className="font-semibold">Política de preservación de estadísticas:</p>
-                <p className="mt-0.5">
-                  Los items no completados quedarán registrados históricamente con estado <code>TRANSFERRED_TO_BACKLOG</code> para que las analíticas y gráficas de burn-down reflejen el trabajo inconcluso.
-                </p>
-              </div>
+          {isLoadingCheck ? (
+            <div className="py-10 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="size-6 text-indigo-600 animate-spin" />
+              <p className="text-xs text-slate-500">Verificando tareas del ciclo...</p>
             </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              {incompleteItemsCount > 0 ? (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-900 font-semibold text-sm">
+                    <AlertTriangle className="size-4 text-amber-600 shrink-0" />
+                    <span>
+                      Hay {incompleteItemsCount} {incompleteItemsCount === 1 ? "tarea pendiente" : "tareas pendientes"} sin completar
+                    </span>
+                  </div>
 
-            <div className="space-y-2">
-              <Label>Destino de los Work Items pendientes</Label>
-              <Select value={transferTarget} onValueChange={(v) => setTransferTarget(v as any)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="BACKLOG">
-                    Regresar al Backlog (Por defecto)
-                  </SelectItem>
-                  {upcomingCycles.length > 0 && (
-                    <SelectItem value="CYCLE">
-                      Transferir a otro ciclo próximo
-                    </SelectItem>
+                  {nextCycleCandidate ? (
+                    <div className="space-y-3 pt-1">
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Al completar el ciclo, las tareas pendientes se <strong>trasladarán automáticamente al ciclo siguiente: &quot;{nextCycleCandidate.name}&quot;</strong>.
+                      </p>
+
+                      <div className="space-y-1.5 pt-1">
+                        <Label className="text-xs font-semibold text-amber-900">Destino de las tareas pendientes:</Label>
+                        <Select value={transferTarget} onValueChange={(v) => setTransferTarget(v as any)}>
+                          <SelectTrigger className="bg-white border-amber-200 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CYCLE">
+                              Trasladar al siguiente ciclo ({nextCycleCandidate.name})
+                            </SelectItem>
+                            <SelectItem value="BACKLOG">
+                              Quitar del ciclo (regresar al Backlog del proyecto)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {transferTarget === "CYCLE" && upcomingCycles.length > 1 && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-amber-900">Seleccionar otro ciclo próximo:</Label>
+                          <Select value={targetCycleId} onValueChange={setTargetCycleId}>
+                            <SelectTrigger className="bg-white border-amber-200 text-xs">
+                              <SelectValue placeholder="Elige un ciclo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {upcomingCycles.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                  {c.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-800 leading-relaxed pt-1">
+                      <strong>No existe un ciclo siguiente planificado.</strong> Al completar el ciclo, se <strong>quitará la relación del ciclo de estas tareas</strong> y regresarán al Backlog del proyecto.
+                    </p>
                   )}
-                </SelectContent>
-              </Select>
+                </div>
+              ) : (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
+                  <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-emerald-900 space-y-1">
+                    <p className="font-semibold text-sm">¡Todas las tareas están completadas!</p>
+                    <p className="text-emerald-700 leading-relaxed">
+                      Todas las tareas asignadas a este ciclo se encuentran finalizadas. Al completar el ciclo, se consolidarán las métricas y el historial de entrega.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {transferTarget === "CYCLE" && (
-              <div className="space-y-2">
-                <Label>Selecciona el ciclo de destino</Label>
-                <Select value={targetCycleId} onValueChange={setTargetCycleId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige un ciclo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {upcomingCycles.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
+          )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenCompleteModal(false)}>
@@ -508,10 +737,57 @@ export default function CyclesPage() {
             <Button
               onClick={handleCompleteCycle}
               className="bg-indigo-600 hover:bg-indigo-500 text-white"
-              disabled={isCompleting || (transferTarget === "CYCLE" && !targetCycleId)}
+              disabled={isCompleting || isLoadingCheck || (transferTarget === "CYCLE" && !targetCycleId)}
             >
               {isCompleting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-              Confirmar y Cerrar Ciclo
+              Confirmar y Finalizar Ciclo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Eliminar Ciclo (con advertencia de eliminación de work items asociados) */}
+      <Dialog open={openDeleteModal} onOpenChange={setOpenDeleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="size-5" />
+              Eliminar Ciclo: {cycleToDelete?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción es permanente y afectará a los datos vinculados.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+              <AlertTriangle className="size-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-red-900 space-y-1.5">
+                <p className="font-bold text-sm">
+                  ¿Estás seguro de que deseas eliminar este ciclo?
+                </p>
+                <p className="text-red-700 leading-relaxed">
+                  Al eliminar el ciclo <strong>&quot;{cycleToDelete?.name}&quot;</strong>, <strong>también se eliminarán todos los work items asociados a él</strong>.
+                </p>
+                <p className="font-semibold text-red-800">
+                  Esta acción no se puede deshacer.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDeleteModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteCycle}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+              Eliminar Ciclo y Work Items
             </Button>
           </DialogFooter>
         </DialogContent>

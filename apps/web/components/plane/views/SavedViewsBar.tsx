@@ -26,11 +26,12 @@ import { Bookmark, Plus, Trash2, Check, RotateCcw, Loader2 } from "lucide-react"
 import { toast } from "sonner";
 
 interface SavedViewsBarProps {
-  projectId: string | number;
+  projectId?: string | number;
   currentLayout: "kanban" | "list" | "calendar" | "gantt";
   currentGroupBy: "state" | "priority";
   currentPriority: string;
   currentType: string;
+  currentState?: string;
   currentSearch: string;
   onApplyView: (view: SavedView) => void;
   onResetView: () => void;
@@ -42,6 +43,7 @@ export function SavedViewsBar({
   currentGroupBy,
   currentPriority,
   currentType,
+  currentState,
   currentSearch,
   onApplyView,
   onResetView,
@@ -69,9 +71,7 @@ export function SavedViewsBar({
   };
 
   useEffect(() => {
-    if (projectId) {
-      fetchViews();
-    }
+    fetchViews();
   }, [projectId]);
 
   const handleSaveCurrentView = async (e: React.FormEvent) => {
@@ -86,6 +86,7 @@ export function SavedViewsBar({
         filters: {
           priority: currentPriority,
           type_id: currentType,
+          state_id: currentState,
           search: currentSearch,
         },
         display_filters: {
@@ -159,7 +160,7 @@ export function SavedViewsBar({
             </div>
           ) : savedViews.length === 0 ? (
             <div className="p-3 text-center text-xs text-slate-400">
-              No tienes vistas guardadas en este proyecto.
+              No tienes vistas guardadas.
             </div>
           ) : (
             savedViews.map((view) => (
@@ -253,7 +254,7 @@ export function SavedViewsBar({
               <p className="font-semibold text-slate-700">Configuración a almacenar:</p>
               <p>• Layout: <span className="font-mono text-indigo-600 font-bold uppercase">{currentLayout}</span></p>
               <p>• Agrupación: <span className="font-mono text-indigo-600 font-bold uppercase">{currentGroupBy}</span></p>
-              <p>• Filtros: Prioridad: {currentPriority}, Tipo: {currentType}</p>
+              <p>• Filtros: Prioridad: {currentPriority}, Tipo: {currentType}{currentState && currentState !== "ALL" ? `, Estado: ${currentState}` : ""}</p>
             </div>
 
             <DialogFooter className="pt-2">

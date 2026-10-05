@@ -93,7 +93,7 @@ export default function TeamspacesPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6 max-w-7xl mx-auto">
+    <div className="flex-1 space-y-6 w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
         <div>

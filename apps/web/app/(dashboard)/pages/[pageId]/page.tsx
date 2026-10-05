@@ -28,11 +28,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function PageDetailPage() {
   const params = useParams();
   const router = useRouter();
   const pageId = String(params.pageId);
+  const { user } = useAuth();
 
   const [page, setPage] = useState<DocPage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,6 +152,13 @@ export default function PageDetailPage() {
     );
   }
 
+  const isProjectAdmin = page.project?.current_user_role === "ADMIN";
+  const isCreator = Boolean(
+    (page.created_by && String(page.created_by) === String(user?.id)) ||
+    ((page as any)?.creator?.id && String((page as any).creator.id) === String(user?.id))
+  );
+  const canDelete = Boolean(user?.is_instance_admin || isProjectAdmin || isCreator);
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Collapsible Left Wiki Tree */}
@@ -258,20 +267,22 @@ export default function PageDetailPage() {
             </Button>
 
             {/* Delete */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="size-8 text-slate-400 hover:text-red-600"
-              title="Eliminar página"
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                className="size-8 text-slate-400 hover:text-red-600"
+                title="Eliminar página"
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            )}
           </div>
         </header>
 
         {/* Document Body */}
-        <div className="flex-1 max-w-4xl w-full mx-auto p-8 space-y-6">
+        <div className="flex-1 w-full p-8 space-y-6">
           {/* Page Header: Icon & Big Title */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">

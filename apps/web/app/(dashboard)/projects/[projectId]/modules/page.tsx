@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { moduleService } from "@/services/plane/moduleService";
 import { projectService } from "@/services/plane/projectService";
-import { Module, ModuleProgress, Project } from "@/types/plane-types";
+import { Module, ModuleProgress, Project, State } from "@/types/plane-types";
+import { ModuleWorkItemsSection } from "@/components/plane/modules/ModuleWorkItemsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,8 @@ import {
   TrendingUp,
   Loader2,
   Layers,
+  ChevronRight,
+  ListTodo,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -40,6 +43,8 @@ export default function ModulesPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
+  const [states, setStates] = useState<State[]>([]);
+  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Create Modal
@@ -58,12 +63,14 @@ export default function ModulesPage() {
   const loadModules = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [projData, modulesData] = await Promise.all([
+      const [projData, modulesData, statesData] = await Promise.all([
         projectService.get(projectId),
         moduleService.list(projectId),
+        projectService.getStates(projectId).catch(() => []),
       ]);
       setProject(projData);
       setModules(modulesData);
+      setStates(statesData);
     } catch {
       toast.error("Error al cargar los módulos");
     } finally {
@@ -123,8 +130,31 @@ export default function ModulesPage() {
     );
   }
 
+  const isAdmin = project?.current_user_role === "ADMIN";
+
+  if (selectedModule) {
+    return (
+      <div className="w-full">
+        <ModuleWorkItemsSection
+          module={selectedModule}
+          projectId={projectId}
+          project={project}
+          states={states}
+          onModuleUpdated={async () => {
+            loadModules();
+            try {
+              const refreshed = await moduleService.get(selectedModule.id);
+              setSelectedModule(refreshed);
+            } catch {}
+          }}
+          onBack={() => setSelectedModule(null)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -133,17 +163,19 @@ export default function ModulesPage() {
             Módulos
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Agrupaciones temáticas de trabajo con métricas y porcentajes de avance agregado.
+            Agrupaciones temáticas de trabajo con métricas y porcentajes de avance agregado. Haz clic en un módulo para gestionar sus work items.
           </p>
         </div>
 
-        <Button
-          onClick={() => setOpenCreateModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-        >
-          <Plus className="mr-2 size-4" />
-          Nuevo Módulo
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={() => setOpenCreateModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+          >
+            <Plus className="mr-2 size-4" />
+            Nuevo Módulo
+          </Button>
+        )}
       </div>
 
       {/* Modules Grid */}
@@ -154,13 +186,15 @@ export default function ModulesPage() {
           <p className="text-sm text-slate-500 mt-1">
             Crea módulos para agrupar features, componentes o iniciativas de tu proyecto.
           </p>
-          <Button
-            onClick={() => setOpenCreateModal(true)}
-            className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-          >
-            <Plus className="mr-2 size-4" />
-            Crear Primer Módulo
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={() => setOpenCreateModal(true)}
+              className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
+            >
+              <Plus className="mr-2 size-4" />
+              Crear Primer Módulo
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -171,7 +205,11 @@ export default function ModulesPage() {
             const completed = module.completed_items ?? 0;
 
             return (
-              <Card key={module.id} className="border-slate-200 bg-white hover:border-indigo-300 transition-all flex flex-col justify-between">
+              <Card
+                key={module.id}
+                onClick={() => setSelectedModule(module)}
+                className="border-slate-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border", statusCfg.color)}>
@@ -185,7 +223,7 @@ export default function ModulesPage() {
                     )}
                   </div>
 
-                  <CardTitle className="text-lg font-semibold text-slate-900 line-clamp-1">
+                  <CardTitle className="text-lg font-semibold text-slate-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
                     {module.name}
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-500 line-clamp-2 mt-1">
@@ -206,15 +244,28 @@ export default function ModulesPage() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="pt-2 border-t border-slate-100">
+                <CardFooter className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setSelectedModule(module)}
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold h-8 shadow-none gap-1.5"
+                  >
+                    <ListTodo className="size-3.5" />
+                    <span>Work Items ({total})</span>
+                  </Button>
+
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleOpenProgress(module)}
-                    className="w-full justify-between text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium text-xs group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenProgress(module);
+                    }}
+                    className="text-slate-500 hover:text-slate-800 text-xs h-8"
                   >
-                    <span>Desglose de estados</span>
-                    <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
+                    <span>Desglose</span>
+                    <ArrowRight className="size-3.5 ml-1 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </CardFooter>
               </Card>

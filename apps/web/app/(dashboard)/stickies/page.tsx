@@ -6,7 +6,7 @@ import { StickyNote } from "lucide-react";
 
 export default function StickiesPage() {
   return (
-    <div className="flex-1 space-y-6 p-6 max-w-7xl mx-auto">
+    <div className="flex-1 space-y-6 w-full">
       {/* Header */}
       <div className="border-b border-slate-200 pb-5">
         <div className="flex items-center gap-2">

@@ -9,6 +9,38 @@ interface JsonApiItem<T> {
   relationships?: any;
 }
 
+function formatWorkItemResponse(item: JsonApiItem<WorkItem>): WorkItem {
+  return {
+    id: item.id,
+    ...item.attributes,
+    state: item.relationships?.state?.attributes
+      ? { id: item.relationships.state.id, ...item.relationships.state.attributes }
+      : undefined,
+    type: item.relationships?.type?.attributes
+      ? { id: item.relationships.type.id, ...item.relationships.type.attributes }
+      : undefined,
+    lead: (item.relationships?.lead as any)?.data
+      ? (item.relationships.lead as any).data
+      : undefined,
+    milestone: (item.relationships?.milestone as any)?.data
+      ? (item.relationships.milestone as any).data
+      : undefined,
+    assignees: item.relationships?.assignees ?? [],
+    labels: (item.relationships?.labels ?? []).map((l: any) => ({
+      id: l.id,
+      ...(l.attributes || l),
+    })),
+    project: item.relationships?.project?.data,
+    creator: (item.relationships?.creator as any)?.data ?? undefined,
+    parent: item.relationships?.parent,
+    sub_items: item.relationships?.sub_items ?? [],
+    cycles: item.relationships?.cycles ?? [],
+    modules: item.relationships?.modules ?? [],
+    outward_relations: item.relationships?.outward_relations ?? [],
+    inward_relations: item.relationships?.inward_relations ?? [],
+  };
+}
+
 export const workItemService = {
   list: async (projectId: string | number, params?: Record<string, any>) => {
     const res = await httpRequestService<{ data: JsonApiItem<WorkItem>[] }>({
@@ -16,25 +48,7 @@ export const workItemService = {
       method: "GET",
       params,
     });
-    return res.data.map((item) => ({
-      id: item.id,
-      ...item.attributes,
-      state: item.relationships?.state?.attributes
-        ? { id: item.relationships.state.id, ...item.relationships.state.attributes }
-        : undefined,
-      type: item.relationships?.type?.attributes
-        ? { id: item.relationships.type.id, ...item.relationships.type.attributes }
-        : undefined,
-      assignees: item.relationships?.assignees ?? [],
-      labels: (item.relationships?.labels ?? []).map((l: any) => ({
-        id: l.id,
-        ...l.attributes,
-      })),
-      project: item.relationships?.project?.data,
-      sub_items: item.relationships?.sub_items ?? [],
-      cycles: item.relationships?.cycles ?? [],
-      modules: item.relationships?.modules ?? [],
-    }));
+    return res.data.map(formatWorkItemResponse);
   },
 
   create: async (projectId: string | number, payload: {
@@ -50,6 +64,7 @@ export const workItemService = {
     module_id?: string | number;
     start_date?: string;
     target_date?: string;
+    lead_id?: string | number | null;
     assignee_ids?: (string | number)[];
     label_ids?: (string | number)[];
   }) => {
@@ -58,13 +73,7 @@ export const workItemService = {
       method: "POST",
       data: payload,
     });
-    return {
-      id: res.data.id,
-      ...res.data.attributes,
-      state: res.data.relationships?.state?.attributes,
-      type: res.data.relationships?.type?.attributes,
-      assignees: res.data.relationships?.assignees ?? [],
-    };
+    return formatWorkItemResponse(res.data);
   },
 
   get: async (id: string | number) => {
@@ -72,24 +81,7 @@ export const workItemService = {
       url: `${API_BASE_URL}/work-items/${id}`,
       method: "GET",
     });
-    return {
-      id: res.data.id,
-      ...res.data.attributes,
-      state: res.data.relationships?.state?.attributes
-        ? { id: res.data.relationships.state.id, ...res.data.relationships.state.attributes }
-        : undefined,
-      type: res.data.relationships?.type?.attributes
-        ? { id: res.data.relationships.type.id, ...res.data.relationships.type.attributes }
-        : undefined,
-      assignees: res.data.relationships?.assignees ?? [],
-      labels: res.data.relationships?.labels ?? [],
-      parent: res.data.relationships?.parent,
-      sub_items: res.data.relationships?.sub_items ?? [],
-      cycles: res.data.relationships?.cycles ?? [],
-      modules: res.data.relationships?.modules ?? [],
-      outward_relations: res.data.relationships?.outward_relations ?? [],
-      inward_relations: res.data.relationships?.inward_relations ?? [],
-    };
+    return formatWorkItemResponse(res.data);
   },
 
   update: async (id: string | number, payload: Partial<WorkItem> & {
@@ -98,18 +90,16 @@ export const workItemService = {
     parent_id?: string | number;
     cycle_id?: string | number;
     module_id?: string | number;
+    lead_id?: string | number | null;
+    assignee_ids?: (string | number)[];
+    label_ids?: (string | number)[];
   }) => {
     const res = await httpRequestService<{ data: JsonApiItem<WorkItem> }>({
       url: `${API_BASE_URL}/work-items/${id}`,
       method: "PUT",
       data: payload,
     });
-    return {
-      id: res.data.id,
-      ...res.data.attributes,
-      state: res.data.relationships?.state?.attributes,
-      type: res.data.relationships?.type?.attributes,
-    };
+    return formatWorkItemResponse(res.data);
   },
 
   delete: async (id: string | number) => {
