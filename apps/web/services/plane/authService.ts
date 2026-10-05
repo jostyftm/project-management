@@ -37,4 +37,19 @@ export const authService = {
       url: `${API_BASE_URL}/auth/logout`,
       method: "POST",
     }),
+
+  forgotPassword: (email: string) =>
+    httpRequestService<{ status: number; data: { message: string } }>({
+      url: `${API_BASE_URL}/auth/forgot-password`,
+      method: "POST",
+      data: { email },
+    }),
+
+  resetPassword: (payload: { email: string; token: string; password: string; password_confirmation: string }) =>
+    httpRequestService<{ status: number; data: { message: string } }>({
+      url: `${API_BASE_URL}/auth/reset-password`,
+      method: "POST",
+      data: payload,
+    }),
 };
+
