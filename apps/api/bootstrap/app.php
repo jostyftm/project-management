@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.sdi' => AuthenticateSdiUser::class,
             'workspace' => \App\Http\Middleware\IdentifyWorkspace::class,
+            'project.member' => \App\Http\Middleware\AuthorizeProjectAccess::class,
+            'workspace.owner' => \App\Http\Middleware\AuthorizeWorkspaceOwner::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

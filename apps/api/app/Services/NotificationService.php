@@ -70,7 +70,7 @@ class NotificationService
     }
 
     /**
-     * Create and send a notification to a recipient.
+     * Create and send a notification to a recipient and optionally queue an email.
      */
     public function sendNotification(
         int|string $workspaceId,
@@ -81,9 +81,10 @@ class NotificationService
         int|string $entityId,
         string $title,
         string $message,
-        ?string $targetUrl = null
+        ?string $targetUrl = null,
+        ?\Illuminate\Mail\Mailable $mailable = null
     ): Notification {
-        return DB::transaction(function () use (
+        $notification = DB::transaction(function () use (
             $workspaceId,
             $recipientId,
             $actorId,
@@ -107,5 +108,19 @@ class NotificationService
                 'is_read' => false,
             ]);
         });
+
+        // Si se provee mailable, encolar el Job de correo en segundo plano
+        if ($mailable) {
+            $recipient = \App\Models\User::find($recipientId);
+            if ($recipient && ! empty($recipient->email)) {
+                try {
+                    \App\Jobs\SendNotificationEmailJob::dispatch($recipient->email, $mailable);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("No se pudo encolar correo para {$recipient->email}: " . $e->getMessage());
+                }
+            }
+        }
+
+        return $notification;
     }
 }

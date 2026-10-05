@@ -98,3 +98,46 @@ test('it creates work item with type and estimate value and supports sub-items h
         'relation_type' => 'BLOCKS',
     ]);
 });
+
+test('it returns priority, dates, and lead on sub_items when fetching parent work item', function () {
+    // 1. Crear item padre
+    $parent = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 10,
+        'title' => 'Tarea Padre con Subtareas',
+        'state_id' => $this->state->id,
+        'created_by' => $this->user->id,
+        'priority' => 'HIGH',
+    ]);
+
+    // 2. Crear subtarea con prioridad, fechas y lead
+    $subItem = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 11,
+        'title' => 'Subtarea Detallada',
+        'parent_id' => $parent->id,
+        'state_id' => $this->state->id,
+        'created_by' => $this->user->id,
+        'priority' => 'URGENT',
+        'start_date' => '2026-10-05',
+        'target_date' => '2026-10-15',
+        'lead_id' => $this->user->id,
+    ]);
+
+    // 3. Consultar padre vía endpoint GET
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/work-items/{$parent->id}");
+
+    $response->assertStatus(200);
+    $subItems = $response->json('data.relationships.sub_items');
+    $this->assertCount(1, $subItems);
+    $this->assertEquals((string) $subItem->id, $subItems[0]['id']);
+    $this->assertEquals('URGENT', $subItems[0]['priority']);
+    $this->assertEquals('2026-10-05', $subItems[0]['start_date']);
+    $this->assertEquals('2026-10-15', $subItems[0]['target_date']);
+    $this->assertEquals((string) $this->state->id, $subItems[0]['state']['id']);
+    $this->assertEquals((string) $this->user->id, $subItems[0]['lead']['id']);
+});

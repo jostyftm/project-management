@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Mail\UserMentionedMail;
+use App\Mail\WorkItemCommentMail;
 use App\Models\Comment;
 use App\Models\Page;
 use App\Models\User;
@@ -39,8 +41,8 @@ class CommentService
                 $foundUsers = User::query()
                     ->where(function ($q) use ($matchedHandles) {
                         $q->whereIn('name', $matchedHandles)
-                          ->orWhereIn('email', $matchedHandles)
-                          ->orWhereIn('id', $matchedHandles);
+                            ->orWhereIn('email', $matchedHandles)
+                            ->orWhereIn('id', $matchedHandles);
                     })
                     ->pluck('id')
                     ->all();
@@ -49,7 +51,7 @@ class CommentService
             }
 
             // Remove author from mentioned list to avoid self-notification
-            $mentionedUserIds = array_values(array_filter($mentionedUserIds, fn ($id) => (string) $id !== (string) $author->id));
+            $mentionedUserIds = array_values(array_filter($mentionedUserIds, fn($id) => (string) $id !== (string) $author->id));
 
             $workItem = null;
             if ($workItemId) {
@@ -89,15 +91,23 @@ class CommentService
                     ]
                 );
 
+                $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                 $targetUrl = "/projects/{$projectId}?item={$workItem->id}";
+                $fullWorkItemUrl = $frontendUrl . $targetUrl;
 
                 // 2. Notify assignee or creator if not the author
                 $candidateRecipients = array_filter([
                     $workItem->created_by,
                     $workItem->lead_id,
-                ], fn ($id) => $id && (string) $id !== (string) $author->id && !in_array($id, $mentionedUserIds));
+                ], fn($id) => $id && (string) $id !== (string) $author->id && !in_array($id, $mentionedUserIds));
 
                 foreach (array_unique($candidateRecipients) as $recipientId) {
+                    $commentMailable = new WorkItemCommentMail(
+                        workItem: $workItem->loadMissing('project'),
+                        comment: $comment,
+                        author: $author,
+                        workItemUrl: $fullWorkItemUrl
+                    );
                     $this->notificationService->sendNotification(
                         $workspaceId,
                         $recipientId,
@@ -107,12 +117,22 @@ class CommentService
                         $workItem->id,
                         "Nuevo comentario en [{$workItem->identifier}] {$workItem->title}",
                         "{$author->name} comentó: \"" . Str::limit($content, 80) . "\"",
-                        $targetUrl
+                        $targetUrl,
+                        $commentMailable
                     );
                 }
 
                 // 3. Notify mentioned users
                 foreach ($mentionedUserIds as $mentionedId) {
+                    $mentionedUser = User::find($mentionedId);
+                    $mentionMailable = $mentionedUser ? new UserMentionedMail(
+                        recipient: $mentionedUser,
+                        actor: $author,
+                        contextTitle: "[{$workItem->identifier}] {$workItem->title}",
+                        contentSnippet: $content,
+                        targetUrl: $fullWorkItemUrl
+                    ) : null;
+
                     $this->notificationService->sendNotification(
                         $workspaceId,
                         $mentionedId,
@@ -122,14 +142,17 @@ class CommentService
                         $workItem->id,
                         "Te mencionaron en [{$workItem->identifier}] {$workItem->title}",
                         "{$author->name} te mencionó en una discusión: \"" . Str::limit($content, 80) . "\"",
-                        $targetUrl
+                        $targetUrl,
+                        $mentionMailable
                     );
                 }
             }
 
             // Handle Page context
             if ($page) {
+                $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                 $targetUrl = "/pages/{$page->id}";
+                $fullPageUrl = $frontendUrl . $targetUrl;
 
                 if ($page->created_by && (string) $page->created_by !== (string) $author->id && !in_array($page->created_by, $mentionedUserIds)) {
                     $this->notificationService->sendNotification(
@@ -147,6 +170,15 @@ class CommentService
 
                 // Notify mentioned users
                 foreach ($mentionedUserIds as $mentionedId) {
+                    $mentionedUser = User::find($mentionedId);
+                    $mentionMailable = $mentionedUser ? new UserMentionedMail(
+                        recipient: $mentionedUser,
+                        actor: $author,
+                        contextTitle: "Página: {$page->title}",
+                        contentSnippet: $content,
+                        targetUrl: $fullPageUrl
+                    ) : null;
+
                     $this->notificationService->sendNotification(
                         $workspaceId,
                         $mentionedId,
@@ -156,7 +188,8 @@ class CommentService
                         $page->id,
                         "Te mencionaron en la página \"{$page->title}\"",
                         "{$author->name} te mencionó: \"" . Str::limit($content, 80) . "\"",
-                        $targetUrl
+                        $targetUrl,
+                        $mentionMailable
                     );
                 }
             }

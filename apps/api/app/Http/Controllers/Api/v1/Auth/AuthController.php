@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\v1\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Services\AuthService;
 use App\Traits\HasApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -57,4 +59,25 @@ class AuthController extends Controller
 
         return $this->successResponse(['message' => 'Sesión cerrada exitosamente.'], 200);
     }
+
+    /**
+     * Solicitar enlace temporal de 10 minutos para restablecer contraseña.
+     */
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $result = $this->authService->forgotPassword($request);
+
+        return $this->successResponse($result, 200);
+    }
+
+    /**
+     * Restablecer la contraseña con el token firmado temporal.
+     */
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $result = $this->authService->resetPassword($request);
+
+        return $this->successResponse($result, 200);
+    }
 }
+

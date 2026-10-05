@@ -39,6 +39,12 @@ beforeEach(function () {
         'identifier' => 'ACM',
     ]);
 
+    \App\Models\ProjectMember::create([
+        'project_id' => $this->project->id,
+        'user_id' => $this->otherUser->id,
+        'role' => 'MEMBER',
+    ]);
+
     $this->state = State::create([
         'workspace_id' => $this->workspace->id,
         'project_id' => $this->project->id,

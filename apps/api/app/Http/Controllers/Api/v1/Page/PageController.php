@@ -59,7 +59,7 @@ class PageController extends Controller
 
     public function destroy(Request $request, Page $page): JsonResponse
     {
-        $this->pageService->delete($page);
+        $this->pageService->delete($page, $request->user());
         return response()->json(['message' => 'Página eliminada exitosamente']);
     }
 

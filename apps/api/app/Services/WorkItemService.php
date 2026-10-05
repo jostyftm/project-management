@@ -2,15 +2,21 @@
 
 namespace App\Services;
 
+use App\Mail\WorkItemAssignedMail;
+use App\Mail\WorkItemStatusChangedMail;
 use App\Models\Activity;
 use App\Models\Project;
 use App\Models\State;
+use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemRelation;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class WorkItemService
 {
@@ -21,7 +27,7 @@ class WorkItemService
     {
         return (new WorkItem)->search(
             request: $request,
-            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'cycles', 'modules'],
+            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules'],
             callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
 
@@ -40,7 +46,7 @@ class WorkItemService
                 if ($request->has('milestone_id')) {
                     $builder->where(function ($q) use ($request) {
                         $q->where('milestone_id', $request->milestone_id)
-                            ->orWhereHas('milestones', fn ($mq) => $mq->where('milestones.id', $request->milestone_id));
+                            ->orWhereHas('milestones', fn($mq) => $mq->where('milestones.id', $request->milestone_id));
                     });
                 }
 
@@ -74,6 +80,8 @@ class WorkItemService
             'project',
             'parent',
             'subItems.state',
+            'subItems.lead',
+            'subItems.assignees',
             'cycles',
             'modules',
             'outwardRelations.target.state',
@@ -107,6 +115,9 @@ class WorkItemService
                 $stateId = $defaultState?->id;
             }
 
+            $initialState = $stateId ? State::find($stateId) : null;
+            $completedAt = ($initialState && in_array(strtoupper($initialState->group), ['COMPLETED', 'CANCELLED'])) ? now() : null;
+
             $workItem = WorkItem::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
@@ -123,6 +134,7 @@ class WorkItemService
                 'estimate_value' => $data['estimate_value'] ?? null,
                 'start_date' => $data['start_date'] ?? null,
                 'target_date' => $data['target_date'] ?? null,
+                'completed_at' => $completedAt,
                 'is_draft' => $data['is_draft'] ?? false,
                 'created_by' => $user->id,
             ]);
@@ -158,6 +170,51 @@ class WorkItemService
                 'changes_diff' => ['title' => $workItem->title],
             ]);
 
+            // Notificar asignaciones si aplica (In-App y Job encolado)
+            try {
+                $assigneesToNotify = collect();
+                if ($workItem->lead_id && (int) $workItem->lead_id !== (int) $user->id) {
+                    $assigneesToNotify->push($workItem->lead_id);
+                }
+                if (! empty($data['assignee_ids'])) {
+                    foreach ($data['assignee_ids'] as $aId) {
+                        if ((int) $aId !== (int) $user->id) {
+                            $assigneesToNotify->push($aId);
+                        }
+                    }
+                }
+
+                $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+                $workItemUrl = "{$frontendUrl}/projects/{$project->id}/work-items?selected={$workItem->id}";
+                $notificationService = app(NotificationService::class);
+
+                foreach ($assigneesToNotify->unique() as $recipientId) {
+                    $recipientUser = User::find($recipientId);
+                    if ($recipientUser) {
+                        $mailable = new WorkItemAssignedMail(
+                            workItem: $workItem->loadMissing(['project', 'state']),
+                            assignee: $recipientUser,
+                            actor: $user,
+                            workItemUrl: $workItemUrl
+                        );
+                        $notificationService->sendNotification(
+                            workspaceId: $project->workspace_id,
+                            recipientId: $recipientId,
+                            actorId: $user->id,
+                            type: 'ASSIGNMENT',
+                            entityType: 'WORK_ITEM',
+                            entityId: $workItem->id,
+                            title: 'Nueva tarea asignada',
+                            message: "{$user->name} te ha asignado la tarea «{$workItem->name}».",
+                            targetUrl: $workItemUrl,
+                            mailable: $mailable
+                        );
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::warning("Error despachando notificaciones de creación de work item: " . $e->getMessage());
+            }
+
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'cycles', 'modules']);
         });
     }
@@ -174,8 +231,49 @@ class WorkItemService
         $data = $request->validated();
         $user = $request->user();
 
+        // Verificación de autorización por rol de proyecto
+        $role = $request->attributes->get('current_project_role');
+        if (! $role && $workItem->project && $user) {
+            $member = $workItem->project->members()->where('users.id', $user->id)->first();
+            $role = $member?->pivot?->role;
+        }
+
+        $isProjectAdmin = ($user && $user->is_instance_admin)
+            || ($workItem->project && $workItem->project->workspace && (int) $workItem->project->workspace->owner_id === (int) $user->id)
+            || $role === 'ADMIN';
+
+        if (! $isProjectAdmin) {
+            // Validar si el usuario está asignado como lead, en assignees o es el creador
+            $isAssigneeOrCreator = (int) $workItem->lead_id === (int) $user->id
+                || (int) $workItem->created_by === (int) $user->id
+                || $workItem->assignees()->where('users.id', $user->id)->exists();
+
+            if (! $isAssigneeOrCreator) {
+                // Seguridad por diseño: 404 para miembros no asignados o sin permisos
+                abort(404, 'Recurso no encontrado.');
+            }
+
+            // Validar que únicamente modifique el estado (state_id)
+            $payloadKeys = array_keys($data);
+            $disallowedKeys = array_diff($payloadKeys, ['state_id']);
+            if (! empty($disallowedKeys)) {
+                abort(403, 'Los miembros únicamente pueden cambiar el estado de la tarea.');
+            }
+        }
+
         return DB::transaction(function () use ($data, $user, $workItem) {
             $originalStateId = $workItem->state_id;
+            $originalLeadId = $workItem->lead_id;
+            $originalAssigneeIds = $workItem->assignees()->pluck('users.id')->all();
+
+            if (array_key_exists('state_id', $data) && $data['state_id'] != $originalStateId) {
+                $newState = $data['state_id'] ? State::find($data['state_id']) : null;
+                if ($newState && in_array(strtoupper($newState->group), ['COMPLETED', 'CANCELLED'])) {
+                    $data['completed_at'] = now();
+                } else {
+                    $data['completed_at'] = null;
+                }
+            }
 
             $workItem->update($data);
 
@@ -233,7 +331,102 @@ class WorkItemService
                 ]);
             }
 
-            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'cycles', 'modules']);
+            // Notificar cambio de estado si aplica (In-App y Job encolado)
+            if ($action === 'STATE_CHANGED') {
+                try {
+                    $oldState = State::find($originalStateId);
+                    $newState = $workItem->state ?? State::find($workItem->state_id);
+                    $oldStateName = $oldState?->name ?? 'Anterior';
+                    $newStateName = $newState?->name ?? 'Nuevo';
+
+                    $subscribers = collect([$workItem->created_by, $workItem->lead_id])
+                        ->merge($workItem->assignees->pluck('id'))
+                        ->filter(fn($id) => ! empty($id) && (int) $id !== (int) $user->id)
+                        ->unique();
+
+                    $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+                    $workItemUrl = "{$frontendUrl}/projects/{$workItem->project_id}/work-items?selected={$workItem->id}";
+                    $notificationService = app(NotificationService::class);
+
+                    foreach ($subscribers as $subId) {
+                        $subUser = User::find($subId);
+                        if ($subUser) {
+                            $mailable = new WorkItemStatusChangedMail(
+                                workItem: $workItem->loadMissing('project'),
+                                oldStateName: $oldStateName,
+                                newStateName: $newStateName,
+                                actor: $user,
+                                workItemUrl: $workItemUrl
+                            );
+                            $notificationService->sendNotification(
+                                workspaceId: $workItem->workspace_id,
+                                recipientId: $subId,
+                                actorId: $user->id,
+                                type: 'STATE_CHANGED',
+                                entityType: 'WORK_ITEM',
+                                entityId: $workItem->id,
+                                title: 'Cambio de estado en tarea',
+                                message: "{$user->name} cambió el estado de «{$workItem->name}» a «{$newStateName}».",
+                                targetUrl: $workItemUrl,
+                                mailable: $mailable
+                            );
+                        }
+                    }
+                } catch (Throwable $e) {
+                    Log::warning("Error notificando cambio de estado: " . $e->getMessage());
+                }
+            }
+
+            // Notificar nuevas asignaciones si aplica
+            try {
+                $newAssigneesToNotify = collect();
+                if ($workItem->lead_id && (int) $workItem->lead_id !== (int) $originalLeadId && (int) $workItem->lead_id !== (int) $user->id) {
+                    $newAssigneesToNotify->push($workItem->lead_id);
+                }
+                if (array_key_exists('assignee_ids', $data)) {
+                    $currentAssigneeIds = $data['assignee_ids'] ?? [];
+                    $freshlyAssigned = array_diff($currentAssigneeIds, $originalAssigneeIds);
+                    foreach ($freshlyAssigned as $aId) {
+                        if ((int) $aId !== (int) $user->id) {
+                            $newAssigneesToNotify->push($aId);
+                        }
+                    }
+                }
+
+                if ($newAssigneesToNotify->isNotEmpty()) {
+                    $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+                    $workItemUrl = "{$frontendUrl}/projects/{$workItem->project_id}/work-items?selected={$workItem->id}";
+                    $notificationService = app(NotificationService::class);
+
+                    foreach ($newAssigneesToNotify->unique() as $recipientId) {
+                        $recipientUser = User::find($recipientId);
+                        if ($recipientUser) {
+                            $mailable = new WorkItemAssignedMail(
+                                workItem: $workItem->loadMissing(['project', 'state']),
+                                assignee: $recipientUser,
+                                actor: $user,
+                                workItemUrl: $workItemUrl
+                            );
+                            $notificationService->sendNotification(
+                                workspaceId: $workItem->workspace_id,
+                                recipientId: $recipientId,
+                                actorId: $user->id,
+                                type: 'ASSIGNMENT',
+                                entityType: 'WORK_ITEM',
+                                entityId: $workItem->id,
+                                title: 'Nueva tarea asignada',
+                                message: "{$user->name} te ha asignado la tarea «{$workItem->name}».",
+                                targetUrl: $workItemUrl,
+                                mailable: $mailable
+                            );
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::warning("Error notificando nuevas asignaciones: " . $e->getMessage());
+            }
+
+            return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules']);
         });
     }
 

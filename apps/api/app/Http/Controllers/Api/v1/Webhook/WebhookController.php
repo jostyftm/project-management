@@ -41,4 +41,10 @@ class WebhookController extends Controller
         $this->webhookService->delete($id);
         return response()->json(null, 204);
     }
+
+    public function test(Request $request, string|int $id): JsonResponse
+    {
+        $result = $this->webhookService->testWebhook($id);
+        return response()->json($result);
+    }
 }

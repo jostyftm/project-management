@@ -31,6 +31,7 @@ class WorkItem extends Model
         'estimate_value',
         'start_date',
         'target_date',
+        'completed_at',
         'is_draft',
         'created_by',
     ];
@@ -43,6 +44,7 @@ class WorkItem extends Model
             'estimate_points' => 'float',
             'start_date' => 'date',
             'target_date' => 'date',
+            'completed_at' => 'datetime',
             'is_draft' => 'boolean',
         ];
     }
@@ -145,5 +147,15 @@ class WorkItem extends Model
         return $this->hasMany(Activity::class, 'entity_id')
             ->where('entity_type', 'WORK_ITEM')
             ->latest();
+    }
+
+    public function githubPullRequests(): HasMany
+    {
+        return $this->hasMany(GithubPullRequest::class)->latest();
+    }
+
+    public function githubCommits(): HasMany
+    {
+        return $this->hasMany(GithubCommit::class)->latest('committed_at');
     }
 }

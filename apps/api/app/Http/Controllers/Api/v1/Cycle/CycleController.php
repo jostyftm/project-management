@@ -9,6 +9,7 @@ use App\Http\Requests\Cycle\CycleUpdateRequest;
 use App\Http\Resources\Cycle\CycleResource;
 use App\Models\Cycle;
 use App\Models\Project;
+use App\Models\WorkItem;
 use App\Services\CycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,6 +81,24 @@ class CycleController extends Controller
         return response()->json([
             'message' => 'Work items vinculados al ciclo',
             'data' => new CycleResource($cycle),
+        ]);
+    }
+
+    public function removeWorkItem(Cycle $cycle, WorkItem $workItem): JsonResponse
+    {
+        $this->cycleService->removeWorkItem($cycle, $workItem);
+
+        return response()->json([
+            'message' => 'Work item removido del ciclo',
+        ]);
+    }
+
+    public function destroy(Cycle $cycle): JsonResponse
+    {
+        $this->cycleService->delete($cycle);
+
+        return response()->json([
+            'message' => 'Ciclo y sus work items asociados eliminados con éxito',
         ]);
     }
 }

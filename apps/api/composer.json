@@ -16,6 +16,9 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "predis/predis": "^3.6",
+        "spatie/browsershot": "^5.4",
+        "spatie/image": "^3.9",
+        "spatie/laravel-data": "^4.23",
         "spatie/laravel-query-builder": "^6.4"
     },
     "require-dev": {

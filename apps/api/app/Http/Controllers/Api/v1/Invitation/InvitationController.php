@@ -41,6 +41,7 @@ class InvitationController extends Controller
                         'name' => $invitation->inviter->name,
                         'email' => $invitation->inviter->email,
                     ] : null,
+                    'user_exists' => \App\Models\User::where('email', strtolower(trim($invitation->email)))->exists(),
                     'expires_at' => $invitation->expires_at->toISOString(),
                 ],
             ]);
@@ -48,6 +49,37 @@ class InvitationController extends Controller
             return response()->json([
                 'message' => $e->getMessage(),
             ], 404);
+        }
+    }
+
+    /**
+     * Registra al usuario y auto-acepta la invitación (Onboarding).
+     */
+    public function onboard(Request $request, string $token): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'     => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8'],
+        ]);
+
+        try {
+            $result = $this->memberService->onboardAndAccept($token, $validated);
+
+            return response()->json([
+                'message'           => $result['message'],
+                'token'             => $result['token'],
+                'user'              => $result['user'],
+                'current_workspace' => $result['current_workspace'],
+                'data'              => [
+                    'project' => $result['project'],
+                ],
+            ], 201);
+        } catch (Exception $e) {
+            $status = ($e->getCode() >= 400 && $e->getCode() < 500) ? $e->getCode() : 400;
+
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $status);
         }
     }
 
@@ -77,3 +109,4 @@ class InvitationController extends Controller
         }
     }
 }
+

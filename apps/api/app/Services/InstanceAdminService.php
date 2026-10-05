@@ -139,15 +139,54 @@ class InstanceAdminService
     }
 
     /**
-     * Prueba de envío de correo SMTP.
+     * Construye un mailer SMTP dinámico usando la configuración guardada en la BD.
+     * Esto asegura que el correo siempre use el servidor SMTP configurado por el admin,
+     * independientemente del valor de MAIL_MAILER en el .env.
+     *
+     * @return \Illuminate\Contracts\Mail\Mailer
+     */
+    private function getSmtpMailer(): \Illuminate\Contracts\Mail\Mailer
+    {
+        $settings = $this->getSettings();
+
+        $encryption = ($settings->smtp_encryption && $settings->smtp_encryption !== 'none')
+            ? $settings->smtp_encryption
+            : null;
+
+        // Registrar un mailer temporal con la config de la instancia
+        config([
+            'mail.mailers.smtp_instance' => [
+                'transport'  => 'smtp',
+                'host'       => $settings->smtp_host ?: '127.0.0.1',
+                'port'       => $settings->smtp_port ?: 587,
+                'username'   => $settings->smtp_username ?: null,
+                'password'   => $settings->smtp_password ?: null,
+                'encryption' => $encryption,
+                'timeout'    => 10,
+            ],
+            'mail.from.address' => $settings->smtp_from_email ?: config('mail.from.address'),
+            'mail.from.name'    => $settings->smtp_from_name ?: config('mail.from.name'),
+        ]);
+
+        return Mail::mailer('smtp_instance');
+    }
+
+    /**
+     * Prueba de envío de correo SMTP usando la configuración guardada en la BD.
      */
     public function sendTestEmail(string $recipientEmail): array
     {
         try {
-            Mail::raw('Esta es una prueba de configuración de correo desde el módulo Instance Admin de Plane.', function ($message) use ($recipientEmail) {
-                $message->to($recipientEmail)
-                    ->subject('Prueba de configuración SMTP - Plane Instance Admin');
-            });
+            $mailer = $this->getSmtpMailer();
+
+            $mailer->raw(
+                'Esta es una prueba de configuración de correo desde el módulo Instance Admin de Plane. '.
+                'Si recibes este mensaje, la configuración SMTP está funcionando correctamente.',
+                function ($message) use ($recipientEmail) {
+                    $message->to($recipientEmail)
+                        ->subject('✅ Prueba de configuración SMTP - Plane Instance Admin');
+                }
+            );
 
             return [
                 'success' => true,
@@ -159,5 +198,16 @@ class InstanceAdminService
                 'message' => 'Error al enviar correo de prueba: '.$e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Retorna el mailer configurado en la instancia para uso externo (invitaciones, etc.).
+     * Expuesto como público para que otros servicios puedan usarlo.
+     *
+     * @return \Illuminate\Contracts\Mail\Mailer
+     */
+    public function getInstanceMailer(): \Illuminate\Contracts\Mail\Mailer
+    {
+        return $this->getSmtpMailer();
     }
 }

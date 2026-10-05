@@ -2,15 +2,19 @@
 
 namespace App\Services;
 
+use App\Mail\CycleCompletedMail;
 use App\Models\Cycle;
 use App\Models\CycleWorkItem;
 use App\Models\Project;
 use App\Models\State;
+use App\Models\User;
 use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CycleService
 {
@@ -87,6 +91,20 @@ class CycleService
     }
 
     /**
+     * Elimina el ciclo y todos sus work items asociados.
+     */
+    public function delete(Cycle $cycle): void
+    {
+        DB::transaction(function () use ($cycle) {
+            $cycle->load('workItems');
+            foreach ($cycle->workItems as $workItem) {
+                $workItem->delete();
+            }
+            $cycle->delete();
+        });
+    }
+
+    /**
      * Finaliza un ciclo de trabajo:
      * - Registra el status_at_completion de cada item.
      * - Por defecto transfiere los items pendientes de vuelta al Backlog (conservando la auditoría).
@@ -135,6 +153,44 @@ class CycleService
 
             $cycle->update(['status' => 'COMPLETED']);
 
+            // Notificar a los miembros del proyecto sobre la finalización del ciclo
+            try {
+                $completedCount = $cycle->workItems->filter(fn($i) => in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->count();
+                $transferredCount = $cycle->workItems->count() - $completedCount;
+                $user = auth()->user() ?? $project->creator ?? User::first();
+                $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+                $cycleUrl = "{$frontendUrl}/projects/{$project->id}/cycles";
+                $notificationService = app(NotificationService::class);
+
+                $members = $project->members()->get();
+                foreach ($members as $member) {
+                    if ($member && (int) $member->id !== (int) $user?->id) {
+                        $mailable = new CycleCompletedMail(
+                            cycle: $cycle,
+                            project: $project,
+                            completedBy: $user,
+                            completedCount: $completedCount,
+                            transferredCount: $transferredCount,
+                            cycleUrl: $cycleUrl
+                        );
+                        $notificationService->sendNotification(
+                            workspaceId: $project->workspace_id,
+                            recipientId: $member->id,
+                            actorId: $user?->id,
+                            type: 'CYCLE_COMPLETED',
+                            entityType: 'CYCLE',
+                            entityId: $cycle->id,
+                            title: 'Ciclo completado',
+                            message: "El ciclo «{$cycle->name}» en «{$project->name}» fue completado ({$completedCount} completadas, {$transferredCount} transferidas).",
+                            targetUrl: "/projects/{$project->id}/cycles",
+                            mailable: $mailable
+                        );
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::warning("Error notificando finalización de ciclo: " . $e->getMessage());
+            }
+
             return $cycle->fresh(['workItems.state']);
         });
     }
@@ -145,43 +201,181 @@ class CycleService
     public function getAnalytics(Cycle $cycle): array
     {
         $cycle->load(['workItems.state']);
+        $workItems = $cycle->workItems;
+        $totalItems = $workItems->count();
 
-        $totalItems = $cycle->workItems->count();
-        $completedItems = 0;
-        $incompleteItems = 0;
-        $totalPoints = 0;
-        $completedPoints = 0;
+        // Breakdown by state groups
+        $doneCount = 0;
+        $startedCount = 0;
+        $unstartedCount = 0;
+        $backlogCount = 0;
+        $cancelledCount = 0;
+        $totalPoints = 0.0;
+        $completedPoints = 0.0;
 
-        foreach ($cycle->workItems as $item) {
+        foreach ($workItems as $item) {
+            $group = strtoupper($item->state?->group ?? 'UNSTARTED');
             $points = (float) ($item->estimate_points ?? 0);
-            $totalPoints += $points;
 
-            $statusAtCompletion = $item->pivot->status_at_completion ?? null;
-            $isCompletedNow = in_array($item->state?->group, ['COMPLETED', 'CANCELLED']);
+            if ($group !== 'CANCELLED') {
+                $totalPoints += $points;
+            }
 
-            if ($statusAtCompletion === 'COMPLETED' || ($cycle->status !== 'COMPLETED' && $isCompletedNow)) {
-                $completedItems++;
+            if ($group === 'COMPLETED') {
+                $doneCount++;
                 $completedPoints += $points;
-            } elseif ($statusAtCompletion === 'TRANSFERRED_TO_BACKLOG' || ($cycle->status !== 'COMPLETED' && !$isCompletedNow)) {
-                $incompleteItems++;
+            } elseif ($group === 'STARTED') {
+                $startedCount++;
+            } elseif ($group === 'BACKLOG') {
+                $backlogCount++;
+            } elseif ($group === 'CANCELLED') {
+                $cancelledCount++;
+            } else {
+                $unstartedCount++;
             }
         }
 
-        $completionRate = $totalItems > 0 ? round(($completedItems / $totalItems) * 100, 1) : 0;
+        $scope = max(0, $totalItems - $cancelledCount);
+        $pending = $unstartedCount + $startedCount + $backlogCount;
+        $done = $doneCount;
+        $started = $startedCount;
+        $unstarted = $unstartedCount;
+        $completionRate = $scope > 0 ? round(($done / $scope) * 100, 1) : 0.0;
+
+        // Date range and current day index
+        $startDate = $cycle->start_date ? \Carbon\Carbon::parse($cycle->start_date)->startOfDay() : ($cycle->created_at ? $cycle->created_at->copy()->startOfDay() : now()->startOfDay());
+        $endDate = $cycle->end_date ? \Carbon\Carbon::parse($cycle->end_date)->endOfDay() : (clone $startDate)->addDays(13)->endOfDay();
+        if ($endDate->lessThanOrEqualTo($startDate)) {
+            $endDate = (clone $startDate)->addDays(13)->endOfDay();
+        }
+
+        $totalDays = max(1, $startDate->diffInDays($endDate));
+        $today = now()->startOfDay();
+        if ($today->lessThan($startDate)) {
+            $todayIndex = 0;
+        } elseif ($today->greaterThan($endDate)) {
+            $todayIndex = $totalDays;
+        } else {
+            $todayIndex = min($totalDays, max(0, $startDate->diffInDays($today)));
+        }
+
+        $todayIdeal = $scope > 0 ? round(max(0, $scope - (($todayIndex / $totalDays) * $scope)), 1) : 0;
+        $trailingCount = max(0, round($pending - $todayIdeal, 1));
+
+        $dates = [];
+        $workItemsSeries = [];
+        $estimatesSeries = [];
+
+        for ($i = 0; $i <= $totalDays; $i++) {
+            $currentDay = (clone $startDate)->addDays($i)->endOfDay();
+            $dateLabel = $currentDay->format('M d');
+            $fullDate = $currentDay->format('Y-m-d');
+            $dates[] = $dateLabel;
+
+            $idealPending = $scope > 0 ? round(max(0, $scope - (($i / $totalDays) * $scope)), 1) : 0;
+            $idealCompleted = $scope > 0 ? round(($i / $totalDays) * $scope, 1) : 0;
+            $idealPendingPoints = $totalPoints > 0 ? round(max(0, $totalPoints - (($i / $totalDays) * $totalPoints)), 1) : 0;
+            $idealCompletedPoints = $totalPoints > 0 ? round(($i / $totalDays) * $totalPoints, 1) : 0;
+
+            if ($scope === 0) {
+                $dayPending = 0;
+                $dayStarted = 0;
+                $dayCompleted = 0;
+                $dayPendingPoints = 0;
+                $dayStartedPoints = 0;
+                $dayCompletedPoints = 0;
+            } elseif ($i <= $todayIndex) {
+                // Determine completed items on or before this day
+                $completedOnDay = $workItems->filter(function ($item) use ($currentDay) {
+                    if ($item->state?->group !== 'COMPLETED') {
+                        return false;
+                    }
+                    $compDate = $item->completed_at ? \Carbon\Carbon::parse($item->completed_at) : \Carbon\Carbon::parse($item->updated_at);
+                    return $compDate->lessThanOrEqualTo($currentDay);
+                });
+
+                $dayCompleted = $completedOnDay->count();
+                $dayCompletedPoints = (float) $completedOnDay->sum('estimate_points');
+
+                // Determine started items on this day
+                $startedOnDay = $workItems->filter(function ($item) use ($currentDay) {
+                    if ($item->state?->group !== 'STARTED') {
+                        return false;
+                    }
+                    $startDate = \Carbon\Carbon::parse($item->updated_at ?? $item->created_at);
+                    return $startDate->lessThanOrEqualTo($currentDay);
+                });
+
+                $dayStarted = $startedOnDay->count();
+                $dayStartedPoints = (float) $startedOnDay->sum('estimate_points');
+
+                $dayPending = max(0, $scope - $dayCompleted);
+                $dayPendingPoints = max(0, $totalPoints - $dayCompletedPoints);
+            } else {
+                // Future days project from current status
+                $dayCompleted = $done;
+                $dayCompletedPoints = $completedPoints;
+                $dayStarted = $started;
+                $dayStartedPoints = (float) $workItems->filter(fn($i) => $i->state?->group === 'STARTED')->sum('estimate_points');
+                $dayPending = $pending;
+                $dayPendingPoints = max(0, $totalPoints - $completedPoints);
+            }
+
+            $workItemsSeries[] = [
+                'date' => $dateLabel,
+                'full_date' => $fullDate,
+                'scope' => $scope,
+                'pending' => $dayPending,
+                'started' => $dayStarted,
+                'completed' => $dayCompleted,
+                'ideal_pending' => $idealPending,
+                'ideal_completed' => $idealCompleted,
+            ];
+
+            $estimatesSeries[] = [
+                'date' => $dateLabel,
+                'full_date' => $fullDate,
+                'scope' => round($totalPoints),
+                'pending' => round($dayPendingPoints),
+                'started' => round($dayStartedPoints),
+                'completed' => round($dayCompletedPoints),
+                'ideal_pending' => $idealPendingPoints,
+                'ideal_completed' => $idealCompletedPoints,
+            ];
+        }
 
         return [
             'cycle_id' => $cycle->id,
             'name' => $cycle->name,
             'status' => $cycle->status,
-            'start_date' => $cycle->start_date?->format('Y-m-d'),
-            'end_date' => $cycle->end_date?->format('Y-m-d'),
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+            'today_index' => $todayIndex,
+            'today_date' => $today->format('Y-m-d'),
+            'progress_percentage' => $completionRate,
             'metrics' => [
-                'total_items' => $totalItems,
-                'completed_items' => $completedItems,
-                'incomplete_items' => $incompleteItems,
+                'total_items' => $scope,
+                'completed_items' => $done,
+                'incomplete_items' => $pending,
                 'completion_rate' => $completionRate,
-                'total_points' => $totalPoints,
-                'completed_points' => $completedPoints,
+                'total_points' => round($totalPoints, 1),
+                'completed_points' => round($completedPoints, 1),
+            ],
+            'breakdown' => [
+                'scope' => $scope,
+                'pending' => $pending,
+                'started' => $started,
+                'done' => $done,
+                'unstarted' => $unstarted,
+                'backlog' => $backlogCount,
+                'cancelled' => $cancelledCount,
+                'today_ideal_pending' => $todayIdeal,
+                'trailing_count' => $trailingCount,
+            ],
+            'timeline' => [
+                'dates' => $dates,
+                'work_items' => $workItemsSeries,
+                'estimates' => $estimatesSeries,
             ],
         ];
     }

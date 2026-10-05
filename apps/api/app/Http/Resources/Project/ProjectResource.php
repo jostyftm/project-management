@@ -20,6 +20,11 @@ class ProjectResource extends JsonResource
                 'is_archived' => $this->is_archived,
                 'is_public' => $this->is_public,
                 'estimate_system' => $this->estimate_system ?? 'FIBONACCI',
+                'start_date' => $this->start_date?->format('Y-m-d'),
+                'target_date' => $this->target_date?->format('Y-m-d'),
+                'completed_work_items_count' => $this->workItems()->whereHas('state', fn($q) => $q->where('group', 'COMPLETED'))->count(),
+                'overdue_items_count' => $this->workItems()->whereHas('state', fn($q) => $q->whereNotIn('group', ['COMPLETED', 'CANCELLED']))->whereNotNull('target_date')->where('target_date', '<', now()->toDateString())->count(),
+                'current_user_role' => $this->resolveCurrentUserRole($request->user()),
                 'created_at' => $this->created_at?->toISOString(),
                 'updated_at' => $this->updated_at?->toISOString(),
             ],
@@ -37,5 +42,33 @@ class ProjectResource extends JsonResource
                 'members_count' => $this->members()->count(),
             ],
         ];
+    }
+
+    protected function resolveCurrentUserRole(?\App\Models\User $user): ?string
+    {
+        if (! $user) {
+            return null;
+        }
+
+        if ($user->is_instance_admin) {
+            return 'ADMIN';
+        }
+
+        if ($this->workspace && (int) $this->workspace->owner_id === (int) $user->id) {
+            return 'ADMIN';
+        }
+
+        if ($this->relationLoaded('members')) {
+            $member = $this->members->firstWhere('id', $user->id);
+            if ($member && isset($member->pivot->role)) {
+                return $member->pivot->role;
+            }
+        }
+
+        $projectMember = \App\Models\ProjectMember::where('project_id', $this->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        return $projectMember?->role;
     }
 }

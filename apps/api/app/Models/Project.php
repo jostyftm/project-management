@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Project extends Model
 {
@@ -25,6 +26,8 @@ class Project extends Model
         'is_public',
         'lead_id',
         'estimate_system',
+        'start_date',
+        'target_date',
     ];
 
     protected function casts(): array
@@ -32,6 +35,8 @@ class Project extends Model
         return [
             'is_archived' => 'boolean',
             'is_public' => 'boolean',
+            'start_date' => 'date',
+            'target_date' => 'date',
         ];
     }
 
@@ -95,5 +100,25 @@ class Project extends Model
     public function workItemTypes(): HasMany
     {
         return $this->hasMany(WorkItemType::class);
+    }
+
+    public function githubRepositories(): HasMany
+    {
+        return $this->hasMany(ProjectGithubRepository::class);
+    }
+
+    public function githubSetting(): HasOne
+    {
+        return $this->hasOne(ProjectGithubSetting::class);
+    }
+
+    public function automationRules(): HasMany
+    {
+        return $this->hasMany(AutomationRule::class);
+    }
+
+    public function recurringWorkItems(): HasMany
+    {
+        return $this->hasMany(RecurringWorkItem::class);
     }
 }

@@ -149,3 +149,142 @@ test('it completes cycle, transfers incomplete items to backlog, and records sna
     $analyticsResponse->assertJsonPath('data.metrics.incomplete_items', 1);
     $analyticsResponse->assertJsonPath('data.metrics.completion_rate', 50);
 });
+
+test('it computes dynamic burndown analytics reflecting work item status changes over time', function () {
+    $cycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Sprint Burndown Test',
+        'status' => 'CURRENT',
+        'start_date' => now()->subDays(2)->format('Y-m-d'),
+        'end_date' => now()->addDays(5)->format('Y-m-d'),
+    ]);
+
+    // Item 1: Completado hoy
+    $itemDone = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 10,
+        'title' => 'Task Done Today',
+        'state_id' => $this->doneState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => 3,
+        'completed_at' => now(),
+    ]);
+
+    // Item 2: En curso
+    $itemStarted = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 11,
+        'title' => 'Task In Progress',
+        'state_id' => $this->inProgressState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => 5,
+    ]);
+
+    // Item 3: Pendiente en backlog
+    $itemBacklog = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 12,
+        'title' => 'Task Backlog',
+        'state_id' => $this->backlogState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => 2,
+    ]);
+
+    $cycle->workItems()->attach([$itemDone->id, $itemStarted->id, $itemBacklog->id]);
+
+    $analytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$cycle->id}/analytics");
+
+    $analytics->assertStatus(200);
+    $analytics->assertJsonPath('data.metrics.total_items', 3);
+    $analytics->assertJsonPath('data.metrics.completed_items', 1);
+    $analytics->assertJsonPath('data.metrics.incomplete_items', 2);
+    $analytics->assertJsonPath('data.metrics.total_points', 10);
+    $analytics->assertJsonPath('data.metrics.completed_points', 3);
+    $analytics->assertJsonPath('data.breakdown.done', 1);
+    $analytics->assertJsonPath('data.breakdown.started', 1);
+    $analytics->assertJsonPath('data.breakdown.pending', 2);
+    $analytics->assertJsonPath('data.breakdown.scope', 3);
+
+    // Verificar que la serie temporal tiene datos progresivos
+    $workItemsTimeline = $analytics->json('data.timeline.work_items');
+    expect($workItemsTimeline)->not->toBeEmpty();
+    $todayIndex = $analytics->json('data.today_index');
+    expect($workItemsTimeline[$todayIndex]['completed'])->toBe(1);
+    expect($workItemsTimeline[$todayIndex]['pending'])->toBe(2);
+    expect($workItemsTimeline[$todayIndex]['started'])->toBe(1);
+
+    // Actualizar Item 2 a Done a través de la API
+    $updateResponse = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->putJson("/api/v1/work-items/{$itemStarted->id}", [
+            'state_id' => $this->doneState->id,
+        ]);
+    $updateResponse->assertStatus(200);
+    expect($itemStarted->fresh()->completed_at)->not->toBeNull();
+
+    // Nueva consulta a analytics debe reflejar inmediatamente el cambio de estado
+    $updatedAnalytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$cycle->id}/analytics");
+
+    $updatedAnalytics->assertStatus(200);
+    $updatedAnalytics->assertJsonPath('data.metrics.completed_items', 2);
+    $updatedAnalytics->assertJsonPath('data.metrics.incomplete_items', 1);
+    $updatedAnalytics->assertJsonPath('data.metrics.completed_points', 8);
+    $updatedAnalytics->assertJsonPath('data.breakdown.done', 2);
+    $updatedAnalytics->assertJsonPath('data.breakdown.pending', 1);
+
+    // Desvincular Item 3 del ciclo
+    $deleteResponse = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->deleteJson("/api/v1/cycles/{$cycle->id}/work-items/{$itemBacklog->id}");
+
+    $deleteResponse->assertStatus(200);
+    expect($cycle->fresh()->workItems)->toHaveCount(2);
+
+    // Analytics recalculados tras remover item
+    $afterDeleteAnalytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$cycle->id}/analytics");
+
+    $afterDeleteAnalytics->assertStatus(200);
+    $afterDeleteAnalytics->assertJsonPath('data.metrics.total_items', 2);
+    $afterDeleteAnalytics->assertJsonPath('data.metrics.completed_items', 2);
+    $afterDeleteAnalytics->assertJsonPath('data.metrics.incomplete_items', 0);
+    $afterDeleteAnalytics->assertJsonPath('data.progress_percentage', 100);
+});
+
+test('it deletes cycle and all associated work items', function () {
+    $cycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Sprint To Delete',
+        'status' => 'CURRENT',
+    ]);
+
+    $item1 = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 10,
+        'title' => 'Item to be deleted with cycle',
+        'state_id' => $this->backlogState->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $cycle->workItems()->attach($item1->id);
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->deleteJson("/api/v1/cycles/{$cycle->id}");
+
+    $response->assertStatus(200);
+    $this->assertDatabaseMissing('cycles', ['id' => $cycle->id]);
+    $this->assertDatabaseMissing('work_items', ['id' => $item1->id]);
+});
+

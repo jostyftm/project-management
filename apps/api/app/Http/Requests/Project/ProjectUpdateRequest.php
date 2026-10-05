@@ -52,6 +52,8 @@ class ProjectUpdateRequest extends FormRequest
              * @example FIBONACCI
              */
             'estimate_system' => ['sometimes', 'string', 'in:FIBONACCI,TSHIRT,NUMERIC,NONE'],
+            'start_date' => ['nullable', 'date'],
+            'target_date' => ['nullable', 'date'],
         ];
     }
 }

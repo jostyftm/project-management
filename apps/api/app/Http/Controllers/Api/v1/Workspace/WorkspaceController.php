@@ -56,6 +56,13 @@ class WorkspaceController extends Controller
      */
     public function update(WorkspaceUpdateRequest $request, Workspace $workspace): JsonResource
     {
+        $user = $request->user();
+        abort_if(
+            (int) $workspace->owner_id !== (int) $user->id && ! $user->is_instance_admin,
+            403,
+            'Solo el dueño del workspace puede modificar su configuración.'
+        );
+
         $workspace = $this->workspaceService->update($request, $workspace);
 
         return new WorkspaceResource($workspace);
@@ -66,6 +73,13 @@ class WorkspaceController extends Controller
      */
     public function destroy(Workspace $workspace): Response
     {
+        $user = auth()->user();
+        abort_if(
+            (int) $workspace->owner_id !== (int) $user->id && ! $user->is_instance_admin,
+            403,
+            'Solo el dueño del workspace puede eliminar el espacio de trabajo.'
+        );
+
         $this->workspaceService->delete($workspace);
 
         return response()->noContent();

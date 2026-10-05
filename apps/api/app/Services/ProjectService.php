@@ -19,9 +19,30 @@ class ProjectService
      */
     public function list(Request $request): Collection|AbstractPaginator
     {
+        $user = $request->user();
+        $workspace = app()->has('current_workspace')
+            ? app('current_workspace')
+            : ($request->attributes->get('workspace') ?? \App\Models\Workspace::find(app('current_workspace_id')));
+
         return (new Project)->search(
             request: $request,
-            relationships: ['lead', 'states', 'labels'],
+            relationships: ['lead', 'states', 'labels', 'members'],
+            callback: function ($builder) use ($user, $workspace) {
+                if (! $user) {
+                    $builder->whereRaw('1 = 0');
+                    return;
+                }
+
+                // Superadministrador de la instancia y Dueño del Workspace ven todos los proyectos del workspace
+                if ($user->is_instance_admin || ($workspace && (int) $workspace->owner_id === (int) $user->id)) {
+                    return;
+                }
+
+                // Miembros regulares solo ven los proyectos donde están registrados en project_members
+                $builder->whereHas('members', function ($query) use ($user) {
+                    $query->where('users.id', $user->id);
+                });
+            },
             filters: ['name', 'identifier', 'is_archived'],
             sorts: ['created_at', 'name', 'identifier']
         );
@@ -70,6 +91,8 @@ class ProjectService
                 'icon' => $data['icon'] ?? '📁',
                 'is_public' => $data['is_public'] ?? false,
                 'lead_id' => $user->id,
+                'start_date' => $data['start_date'] ?? null,
+                'target_date' => $data['target_date'] ?? null,
             ]);
 
             // Asignar creador como Project ADMIN

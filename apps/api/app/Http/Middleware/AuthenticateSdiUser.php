@@ -73,7 +73,11 @@ class AuthenticateSdiUser
             }
         }
 
-        $token = $request->bearerToken();
+        $token = $request->bearerToken() ?: $request->query('token') ?: $request->query('bearer_token');
+        if ($token && ! $request->headers->has('Authorization')) {
+            $request->headers->set('Authorization', 'Bearer ' . $token);
+        }
+
         if (! $token) {
             // Si estamos en entorno de testing y no hay token explícito ni bypass forzado de desautenticación
             if (app()->environment('testing')) {

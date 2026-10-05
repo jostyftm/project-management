@@ -1,9 +1,13 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
+uses(RefreshDatabase::class);
+
 beforeEach(function () {
+    config(['cache.default' => 'array']);
     Cache::flush();
 });
 

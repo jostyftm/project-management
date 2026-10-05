@@ -24,6 +24,7 @@ class PageResource extends JsonResource
                 'views_count' => (int) $this->views_count,
                 'parent_id' => $this->parent_id ? (string) $this->parent_id : null,
                 'project_id' => $this->project_id ? (string) $this->project_id : null,
+                'created_by' => $this->created_by ? (string) $this->created_by : null,
                 'created_at' => $this->created_at?->toISOString(),
                 'updated_at' => $this->updated_at?->toISOString(),
             ],
@@ -33,6 +34,7 @@ class PageResource extends JsonResource
                         'id' => (string) $this->project->id,
                         'name' => $this->project->name,
                         'identifier' => $this->project->identifier,
+                        'current_user_role' => $this->resolveCurrentUserRole($this->project, $request->user()),
                     ] : null,
                 ],
                 'creator' => [
@@ -52,5 +54,26 @@ class PageResource extends JsonResource
                 'children' => PageResource::collection($this->whenLoaded('children')),
             ],
         ];
+    }
+
+    protected function resolveCurrentUserRole(?\App\Models\Project $project, ?\App\Models\User $user): ?string
+    {
+        if (! $project || ! $user) {
+            return null;
+        }
+
+        if ($user->is_instance_admin) {
+            return 'ADMIN';
+        }
+
+        if ($project->workspace && (int) $project->workspace->owner_id === (int) $user->id) {
+            return 'ADMIN';
+        }
+
+        $projectMember = \App\Models\ProjectMember::where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        return $projectMember?->role;
     }
 }

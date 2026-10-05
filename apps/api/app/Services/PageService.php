@@ -103,8 +103,31 @@ class PageService
         return $page->load(['children', 'creator', 'lastEditor', 'project']);
     }
 
-    public function delete(Page $page): void
+    public function delete(Page $page, ?\App\Models\User $user = null): void
     {
+        $user = $user ?? auth()->user();
+
+        if ($user) {
+            $isInstanceAdmin = (bool) $user->is_instance_admin;
+            $isWorkspaceOwner = $page->workspace && (int) $page->workspace->owner_id === (int) $user->id;
+
+            if (! $isInstanceAdmin && ! $isWorkspaceOwner) {
+                $isProjectAdmin = false;
+                if ($page->project_id) {
+                    $isProjectAdmin = \App\Models\ProjectMember::where('project_id', $page->project_id)
+                        ->where('user_id', $user->id)
+                        ->where('role', 'ADMIN')
+                        ->exists();
+                }
+
+                if (! $isProjectAdmin) {
+                    if ((int) $page->created_by !== (int) $user->id) {
+                        abort(403, 'Solo puedes eliminar las páginas que tú has creado.');
+                    }
+                }
+            }
+        }
+
         $page->delete();
     }
 

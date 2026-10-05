@@ -30,8 +30,11 @@ class YourWorkService
                 break;
             case 'assigned':
             default:
-                $query->whereHas('assignees', function ($q) use ($user) {
-                    $q->where('users.id', $user->id);
+                $query->where(function ($q) use ($user) {
+                    $q->where('lead_id', $user->id)
+                        ->orWhereHas('assignees', function ($sq) use ($user) {
+                            $sq->where('users.id', $user->id);
+                        });
                 })->where('is_draft', false);
                 break;
         }
