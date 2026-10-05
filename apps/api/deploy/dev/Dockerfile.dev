@@ -3,14 +3,19 @@
 # ==========================================
 FROM php:8.4-fpm-bookworm AS base
 
-# Instalar Nginx, Supervisor y dependencias esenciales (incluyendo libaio1 para Oracle)
+# Instalar Nginx, Supervisor, Chromium, Node.js y dependencias esenciales (incluyendo libaio1 para Oracle)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     supervisor \
     git \
     unzip \
     curl \
+    gnupg \
     libaio1 \
+    chromium \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g --allow-scripts=puppeteer puppeteer \
     && rm -rf /var/lib/apt/lists/*
 
 # Descargar el script de instalación de extensiones PHP (mlocati)
@@ -31,7 +36,8 @@ RUN install-php-extensions \
     rdkafka \
     opentelemetry \
     oci8 \
-    pdo_oci
+    pdo_oci \
+    exif
 
 # Configurar OPcache para DESARROLLO (validate_timestamps=1 permite recargar cambios)
 RUN echo "opcache.enable=1\nopcache.enable_cli=1\nopcache.jit=tracing\nopcache.jit_buffer_size=128M\nopcache.validate_timestamps=1" > /usr/local/etc/php/conf.d/opcache-recommended.ini

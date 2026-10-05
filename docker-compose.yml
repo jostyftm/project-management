@@ -1,80 +1,104 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: plane_postgres
-    restart: unless-stopped
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: plane_db
-      POSTGRES_USER: plane_user
-      POSTGRES_PASSWORD: plane_secret
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U plane_user -d plane_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # postgres:
+  #   image: "postgres:16-alpine"
+  #   container_name: plane_postgres
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${FORWARD_DB_PORT:-5432}:5432"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - "postgres_data:/var/lib/postgresql/data"
+  #   networks:
+  #     - sail
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-sdiuser_pro} -d ${DB_DATABASE:-project}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: plane_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # redis:
+  #   image: "redis:7-alpine"
+  #   container_name: plane_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${FORWARD_REDIS_PORT:-6379}:6379"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - "redis_data:/data"
+  #   networks:
+  #     - sail
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
-  api:
+  # rustfs:
+  #   image: "rustfs/rustfs:latest"
+  #   container_name: plane_rustfs
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${FORWARD_RUSTFS_PORT:-9100}:9000"
+  #     - "${FORWARD_RUSTFS_CONSOLE_PORT:-9101}:9001"
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - "sail-rustfs:/data"
+  #   networks:
+  #     - sail
+  #   healthcheck:
+  #     test: ["CMD", "sh", "-c", "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+
+  # mailpit:
+  #   image: "axllent/mailpit:latest"
+  #   container_name: plane_mailpit
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+  #     - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+  #   networks:
+  #     - sail
+
+  project_managment:
     build:
       context: ./apps/api
-      dockerfile: Dockerfile
-    container_name: plane_api
-    restart: unless-stopped
+      dockerfile: ./deploy/local/Dockerfile.local
+      args:
+        WWWGROUP: "${WWWGROUP:-1000}"
+    image: "sail-8.5/app"
+    container_name: project_managment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
-    environment:
-      APP_NAME: "Plane Clone API"
-      APP_ENV: local
-      APP_KEY: "base64:3f05b1c8f1064841ab7cfd2a806930da03260c67980838118021c5658607185c"
-      APP_DEBUG: "true"
-      APP_URL: "http://localhost:8000"
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: plane_db
-      DB_USERNAME: plane_user
-      DB_PASSWORD: plane_secret
-      CACHE_STORE: redis
-      QUEUE_CONNECTION: redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - "${APP_PORT:-8000}:80"
+    env_file:
+      - .env
+    volumes:
+      - "./apps/api:/var/www/html"
+    networks:
+      - sail
+      - dokploy-network
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   redis:
+    #     condition: service_healthy
+    #   rustfs:
+    #     condition: service_healthy
 
-  web:
-    build:
-      context: ./apps/web
-      dockerfile: Dockerfile
-    container_name: plane_web
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000"
-      NEXT_PUBLIC_LOGIN_ROUTE: "/login"
-    depends_on:
-      - api
+networks:
+  dokploy-network:
+    external: true
+  sail:
+    driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
+  sail-rustfs:
