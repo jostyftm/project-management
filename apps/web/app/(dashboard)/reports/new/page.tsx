@@ -42,7 +42,7 @@ const NewReportPage = () => {
     >
       <CardHomePage title="Crear reporte" backRoute="/reports">
         {isLoading ? (
-          <div className="p-6 space-y-6 max-w-4xl mx-auto">
+          <div className="p-6 space-y-6 w-full">
             <div className="space-y-2 text-center">
               <Skeleton className="h-6 w-48 mx-auto" />
               <Skeleton className="h-4 w-96 mx-auto" />

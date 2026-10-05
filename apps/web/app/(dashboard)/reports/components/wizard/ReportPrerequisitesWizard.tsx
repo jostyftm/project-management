@@ -33,7 +33,7 @@ export const ReportPrerequisitesWizard: React.FC<ReportPrerequisitesWizardProps>
   const hasCategories = categories.length > 0;
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-2 sm:px-4 space-y-8">
+    <div className="w-full py-6 px-2 sm:px-4 space-y-8">
       {/* Encabezado explicativo */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
