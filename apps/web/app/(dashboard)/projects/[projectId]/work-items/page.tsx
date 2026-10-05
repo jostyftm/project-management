@@ -18,6 +18,9 @@ import {
 import { projectService } from "@/services/plane/projectService";
 import { workItemService } from "@/services/plane/workItemService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
+import { cycleService } from "@/services/plane/cycleService";
+import { projectMemberService } from "@/services/plane/projectMemberService";
+import { WorkItemListRow, ProjectMemberOption, CycleOption } from "@/components/plane/work-items/WorkItemListRow";
 import { Project, State, WorkItem, WorkItemType, SavedView } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -338,6 +341,8 @@ export default function ProjectWorkItemsPage() {
   const [states, setStates] = useState<State[]>([]);
   const [types, setTypes] = useState<WorkItemType[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+  const [members, setMembers] = useState<ProjectMemberOption[]>([]);
+  const [cycles, setCycles] = useState<CycleOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // View Layout & Display Options
@@ -433,16 +438,20 @@ export default function ProjectWorkItemsPage() {
     if (!projectId) return;
     if (!silent) setIsLoading(true);
     try {
-      const [projData, statesData, itemsData, typesData] = await Promise.all([
+      const [projData, statesData, itemsData, typesData, membersRes, cyclesData] = await Promise.all([
         projectService.get(projectId),
         projectService.getStates(projectId),
         workItemService.list(projectId),
         workItemTypeService.list(projectId),
+        projectMemberService.list(projectId).catch(() => ({ members: [] })),
+        cycleService.list(projectId).catch(() => []),
       ]);
       setProject(projData);
       setStates(statesData);
       setWorkItems(itemsData);
       setTypes(typesData);
+      setMembers(membersRes?.members || []);
+      setCycles(cyclesData || []);
     } catch (err: any) {
       toast.error("Error al cargar la información del proyecto");
     } finally {
@@ -506,6 +515,67 @@ export default function ProjectWorkItemsPage() {
       toast.success("Work item eliminado");
     } catch (err: any) {
       toast.error("Error al eliminar el work item");
+    }
+  };
+
+  const handleQuickUpdate = async (
+    itemId: string | number,
+    payload: Partial<WorkItem> & Record<string, any>
+  ) => {
+    // Optimistic UI update
+    setWorkItems((prev) =>
+      prev.map((item) => {
+        if (String(item.id) === String(itemId)) {
+          const updated = { ...item, ...payload };
+          if (payload.state_id) {
+            updated.state = states.find((s) => String(s.id) === String(payload.state_id)) || item.state;
+          }
+          if (payload.cycle_id !== undefined) {
+            if (payload.cycle_id) {
+              const c = cycles.find((cy) => String(cy.id) === String(payload.cycle_id));
+              updated.cycles = c ? [{ id: c.id, name: c.name, status: c.status || "" }] : item.cycles;
+            } else {
+              updated.cycles = [];
+            }
+          }
+          if (payload.assignee_ids) {
+            updated.assignees = members.filter((m) =>
+              payload.assignee_ids.map(String).includes(String(m.id))
+            ) as any;
+          }
+          return updated;
+        }
+
+        if (item.sub_items && item.sub_items.length > 0) {
+          const hasSub = item.sub_items.some((s) => String(s.id) === String(itemId));
+          if (hasSub) {
+            return {
+              ...item,
+              sub_items: item.sub_items.map((sub) => {
+                if (String(sub.id) === String(itemId)) {
+                  const updatedSub = { ...sub, ...payload };
+                  if (payload.state_id) {
+                    const st = states.find((s) => String(s.id) === String(payload.state_id));
+                    if (st) updatedSub.state = { id: st.id, name: st.name, color: st.color, group: st.group };
+                  }
+                  return updatedSub;
+                }
+                return sub;
+              }),
+            };
+          }
+        }
+
+        return item;
+      })
+    );
+
+    try {
+      await workItemService.update(itemId, payload);
+      toast.success("Tarea actualizada");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Error al actualizar la tarea");
+      loadData(true);
     }
   };
 
@@ -604,6 +674,12 @@ export default function ProjectWorkItemsPage() {
       return matchSearch && matchPriority && matchType && matchState;
     });
   }, [workItems, search, priorityFilter, typeFilter, stateFilter]);
+
+  const listDisplayItems = useMemo(() => {
+    if (search.trim()) return filteredItems;
+    const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
+    return roots.length > 0 ? roots : filteredItems;
+  }, [filteredItems, search]);
 
   if (isLoading) {
     return (
@@ -893,121 +969,31 @@ export default function ProjectWorkItemsPage() {
       )}
 
       {viewLayout === "list" && (
-        /* List View */
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
-              <tr>
-                <th className="px-4 py-3 w-24">ID</th>
-                <th className="px-4 py-3">Título</th>
-                <th className="px-4 py-3 w-32">Tipo</th>
-                <th className="px-4 py-3 w-36">Estado</th>
-                <th className="px-4 py-3 w-28">Prioridad</th>
-                <th className="px-4 py-3 w-28">Estimación</th>
-                <th className="px-4 py-3 w-32">Fecha Límite</th>
-                <th className="px-4 py-3 w-16 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
-                    No hay work items que coincidan con los filtros.
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map((item) => {
-                  const priority = getPriorityBadge(item.priority);
-                  const isMine = isAssignedToMe(item);
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => handleOpenDetail(item)}
-                      className={cn(
-                        "hover:bg-slate-50/80 transition-all cursor-pointer",
-                        !isMine
-                          ? "opacity-55 hover:opacity-100 bg-slate-50/20"
-                          : "opacity-100 bg-white"
-                      )}
-                    >
-                      <td className="px-4 py-3 font-mono font-semibold text-xs text-slate-500">
-                        {item.identifier}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {item.title}
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.type && (
-                          <span
-                            className="text-[10px] font-semibold px-2 py-0.5 rounded"
-                            style={{
-                              backgroundColor: `${item.type.color}15`,
-                              color: item.type.color,
-                            }}
-                          >
-                            {item.type.name}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={String(item.state?.id || "")}
-                          onValueChange={(val) => handleStateChange(item.id, val)}
-                          disabled={!canModifyItemState(item)}
-                        >
-                          <SelectTrigger className="h-7 text-xs bg-transparent border-slate-200">
-                            <span
-                              className="size-2 rounded-full mr-1.5 shrink-0"
-                              style={{ backgroundColor: item.state?.color || "#6366f1" }}
-                            />
-                            <SelectValue placeholder="Estado">
-                              {item.state?.name || "Sin estado"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {states.map((st) => (
-                              <SelectItem key={st.id} value={String(st.id)}>
-                                <div className="flex items-center gap-1.5">
-                                  <span
-                                    className="size-2 rounded-full"
-                                    style={{ backgroundColor: st.color || "#6366f1" }}
-                                  />
-                                  <span>{st.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border", priority.color)}>
-                          {priority.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                        {item.estimate_value || (item.estimate_points ? `${item.estimate_points} pts` : "-")}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
-                        {item.target_date || "-"}
-                      </td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="size-7 text-slate-400 hover:text-red-600"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        /* Modern Two-Column List View with Expandable Subtasks and Interactive Pills */
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          {listDisplayItems.length === 0 ? (
+            <div className="p-12 text-center text-sm text-slate-400">
+              No hay work items que coincidan con los filtros.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+              {listDisplayItems.map((item) => (
+                <WorkItemListRow
+                  key={item.id}
+                  item={item}
+                  states={states}
+                  members={members}
+                  cycles={cycles}
+                  onSelect={handleOpenDetail}
+                  onUpdate={handleQuickUpdate}
+                  onDelete={handleDeleteItem}
+                  isAdmin={isAdmin}
+                  canModifyState={canModifyItemState(item)}
+                  showProjectBadge={false}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

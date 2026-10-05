@@ -19,6 +19,7 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
+  Repeat,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -192,7 +193,23 @@ export function CycleDetailView({
       </div>
 
       {/* Content based on Tab */}
-      {currentTab === "active" && (
+      {currentTab === "active" && (!cycle ? (
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center text-slate-500 my-4">
+          <Repeat className="size-8 text-slate-400 mx-auto mb-2" />
+          <p className="font-semibold text-slate-800 dark:text-slate-200">No hay ningún ciclo activo actualmente</p>
+          <p className="text-xs text-slate-500 mt-1">Puedes iniciar uno desde la pestaña &quot;Próximo&quot; o crear uno nuevo para tu equipo.</p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleTabClick("upcoming")}
+              className="text-xs"
+            >
+              Ver ciclos próximos
+            </Button>
+          </div>
+        </div>
+      ) : (
         <>
           {/* 2. Cabecera del Sprint */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-2">
@@ -370,7 +387,7 @@ export function CycleDetailView({
             />
           )}
         </>
-      )}
+      ))}
 
       {currentTab === "upcoming" && (
         <div className="w-full">

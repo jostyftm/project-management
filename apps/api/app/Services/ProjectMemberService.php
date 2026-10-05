@@ -138,7 +138,28 @@ class ProjectMemberService
             ]
         );
 
-        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+        // Resolver URL del frontend dinámicamente según la petición que realiza la invitación,
+        // o utilizar el valor configurado en app.frontend_url / FRONTEND_URL
+        $frontendUrl = null;
+        if (app()->bound('request') && request()) {
+            $origin = request()->header('Origin');
+            if (!empty($origin)) {
+                $frontendUrl = rtrim($origin, '/');
+            } else {
+                $referer = request()->header('Referer');
+                if (!empty($referer)) {
+                    $parsed = parse_url($referer);
+                    if (!empty($parsed['scheme']) && !empty($parsed['host'])) {
+                        $frontendUrl = $parsed['scheme'] . '://' . $parsed['host'] . (!empty($parsed['port']) ? ':' . $parsed['port'] : '');
+                    }
+                }
+            }
+        }
+
+        if (empty($frontendUrl)) {
+            $frontendUrl = rtrim(config('app.frontend_url') ?: env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        }
+
         $inviteUrl = "{$frontendUrl}/invitations/{$invitation->token}";
 
         // Cargar relaciones necesarias para el Mailable antes de enviarlo

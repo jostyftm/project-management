@@ -17,6 +17,9 @@ import {
 import { yourWorkService, YourWorkTab } from "@/services/plane/yourWorkService";
 import { workItemService } from "@/services/plane/workItemService";
 import { projectService } from "@/services/plane/projectService";
+import { projectMemberService } from "@/services/plane/projectMemberService";
+import { cycleService } from "@/services/plane/cycleService";
+import { WorkItemListRow, ProjectMemberOption, CycleOption } from "@/components/plane/work-items/WorkItemListRow";
 import { WorkItem, State, WorkItemType, SavedView } from "@/types/plane-types";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -309,8 +312,10 @@ export default function YourWorkPage() {
   // Work Item Detail Sheet integration
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
 
-  // Cache for project states to enable inline state changing and dragging
+  // Cache for project states, members and cycles to enable inline updates in list view
   const [projectStatesMap, setProjectStatesMap] = useState<Record<string, State[]>>({});
+  const [projectMembersMap, setProjectMembersMap] = useState<Record<string, ProjectMemberOption[]>>({});
+  const [projectCyclesMap, setProjectCyclesMap] = useState<Record<string, CycleOption[]>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -326,12 +331,23 @@ export default function YourWorkPage() {
       const data = await yourWorkService.list(tab);
       setItems(data);
 
-      // Pre-fetch states for distinct projects in data
+      // Pre-fetch states, members and cycles for distinct projects in data
       const projectIds = Array.from(new Set(data.map((i) => i.project?.id).filter(Boolean)));
       for (const pId of projectIds) {
-        if (!projectStatesMap[String(pId)]) {
+        const idStr = String(pId);
+        if (!projectStatesMap[idStr]) {
           projectService.getStates(pId!).then((states) => {
-            setProjectStatesMap((prev) => ({ ...prev, [String(pId)]: states }));
+            setProjectStatesMap((prev) => ({ ...prev, [idStr]: states }));
+          }).catch(() => { });
+        }
+        if (!projectMembersMap[idStr]) {
+          projectMemberService.list(pId!).then((res) => {
+            setProjectMembersMap((prev) => ({ ...prev, [idStr]: res.members || [] }));
+          }).catch(() => { });
+        }
+        if (!projectCyclesMap[idStr]) {
+          cycleService.list(pId!).then((cycles) => {
+            setProjectCyclesMap((prev) => ({ ...prev, [idStr]: cycles || [] }));
           }).catch(() => { });
         }
       }
@@ -341,7 +357,7 @@ export default function YourWorkPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectStatesMap]);
+  }, [projectStatesMap, projectMembersMap, projectCyclesMap]);
 
   useEffect(() => {
     if (currentWorkspace) {
@@ -396,6 +412,12 @@ export default function YourWorkPage() {
     });
   }, [items, searchQuery, priorityFilter, typeFilter, stateFilter]);
 
+  const listDisplayItems = useMemo(() => {
+    if (searchQuery.trim()) return filteredItems;
+    const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
+    return roots.length > 0 ? roots : filteredItems;
+  }, [filteredItems, searchQuery]);
+
   const handleStateChange = async (item: WorkItem, newStateId: string) => {
     const pId = item.project?.id ? String(item.project.id) : "";
     const pStates = projectStatesMap[pId] || [];
@@ -434,6 +456,74 @@ export default function YourWorkPage() {
       toast.success(`Prioridad cambiada a "${pBadge.label}"`);
     } catch {
       toast.error("Error al actualizar la prioridad");
+      fetchItems(activeTab);
+    }
+  };
+
+  const handleQuickUpdate = async (
+    itemId: string | number,
+    payload: Partial<WorkItem> & Record<string, any>
+  ) => {
+    // Optimistic UI update
+    setItems((prev) =>
+      prev.map((item) => {
+        if (String(item.id) === String(itemId)) {
+          const pId = item.project?.id ? String(item.project.id) : "";
+          const pStates = projectStatesMap[pId] || [];
+          const pMembers = projectMembersMap[pId] || [];
+          const pCycles = projectCyclesMap[pId] || [];
+
+          const updated = { ...item, ...payload };
+          if (payload.state_id) {
+            updated.state = pStates.find((s) => String(s.id) === String(payload.state_id)) || item.state;
+          }
+          if (payload.cycle_id !== undefined) {
+            if (payload.cycle_id) {
+              const c = pCycles.find((cy) => String(cy.id) === String(payload.cycle_id));
+              updated.cycles = c ? [{ id: c.id, name: c.name, status: c.status || "" }] : item.cycles;
+            } else {
+              updated.cycles = [];
+            }
+          }
+          if (payload.assignee_ids) {
+            updated.assignees = pMembers.filter((m) =>
+              payload.assignee_ids.map(String).includes(String(m.id))
+            ) as any;
+          }
+          return updated;
+        }
+
+        if (item.sub_items && item.sub_items.length > 0) {
+          const hasSub = item.sub_items.some((s) => String(s.id) === String(itemId));
+          if (hasSub) {
+            const pId = item.project?.id ? String(item.project.id) : "";
+            const pStates = projectStatesMap[pId] || [];
+            return {
+              ...item,
+              sub_items: item.sub_items.map((sub) => {
+                if (String(sub.id) === String(itemId)) {
+                  const updatedSub = { ...sub, ...payload };
+                  if (payload.state_id) {
+                    const st = pStates.find((s) => String(s.id) === String(payload.state_id));
+                    if (st) updatedSub.state = { id: st.id, name: st.name, color: st.color, group: st.group };
+                  }
+                  return updatedSub;
+                }
+                return sub;
+              }),
+            };
+          }
+        }
+
+        return item;
+      })
+    );
+
+    try {
+      await workItemService.update(itemId, payload);
+      toast.success("Tarea actualizada");
+    } catch {
+      toast.error("Error al actualizar la tarea");
       fetchItems(activeTab);
     }
   };
@@ -778,161 +868,35 @@ export default function YourWorkPage() {
               {/* List Layout */}
               {viewLayout === "list" && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase">
-                      <tr>
-                        <th className="py-3 px-4">ID</th>
-                        <th className="py-3 px-4">Título</th>
-                        <th className="py-3 px-4">Proyecto</th>
-                        <th className="py-3 px-4">Tipo</th>
-                        <th className="py-3 px-4">Estado</th>
-                        <th className="py-3 px-4">Prioridad</th>
-                        <th className="py-3 px-4">Estimación</th>
-                        {/* <th className="py-3 px-4 w-32">Fecha Límite</th> */}
-                        {/* <th className="py-3 px-4 w-24 text-right">Acción</th> */}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredItems.map((item) => {
+                  {listDisplayItems.length === 0 ? (
+                    <div className="p-12 text-center text-sm text-slate-400">
+                      No hay tareas que coincidan con los filtros aplicados.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {listDisplayItems.map((item) => {
                         const pId = item.project?.id ? String(item.project.id) : "";
-                        const availableStates = projectStatesMap[pId] || [];
-                        const priorityInfo = getPriorityBadge(item.priority);
+                        const availableStates = projectStatesMap[pId] || (item.state ? [item.state] : []);
+                        const availableMembers = projectMembersMap[pId] || [];
+                        const availableCycles = projectCyclesMap[pId] || [];
 
                         return (
-                          <tr
+                          <WorkItemListRow
                             key={item.id}
-                            onClick={() => setSelectedItemId(item.id)}
-                            className="hover:bg-slate-50/90 transition-colors cursor-pointer group"
-                          >
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="font-mono text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                                {item.identifier}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 font-medium text-slate-900">
-                              <div className="flex items-center gap-2">
-                                {item.is_draft && (
-                                  <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
-                                    BORRADOR
-                                  </span>
-                                )}
-                                <span className="text-wrap">{item.title}</span>
-                                {item.sub_items && item.sub_items.length > 0 && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded ml-1 shrink-0">
-                                    <GitBranch className="size-2.5" />
-                                    {item.sub_items.length}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="text-xs text-slate-600 font-medium bg-slate-100 px-2 py-1 rounded inline-flex items-center gap-1.5">
-                                <FolderKanban className="size-3 text-slate-400" />
-                                {item.project?.name || "Proyecto"}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              {item.type ? (
-                                <span
-                                  className="text-[10px] font-bold px-2 py-0.5 rounded shrink-0"
-                                  style={{ backgroundColor: `${item.type.color}15`, color: item.type.color }}
-                                >
-                                  {item.type.name}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400">-</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {availableStates.length > 0 ? (
-                                <Select
-                                  value={String(item.state?.id || "")}
-                                  onValueChange={(val) => handleStateChange(item, val)}
-                                >
-                                  <SelectTrigger className="h-7 text-xs bg-transparent border-slate-200">
-                                    <span
-                                      className="size-2 rounded-full mr-1.5 shrink-0"
-                                      style={{ backgroundColor: item.state?.color || "#6366f1" }}
-                                    />
-                                    <SelectValue placeholder="Estado">
-                                      {item.state?.name || "Sin estado"}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableStates.map((st) => (
-                                      <SelectItem key={st.id} value={String(st.id)}>
-                                        <div className="flex items-center gap-1.5">
-                                          <span
-                                            className="size-2 rounded-full"
-                                            style={{ backgroundColor: st.color || "#6366f1" }}
-                                          />
-                                          <span>{st.name}</span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : item.state ? (
-                                <div
-                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border"
-                                  style={{
-                                    backgroundColor: `${item.state.color}15`,
-                                    borderColor: `${item.state.color}40`,
-                                    color: item.state.color,
-                                  }}
-                                >
-                                  <span className="size-2 rounded-full" style={{ backgroundColor: item.state.color }} />
-                                  {item.state.name}
-                                </div>
-                              ) : (
-                                <span className="text-xs text-slate-400">Sin estado</span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border", priorityInfo.color)}>
-                                {priorityInfo.label}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap text-xs text-slate-600 font-medium">
-                              {item.estimate_value ? (
-                                <span className="bg-slate-100 px-2 py-0.5 rounded">
-                                  {item.estimate_value}
-                                </span>
-                              ) : item.estimate_points ? (
-                                <span className="bg-slate-100 px-2 py-0.5 rounded">
-                                  {item.estimate_points} pts
-                                </span>
-                              ) : (
-                                <span className="text-slate-300">-</span>
-                              )}
-                            </td>
-                            {/* <td className="py-3 px-4 whitespace-nowrap text-xs text-slate-500">
-                              {item.target_date ? (
-                                <div className="flex items-center gap-1">
-                                  <CalendarIcon className="size-3.5 text-slate-400" />
-                                  <span>{item.target_date}</span>
-                                </div>
-                              ) : (
-                                <span className="text-slate-300">-</span>
-                              )}
-                            </td> */}
-                            {/* <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setSelectedItemId(item.id)}
-                                className="h-7 text-xs gap-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
-                                title="Abrir detalle interactivo"
-                              >
-                                <span>Detalle</span>
-                                <Maximize2 className="size-3" />
-                              </Button>
-                            </td> */}
-                          </tr>
+                            item={item}
+                            states={availableStates}
+                            members={availableMembers}
+                            cycles={availableCycles}
+                            onSelect={(selected) => setSelectedItemId(selected.id)}
+                            onUpdate={handleQuickUpdate}
+                            isAdmin={true}
+                            canModifyState={true}
+                            showProjectBadge={true}
+                          />
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
                 </div>
               )}
 

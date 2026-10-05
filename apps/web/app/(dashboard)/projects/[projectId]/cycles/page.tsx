@@ -317,8 +317,81 @@ export default function CyclesPage() {
         )}
       </div>
 
-      {/* Cycle Detail View (Activo / Próximo / Completado) */}
-      <CycleDetailView
+      {cycles.length === 0 ? (
+        /* Empty state para crear el primer ciclo */
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-6 shadow-xs">
+          <div className="mx-auto size-20 rounded-3xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
+            <Repeat className="size-10" />
+          </div>
+
+          <div className="space-y-2 max-w-md mx-auto">
+            <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Comienza con tu primer ciclo de trabajo
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              Los ciclos (o sprints) te permiten agrupar tareas por iteraciones temporales fijas (ej. 1 o 2 semanas), dar seguimiento a la velocidad de entrega y visualizar gráficos de burndown en tiempo real.
+            </p>
+          </div>
+
+          {/* Value props */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left max-w-lg mx-auto pt-1">
+            <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                <Clock className="size-3.5 text-indigo-500" />
+                <span>Iteraciones</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Fechas de inicio y fin claras para focalizar el esfuerzo.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                <TrendingUp className="size-3.5 text-emerald-500" />
+                <span>Burndown</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Gráficos diarios para medir la velocidad de entrega.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                <Undo2 className="size-3.5 text-amber-500" />
+                <span>Traspaso</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Traspaso automático de pendientes al siguiente ciclo.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            {isAdmin ? (
+              <Button
+                onClick={() => {
+                  setEditingCycleId(null);
+                  setCycleName("");
+                  setCycleDesc("");
+                  setStartDate("");
+                  setEndDate("");
+                  setOpenCreateModal(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-6 py-2.5 shadow-md shadow-indigo-600/20 cursor-pointer"
+              >
+                <Plus className="mr-2 size-4" />
+                Crear primer ciclo
+              </Button>
+            ) : (
+              <p className="text-xs text-slate-400 italic">
+                Solicita a un administrador del proyecto la creación del primer ciclo.
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Cycle Detail View (Activo / Próximo / Completado) */
+        <CycleDetailView
         cycle={currentCycles[0] || null}
         projectId={projectId}
         project={project}
@@ -505,6 +578,7 @@ export default function CyclesPage() {
           </div>
         }
       />
+    )}
 
       {/* Modal Crear / Editar Ciclo */}
       <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
