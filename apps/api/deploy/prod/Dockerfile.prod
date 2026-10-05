@@ -16,11 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g --allow-scripts=puppeteer puppeteer \
+    && curl -sSLf -o /usr/local/bin/install-php-extensions https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions \
     && rm -rf /var/lib/apt/lists/*
-
-# Descargar el script de instalación de extensiones PHP (mlocati)
-ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
-RUN chmod +x /usr/local/bin/install-php-extensions
 
 # Instalar todas las extensiones requeridas por Laravel, Yajra Oracle y exportación de reportes
 RUN install-php-extensions \
@@ -60,6 +58,9 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --ignor
 
 # Copiar el resto de la aplicación
 COPY . .
+
+# Limpiar manifiestos y cachés residuales antes de generar el autoloader
+RUN rm -f bootstrap/cache/*.php
 
 # Autoloader optimizado para producción
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative

@@ -16,11 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g --allow-scripts=puppeteer puppeteer \
+    && curl -sSLf -o /usr/local/bin/install-php-extensions https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions \
     && rm -rf /var/lib/apt/lists/*
-
-# Descargar el script de instalación de extensiones PHP (mlocati)
-ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
-RUN chmod +x /usr/local/bin/install-php-extensions
 
 # Instalar extensiones (mlocati descarga e instala Oracle Instant Client automáticamente)
 RUN install-php-extensions \
@@ -58,6 +56,9 @@ RUN composer install --no-scripts --no-autoloader --prefer-dist --ignore-platfor
 
 # Copiar el resto de la aplicación
 COPY . .
+
+# Limpiar manifiestos y cachés residuales
+RUN rm -f bootstrap/cache/*.php
 
 # Generar el autoloader optimizado
 RUN composer dump-autoload --optimize
