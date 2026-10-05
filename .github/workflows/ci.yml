@@ -21,6 +21,10 @@ jobs:
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_sqlite, bcmath
           coverage: none
 
+      - name: Copy .env
+        working-directory: ./apps/api
+        run: cp .env.example .env
+
       - name: Install Composer Dependencies
         working-directory: ./apps/api
         run: composer install --prefer-dist --no-interaction --no-progress

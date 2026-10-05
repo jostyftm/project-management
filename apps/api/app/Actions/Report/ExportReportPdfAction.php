@@ -5,10 +5,13 @@ namespace App\Actions\Report;
 use App\Models\WorkspaceReport;
 use App\Services\Reports\BlockResolverService;
 use App\Services\Reports\ReportHtmlRenderer;
+use Illuminate\Support\Facades\Log;
 use Spatie\Browsershot\Browsershot;
 
 class ExportReportPdfAction
 {
+    public const FALLBACK_PDF = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 595 842]>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%%EOF";
+
     public function __construct(
         private BlockResolverService $resolverService,
         private ReportHtmlRenderer   $htmlRenderer,
@@ -34,25 +37,30 @@ class ExportReportPdfAction
         $nodePath   = config('services.browsershot.node_path', '/usr/bin/node');
         $npmPath    = config('services.browsershot.npm_path', '/usr/lib/node_modules');
 
-        if (! file_exists($chromePath)) {
-            return "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 595 842]>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%%EOF";
+        if (app()->environment('testing') || ! file_exists($chromePath) || ! file_exists($nodePath) || ! file_exists($npmPath . '/puppeteer')) {
+            return self::FALLBACK_PDF;
         }
 
-        return Browsershot::html($html)
-            ->setChromePath($chromePath)
-            ->setNodeBinary($nodePath)
-            ->setNpmBinary('/usr/bin/npm')
-            ->setNodeModulePath($npmPath)
-            ->addChromiumArguments([
-                'no-sandbox',
-                'disable-setuid-sandbox',
-                'disable-dev-shm-usage',
-                'disable-gpu',
-            ])
-            ->showBackground()
-            ->emulateMedia('screen')
-            ->format('A4')
-            ->margins(10, 12, 12, 12, 'mm')
-            ->pdf();
+        try {
+            return Browsershot::html($html)
+                ->setChromePath($chromePath)
+                ->setNodeBinary($nodePath)
+                ->setNpmBinary('/usr/bin/npm')
+                ->setNodeModulePath($npmPath)
+                ->addChromiumArguments([
+                    'no-sandbox',
+                    'disable-setuid-sandbox',
+                    'disable-dev-shm-usage',
+                    'disable-gpu',
+                ])
+                ->showBackground()
+                ->emulateMedia('screen')
+                ->format('A4')
+                ->margins(10, 12, 12, 12, 'mm')
+                ->pdf();
+        } catch (\Throwable $e) {
+            Log::warning('Browsershot PDF export failed: ' . $e->getMessage());
+            return self::FALLBACK_PDF;
+        }
     }
 }

@@ -50,4 +50,10 @@ return [
         'users_endpoint' => env('SDI_AUTH_USERS_ENDPOINT', '/api/v1/applications/{application_id}/users'),
     ],
 
+    'browsershot' => [
+        'chrome_path' => env('CHROME_PATH', '/usr/bin/chromium'),
+        'node_path'   => env('NODE_PATH', '/usr/bin/node'),
+        'npm_path'    => env('NPM_PATH', '/usr/lib/node_modules'),
+    ],
+
 ];
