@@ -33,6 +33,17 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 
+// Background decoration wrapper
+function PageWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50/60 dark:bg-slate-950 relative overflow-hidden">
+      {/* Subtle background glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-indigo-500/10 via-purple-500/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="w-full max-w-lg z-10">{children}</div>
+    </div>
+  );
+}
+
 export default function InvitationPage() {
   const params = useParams();
   const router = useRouter();
@@ -168,15 +179,6 @@ export default function InvitationPage() {
       setIsSubmitting(false);
     }
   };
-
-  // Background decoration wrapper
-  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50/60 dark:bg-slate-950 relative overflow-hidden">
-      {/* Subtle background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-gradient-to-b from-indigo-500/10 via-purple-500/5 to-transparent blur-3xl pointer-events-none" />
-      <div className="w-full max-w-lg z-10">{children}</div>
-    </div>
-  );
 
   // 1. Loading state
   if (isLoading || authLoading) {
