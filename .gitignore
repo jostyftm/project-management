@@ -1,2 +1,129 @@
-.env
-/docs
+# ==========================================
+# 1. Dependencias y Gestores de Paquetes
+# ==========================================
+node_modules/
+*/node_modules/
+.pnpm-store/
+vendor/
+*/vendor/
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ==========================================
+# 2. Entornos y Secretos
+# ==========================================
+.env.local
+.env.*.local
+*.env.backup
+*.env.bak
+auth.json
+
+# ==========================================
+# 3. Compilacion y Cache - Next.js / Frontend
+# ==========================================
+.next/
+*/.next/
+out/
+*/out/
+build/
+*/build/
+dist/
+*/dist/
+.turbo/
+*/.turbo/
+*.tsbuildinfo
+.vercel/
+
+# ==========================================
+# 4. Compilacion y Almacenamiento - Laravel / Backend
+# ==========================================
+apps/api/public/build/
+apps/api/public/hot
+apps/api/public/storage
+apps/api/storage/*.key
+apps/api/storage/pail
+apps/api/storage/framework/cache/data/*
+!apps/api/storage/framework/cache/data/.gitignore
+apps/api/storage/framework/sessions/*
+!apps/api/storage/framework/sessions/.gitignore
+apps/api/storage/framework/testing/*
+!apps/api/storage/framework/testing/.gitignore
+apps/api/storage/framework/views/*
+!apps/api/storage/framework/views/.gitignore
+apps/api/storage/logs/*.log
+!apps/api/storage/logs/.gitignore
+apps/api/storage/app/*
+!apps/api/storage/app/.gitignore
+!apps/api/storage/app/public/
+!apps/api/storage/app/private/
+apps/api/bootstrap/cache/*
+!apps/api/bootstrap/cache/.gitignore
+
+# ==========================================
+# 5. Logs, Depuracion y Descargas
+# ==========================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+logs_*/
+logs/
+
+# ==========================================
+# 6. Testing y Cobertura
+# ==========================================
+.phpunit.result.cache
+.phpunit.cache
+coverage/
+*/coverage/
+.nyc_output/
+
+# ==========================================
+# 7. Editores e IDEs
+# ==========================================
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.fleet/
+.nova/
+.zed/
+.phpactor.json
+*.sublime-project
+*.sublime-workspace
+Homestead.json
+Homestead.yaml
+
+# ==========================================
+# 8. Sistema Operativo y Metadatos
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*:Zone.Identifier
+
+# ==========================================
+# 9. Docker, Datos Locales y Archivos Temporales
+# ==========================================
+postgres_data/
+redis_data/
+docker-data/
+*.sqlite
+*.sqlite-journal
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.gemini/
+scratch/
