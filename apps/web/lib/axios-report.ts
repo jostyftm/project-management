@@ -2,7 +2,7 @@ import { REPORT_API_URL } from "@/config/enviroments";
 import Axios from "axios";
 
 const axiosReport = Axios.create({
-  baseURL: REPORT_API_URL,
+  baseURL: REPORT_API_URL || undefined,
   headers: {
     "X-Requested-With": "XMLHttpRequest",
     Accept: "application/json",

@@ -57,7 +57,7 @@ export function NotificationBell() {
       const token = storage.get(ACCESS_TOKEN);
       const currentWs = storage.get("current_workspace") as { id?: number | string } | null;
       if (typeof token === "string" && token && typeof window !== "undefined") {
-        const streamUrl = new URL(`${API_BASE_URL}/live-stream`);
+        const streamUrl = new URL(`${API_BASE_URL}/live-stream`, window.location.origin);
         streamUrl.searchParams.set("token", token);
         if (currentWs?.id) {
           streamUrl.searchParams.set("workspace_id", String(currentWs.id));

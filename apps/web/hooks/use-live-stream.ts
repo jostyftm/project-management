@@ -33,7 +33,8 @@ export function useLiveStream({
     if (typeof token !== "string" || !token) return;
 
     try {
-      const streamUrl = new URL(`${API_BASE_URL}/live-stream`);
+      const baseOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+      const streamUrl = new URL(`${API_BASE_URL}/live-stream`, baseOrigin);
       streamUrl.searchParams.set("token", token);
       if (currentWs?.id) {
         streamUrl.searchParams.set("workspace_id", String(currentWs.id));

@@ -1,9 +1,8 @@
-// import { WEB_URL } from "@/config/enviroments";
 import { WEB_URL } from "@/config/enviroments";
 import Axios from "axios";
 
 const axiosApi = Axios.create({
-  baseURL: WEB_URL,
+  baseURL: WEB_URL || undefined,
   headers: {
     "X-Requested-With": "XMLHttpRequest",
     Accept: "application/json",

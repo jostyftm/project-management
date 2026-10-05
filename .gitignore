@@ -15,6 +15,8 @@ vendor/
 # ==========================================
 # 2. Entornos y Secretos
 # ==========================================
+.env
+.env.prod
 .env.local
 .env.*.local
 *.env.backup
