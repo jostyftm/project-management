@@ -4,7 +4,7 @@ services:
     container_name: plane_postgres_prod
     restart: always
     env_file:
-      - .env.prod
+      - .env
     volumes:
       - "postgres_prod_data:/var/lib/postgresql/data"
     networks:
@@ -32,7 +32,7 @@ services:
         "${REDIS_PASSWORD:-secret_password}",
       ]
     env_file:
-      - .env.prod
+      - .env
     volumes:
       - "redis_prod_data:/data"
     networks:
@@ -49,7 +49,7 @@ services:
     container_name: plane_rustfs_prod
     restart: always
     env_file:
-      - .env.prod
+      - .env
     volumes:
       - "rustfs_prod_data:/data"
     networks:
@@ -74,7 +74,7 @@ services:
     container_name: plane_api_prod
     restart: always
     env_file:
-      - .env.prod
+      - .env
     networks:
       - plane_clone-network
     depends_on:
@@ -96,7 +96,7 @@ services:
     container_name: plane_web_prod
     restart: always
     env_file:
-      - .env.prod
+      - .env
     networks:
       - plane_clone-network
     depends_on:
