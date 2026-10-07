@@ -158,4 +158,14 @@ class WorkItem extends Model
     {
         return $this->hasMany(GithubCommit::class)->latest('committed_at');
     }
+
+    public function deliverables(): HasMany
+    {
+        return $this->hasMany(WorkItemDeliverable::class)->latest();
+    }
+
+    public function dodItems(): HasMany
+    {
+        return $this->hasMany(WorkItemDodItem::class)->oldest();
+    }
 }

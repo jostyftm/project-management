@@ -34,6 +34,7 @@ import {
 } from "@/components/plane/work-items/WorkItemViewModeSwitcher";
 import { WorkItemGitHubWidget } from "@/components/plane/work-items/WorkItemGitHubWidget";
 import { WorkItemSubtasksSection } from "@/components/plane/work-items/WorkItemSubtasksSection";
+import { WorkItemDeliverablesSection } from "@/components/plane/work-items/WorkItemDeliverablesSection";
 import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone, DocBlock } from "@/types/plane-types";
 import {
   Plus,
@@ -802,9 +803,12 @@ export function WorkItemDetailSheet({
           />
         )}
 
-        {/* Tabs: Relations, Activity & Comments */}
-        <Tabs defaultValue="relations" className="w-full">
-          <TabsList className="w-full grid grid-cols-2 bg-slate-100 dark:bg-slate-800">
+        {/* Tabs: Deliverables, Relations, Activity & Comments */}
+        <Tabs defaultValue="deliverables" className="w-full">
+          <TabsList className="w-full grid grid-cols-3 bg-slate-100 dark:bg-slate-800">
+            <TabsTrigger value="deliverables" className="text-xs">
+              Entregables
+            </TabsTrigger>
             <TabsTrigger value="relations" className="text-xs">
               Relaciones ({((item.outward_relations?.length || 0) + (item.inward_relations?.length || 0))})
             </TabsTrigger>
@@ -812,6 +816,21 @@ export function WorkItemDetailSheet({
               Actividad
             </TabsTrigger>
           </TabsList>
+
+          {/* Deliverables Tab */}
+          <TabsContent value="deliverables" className="pt-3">
+            {effectiveProject ? (
+              <WorkItemDeliverablesSection
+                projectId={effectiveProject.id}
+                workItemId={item.id}
+                isAdmin={isAdmin}
+              />
+            ) : (
+              <p className="text-xs text-slate-400 italic py-3 text-center">
+                Proyecto no encontrado.
+              </p>
+            )}
+          </TabsContent>
 
           {/* Relations Tab */}
           <TabsContent value="relations" className="space-y-3 pt-3">

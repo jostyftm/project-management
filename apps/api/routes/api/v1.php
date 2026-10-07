@@ -2,41 +2,43 @@
 
 use App\Http\Controllers\Api\v1\Activity\ActivityController;
 use App\Http\Controllers\Api\v1\Auth\AuthController;
+use App\Http\Controllers\Api\v1\Automation\AutomationRuleController;
+use App\Http\Controllers\Api\v1\Automation\RecurringWorkItemController;
 use App\Http\Controllers\Api\v1\Comment\CommentController;
 use App\Http\Controllers\Api\v1\Cycle\CycleController;
 use App\Http\Controllers\Api\v1\Initiative\InitiativeController;
+use App\Http\Controllers\Api\v1\InstanceAdmin\InstanceAdminController;
+use App\Http\Controllers\Api\v1\Integration\GitHubWebhookController;
+use App\Http\Controllers\Api\v1\Integration\IntegrationController;
+use App\Http\Controllers\Api\v1\Integration\ProjectGitHubController;
+use App\Http\Controllers\Api\v1\Integration\WorkspaceGitHubController;
+use App\Http\Controllers\Api\v1\Invitation\InvitationController;
 use App\Http\Controllers\Api\v1\Milestone\MilestoneController;
 use App\Http\Controllers\Api\v1\Module\ModuleController;
 use App\Http\Controllers\Api\v1\Notification\NotificationController;
 use App\Http\Controllers\Api\v1\Page\PageAnalyticsController;
 use App\Http\Controllers\Api\v1\Page\PageController;
+use App\Http\Controllers\Api\v1\Project\ProjectAnalyticsController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
+use App\Http\Controllers\Api\v1\Project\ProjectMemberController;
 use App\Http\Controllers\Api\v1\Release\ReleaseController;
+use App\Http\Controllers\Api\v1\Report\ReportBlockController;
+use App\Http\Controllers\Api\v1\Report\ReportDataController;
+use App\Http\Controllers\Api\v1\Report\ReportSnapshotController;
+use App\Http\Controllers\Api\v1\Report\WorkspaceReportController;
 use App\Http\Controllers\Api\v1\Sticky\StickyController;
 use App\Http\Controllers\Api\v1\Stream\StreamController;
 use App\Http\Controllers\Api\v1\Teamspace\TeamspaceController;
 use App\Http\Controllers\Api\v1\User\UserController;
 use App\Http\Controllers\Api\v1\View\ViewController;
 use App\Http\Controllers\Api\v1\Webhook\WebhookController;
-use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemController;
+use App\Http\Controllers\Api\v1\WorkItem\WorkItemDeliverableController;
+use App\Http\Controllers\Api\v1\WorkItem\WorkItemImportController;
 use App\Http\Controllers\Api\v1\WorkItem\WorkItemRelationController;
 use App\Http\Controllers\Api\v1\WorkItemType\WorkItemTypeController;
-use App\Http\Controllers\Api\v1\InstanceAdmin\InstanceAdminController;
-use App\Http\Controllers\Api\v1\Invitation\InvitationController;
-use App\Http\Controllers\Api\v1\Project\ProjectMemberController;
+use App\Http\Controllers\Api\v1\Workspace\WorkspaceController;
 use App\Http\Controllers\Api\v1\YourWork\YourWorkController;
-use App\Http\Controllers\Api\v1\Integration\GitHubWebhookController;
-use App\Http\Controllers\Api\v1\Integration\ProjectGitHubController;
-use App\Http\Controllers\Api\v1\Integration\WorkspaceGitHubController;
-use App\Http\Controllers\Api\v1\Integration\IntegrationController;
-use App\Http\Controllers\Api\v1\WorkItem\WorkItemImportController;
-use App\Http\Controllers\Api\v1\Automation\RecurringWorkItemController;
-use App\Http\Controllers\Api\v1\Automation\AutomationRuleController;
-use App\Http\Controllers\Api\v1\Report\WorkspaceReportController;
-use App\Http\Controllers\Api\v1\Report\ReportBlockController;
-use App\Http\Controllers\Api\v1\Report\ReportDataController;
-use App\Http\Controllers\Api\v1\Report\ReportSnapshotController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,7 +54,6 @@ Route::prefix('auth')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 });
-
 
 Route::get('invitations/{token}', [InvitationController::class, 'show']);
 Route::post('invitations/{token}/onboard', [InvitationController::class, 'onboard']);
@@ -225,6 +226,16 @@ Route::middleware(['auth.sdi'])->group(function () {
             Route::get('work-items/{work_item}/activities', [ActivityController::class, 'indexByWorkItem']);
             Route::get('work-items/{work_item}/github', [ProjectGitHubController::class, 'getWorkItemGitHub']);
 
+            // Entregables y Criterios DoD de la Historia de Usuario
+            Route::get('projects/{project}/work-items/{workItem}/deliverables', [WorkItemDeliverableController::class, 'index']);
+            Route::post('projects/{project}/work-items/{workItem}/deliverables', [WorkItemDeliverableController::class, 'store']);
+            Route::get('projects/{project}/work-items/{workItem}/deliverables/{deliverable}/download', [WorkItemDeliverableController::class, 'download']);
+            Route::delete('projects/{project}/work-items/{workItem}/deliverables/{deliverable}', [WorkItemDeliverableController::class, 'destroy']);
+            Route::patch('projects/{project}/work-items/{workItem}/deliverables/{deliverable}/review', [WorkItemDeliverableController::class, 'review']);
+            Route::post('projects/{project}/work-items/{workItem}/dod-items', [WorkItemDeliverableController::class, 'storeDod']);
+            Route::patch('projects/{project}/work-items/{workItem}/dod-items/{dodItem}', [WorkItemDeliverableController::class, 'toggleDod']);
+            Route::delete('projects/{project}/work-items/{workItem}/dod-items/{dodItem}', [WorkItemDeliverableController::class, 'destroyDod']);
+
             // Ciclos (Visualización para miembros)
             Route::get('projects/{project}/cycles', [CycleController::class, 'index']);
             Route::get('cycles/{cycle}', [CycleController::class, 'show']);
@@ -246,6 +257,13 @@ Route::middleware(['auth.sdi'])->group(function () {
             // GitHub Repos & Branches (Visualización para miembros)
             Route::get('projects/{project}/github', [ProjectGitHubController::class, 'index']);
             Route::get('projects/{project}/github/branches', [ProjectGitHubController::class, 'branches']);
+
+            // Analíticas y KPIs del Proyecto y Colaboradores
+            Route::get('projects/{project}/analytics/overview', [ProjectAnalyticsController::class, 'overview']);
+            Route::get('projects/{project}/analytics/velocity', [ProjectAnalyticsController::class, 'velocity']);
+            Route::get('projects/{project}/analytics/cycle-time', [ProjectAnalyticsController::class, 'cycleTime']);
+            Route::get('projects/{project}/analytics/members', [ProjectAnalyticsController::class, 'members']);
+            Route::get('projects/{project}/analytics/members/{user}', [ProjectAnalyticsController::class, 'memberDetail']);
         });
 
         // =========================================================================
