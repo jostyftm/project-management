@@ -67,7 +67,7 @@ Al finalizar la ejecución, el script mostrará las instrucciones exactas:
 
 ### Para Producción (`prod`):
 ```bash
-docker compose --env-file .env -f docker-compose-prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --build
 docker compose -f docker-compose-prod.yml exec api_prod php artisan migrate --force
 docker compose -f docker-compose-prod.yml exec api_prod php artisan storage:link
 ```
