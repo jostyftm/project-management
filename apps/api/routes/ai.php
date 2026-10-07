@@ -11,3 +11,6 @@ Mcp::local('project-management', ProjectManagementServer::class);
 // Servidor web MCP (comunicación HTTP / SSE para agentes remotos, integraciones web y local desde Windows)
 Mcp::web('/mcp/project-management', ProjectManagementServer::class)
     ->middleware([AuthenticateMcpRequest::class, IdentifyWorkspace::class]);
+
+Mcp::web('/api/mcp/project-management', ProjectManagementServer::class)
+    ->middleware([AuthenticateMcpRequest::class, IdentifyWorkspace::class]);

@@ -356,3 +356,22 @@ it('allows unauthenticated web MCP requests in local development falling back to
 
     expect($response->json('result.content.0.text'))->toContain('ENG');
 });
+
+it('supports web MCP requests through the /api/mcp/project-management alias', function () {
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 3,
+        'method' => 'tools/list',
+        'params' => [],
+    ]);
+
+    $response->assertStatus(200)
+        ->assertJsonPath('jsonrpc', '2.0')
+        ->assertJsonPath('id', 3);
+
+    expect(count($response->json('result.tools')))->toBe(15);
+});

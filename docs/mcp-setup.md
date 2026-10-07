@@ -207,3 +207,51 @@ Puedes inspeccionar y probar interactivamente todas las herramientas y recursos 
 ```bash
 docker compose exec project_managment php artisan mcp:inspector project-management
 ```
+
+---
+
+## 7. Conexión a Servidor Remoto (IP y Puerto)
+
+Si despliegas la plataforma en un servidor remoto o VPS (por ejemplo en `http://142.145.145.X:9600`), el servidor MCP está disponible a través de HTTP en:
+- `http://142.145.145.X:9600/mcp/project-management`
+- `http://142.145.145.X:9600/api/mcp/project-management` (alias compatible con cualquier gateway)
+
+### 7.1. Generar Token en el Servidor Remoto
+En producción, el servidor exige un Bearer token. Ejecuta en el servidor remoto:
+```bash
+docker compose exec api_prod php artisan tinker --execute="echo App\Models\User::first()->createToken('mcp-remote')->plainTextToken . PHP_EOL;"
+```
+
+### 7.2. Configuración en Clientes Locales
+En tu archivo de configuración del editor (ej. `.cursor/mcp.json` o `.vscode/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "plane-remote": {
+      "url": "http://142.145.145.X:9600/mcp/project-management",
+      "headers": {
+        "Authorization": "Bearer 1|tu_token_aqui..."
+      }
+    }
+  }
+}
+```
+
+Para clientes que solo admiten transporte Stdio (como Claude Desktop), usa el puente `mcp-remote`:
+```json
+{
+  "mcpServers": {
+    "plane-remote": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://142.145.145.X:9600/mcp/project-management",
+        "--header",
+        "Authorization: Bearer 1|tu_token_aqui..."
+      ]
+    }
+  }
+}
+```
+
