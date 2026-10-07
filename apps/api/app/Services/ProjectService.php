@@ -6,10 +6,12 @@ use App\Models\Label;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\State;
+use App\Models\WorkItemDeliverable;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class ProjectService
@@ -155,6 +157,22 @@ class ProjectService
      */
     public function delete(Project $project): void
     {
+        // Limpiar archivos físicos de entregables asociados al proyecto
+        $deliverables = WorkItemDeliverable::where('project_id', $project->id)
+            ->whereNotNull('file_path')
+            ->get();
+
+        foreach ($deliverables as $deliverable) {
+            if (! str_starts_with($deliverable->file_path, 'http://') && ! str_starts_with($deliverable->file_path, 'https://')) {
+                $disk = $deliverable->disk ?? config('filesystems.default');
+                try {
+                    Storage::disk($disk)->delete($deliverable->file_path);
+                } catch (\Throwable) {
+                    // Prevenir interrupciones si el archivo ya no existe físicamente
+                }
+            }
+        }
+
         $project->delete();
     }
 

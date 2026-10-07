@@ -22,6 +22,7 @@ import { ProjectMembersTab } from "@/components/plane/projects/ProjectMembersTab
 import { ProjectNotFoundView } from "@/components/plane/ProjectNotFoundView";
 import { ProjectGitHubSettingsTab } from "@/components/plane/integrations/ProjectGitHubSettingsTab";
 import { SlackSettingsTab } from "@/components/plane/integrations/SlackSettingsTab";
+import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectModal";
 import {
   Sliders,
   Loader2,
@@ -31,6 +32,7 @@ import {
   Github,
   MessageSquare,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -75,6 +77,7 @@ export default function ProjectSettingsPage() {
   const [description, setDescription] = useState("");
   const [estimateSystem, setEstimateSystem] = useState<string>("FIBONACCI");
   const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -270,6 +273,41 @@ export default function ProjectSettingsPage() {
               </CardFooter>
             </Card>
           </form>
+
+          {/* Danger Zone */}
+          <Card className="border-rose-200 bg-rose-50/20 shadow-xs">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertTriangle className="size-5 shrink-0" />
+                <CardTitle className="text-base font-semibold text-rose-900">
+                  Zona de Peligro
+                </CardTitle>
+              </div>
+              <CardDescription className="text-rose-700/80 text-xs">
+                Acciones destructivas e irreversibles sobre este proyecto.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-rose-200 bg-white">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    Eliminar este proyecto
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5 max-w-xl">
+                    Una vez eliminado, se borrarán de forma irreversible todos los ciclos, tareas, subtareas, entregables, archivos y páginas de documentación asociadas.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setDeleteModalOpen(true)}
+                  className="shrink-0 bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+                >
+                  Eliminar Proyecto
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tab 2: Project Members */}
@@ -293,6 +331,14 @@ export default function ProjectSettingsPage() {
         projectId={projectId}
         open={membersModalOpen}
         onOpenChange={setMembersModalOpen}
+      />
+
+      {/* Delete Project Modal */}
+      <DeleteProjectModal
+        project={project}
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        redirectToProjectsOnSuccess={true}
       />
     </div>
   );

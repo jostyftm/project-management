@@ -11,7 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, FolderKanban, ArrowRight, Layers, Loader2, Hash } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectModal";
+import { Plus, Search, FolderKanban, ArrowRight, Layers, Loader2, Hash, MoreVertical, Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Project } from "@/types/plane-types";
 
@@ -21,6 +29,8 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedProjectToDelete, setSelectedProjectToDelete] = useState<Project | null>(null);
 
   // New project form
   const [name, setName] = useState("");
@@ -152,7 +162,7 @@ export default function ProjectsPage() {
                     <Hash className="size-3 text-slate-400" />
                     <span>{proj.identifier}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {proj.current_user_role && (
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
@@ -173,6 +183,43 @@ export default function ProjectsPage() {
                     <span className="text-xs text-slate-400">
                       {proj.work_items_count ?? 0} items
                     </span>
+
+                    {proj.current_user_role === "ADMIN" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md -mr-1"
+                          >
+                            <MoreVertical className="size-4" />
+                            <span className="sr-only">Opciones del proyecto</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48 bg-white shadow-md">
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/projects/${proj.id}/settings`}
+                              className="cursor-pointer"
+                            >
+                              <Settings className="size-4 mr-2 text-slate-500" />
+                              <span>Configuración</span>
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedProjectToDelete(proj);
+                              setDeleteModalOpen(true);
+                            }}
+                            className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer"
+                          >
+                            <Trash2 className="size-4 mr-2" />
+                            <span>Eliminar Proyecto</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
                 <CardTitle className="text-lg font-semibold text-slate-900 line-clamp-1">
@@ -261,6 +308,17 @@ export default function ProjectsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Eliminar Proyecto */}
+      <DeleteProjectModal
+        project={selectedProjectToDelete}
+        open={deleteModalOpen}
+        onOpenChange={(open) => {
+          setDeleteModalOpen(open);
+          if (!open) setSelectedProjectToDelete(null);
+        }}
+        onSuccess={() => fetchProjects()}
+      />
     </div>
   );
 }

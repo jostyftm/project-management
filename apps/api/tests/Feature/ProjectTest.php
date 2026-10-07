@@ -1,9 +1,15 @@
 <?php
 
+use App\Models\Cycle;
 use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\State;
 use App\Models\User;
+use App\Models\WorkItem;
+use App\Models\WorkItemDeliverable;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -117,3 +123,114 @@ it('creates a custom state and label for a project', function () {
     $labelResponse->assertStatus(201)
         ->assertJsonPath('data.attributes.name', 'Security');
 });
+
+it('deletes a project and cascades all related entities successfully', function () {
+    Storage::fake('public');
+
+    // Crear proyecto
+    $project = Project::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Project to Delete',
+        'identifier' => 'DEL',
+        'lead_id' => $this->user->id,
+    ]);
+
+    // Crear ciclo
+    $cycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $project->id,
+        'name' => 'Sprint 1',
+    ]);
+
+    // Crear estado
+    $state = State::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $project->id,
+        'name' => 'Backlog',
+        'group' => 'BACKLOG',
+        'sequence' => 0,
+    ]);
+
+    // Crear work item
+    $workItem = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $project->id,
+        'sequence_id' => 1,
+        'title' => 'Deliverable Task',
+        'state_id' => $state ? $state->id : null,
+        'created_by' => $this->user->id,
+    ]);
+
+    // Crear archivo falso en Storage
+    $filePath = "deliverables/{$project->id}/fake_doc.pdf";
+    Storage::disk('public')->put($filePath, 'Fake PDF Content');
+
+    // Crear entregable asociado
+    $deliverable = WorkItemDeliverable::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $project->id,
+        'work_item_id' => $workItem->id,
+        'created_by' => $this->user->id,
+        'title' => 'Documento de Entrega',
+        'type' => 'FILE',
+        'disk' => 'public',
+        'file_path' => $filePath,
+        'file_name' => 'fake_doc.pdf',
+        'file_size' => 1024,
+        'file_mime' => 'application/pdf',
+    ]);
+
+    // Eliminar proyecto como Workspace Owner
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->deleteJson("/api/v1/projects/{$project->id}");
+
+    $response->assertStatus(204);
+
+    // Verificar eliminación en cascada en la base de datos
+    $this->assertDatabaseMissing('projects', ['id' => $project->id]);
+    $this->assertDatabaseMissing('cycles', ['id' => $cycle->id]);
+    $this->assertDatabaseMissing('work_items', ['id' => $workItem->id]);
+    $this->assertDatabaseMissing('work_item_deliverables', ['id' => $deliverable->id]);
+
+    // Verificar que el archivo en Storage fue limpiado
+    Storage::disk('public')->assertMissing($filePath);
+});
+
+it('prohibits project deletion for non-admin members', function () {
+    // Usuario miembro normal
+    $memberUser = User::factory()->create();
+    $memberToken = $memberUser->createToken('member-token')->plainTextToken;
+
+    WorkspaceMember::create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $memberUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    $project = Project::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Protected Project',
+        'identifier' => 'PROT',
+        'lead_id' => $this->user->id,
+    ]);
+
+    ProjectMember::create([
+        'project_id' => $project->id,
+        'user_id' => $memberUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    // Miembro intenta eliminar el proyecto -> Debe ser rechazado (404 por seguridad del middleware)
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$memberToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->deleteJson("/api/v1/projects/{$project->id}");
+
+    $response->assertStatus(404);
+
+    // Asegurar que el proyecto sigue existiendo
+    $this->assertDatabaseHas('projects', ['id' => $project->id]);
+});
+

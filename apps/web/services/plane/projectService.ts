@@ -59,6 +59,14 @@ export const projectService = {
     };
   },
 
+  delete: async (id: string | number) => {
+    return await httpRequestService({
+      url: `${API_BASE_URL}/projects/${id}`,
+      method: "DELETE",
+    });
+  },
+
+
   getStates: async (projectId: string | number) => {
     const res = await httpRequestService<{ data: JsonApiItem<State>[] }>({
       url: `${API_BASE_URL}/projects/${projectId}/states`,
