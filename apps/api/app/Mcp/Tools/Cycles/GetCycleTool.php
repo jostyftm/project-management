@@ -41,6 +41,10 @@ class GetCycleTool extends Tool
             return Response::error("Ciclo con ID '{$cycleId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $cycle->project)) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $cycle->workspace_id);
 
         $totalItems = $cycle->workItems->count();

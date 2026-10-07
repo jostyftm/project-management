@@ -50,6 +50,10 @@ class UpdateModuleTool extends Tool
             return Response::error("Módulo con ID '{$moduleId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $module->project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $module->workspace_id);
 
         $updates = [];

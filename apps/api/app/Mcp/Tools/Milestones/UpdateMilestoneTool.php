@@ -46,6 +46,10 @@ class UpdateMilestoneTool extends Tool
             return Response::error("Hito con ID '{$milestoneId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $milestone->project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $milestone->workspace_id);
 
         $updates = [];

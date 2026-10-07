@@ -43,6 +43,18 @@ class DeleteWorkItemTool extends Tool
             return Response::error("Work item '{$itemKey}' no encontrado.");
         }
 
+        $user = $this->resolveUser($request);
+        $role = $user && $workItem->project ? $this->getProjectRole($user, $workItem->project) : null;
+        $isCreator = $user && (int) $workItem->created_by === (int) $user->id;
+
+        if (! $role) {
+            return Response::error("Acceso denegado: No perteneces al proyecto '{$workItem->project?->identifier}'.");
+        }
+
+        if ($role !== 'ADMIN' && ! $isCreator) {
+            return Response::error('Acción denegada: Solo los administradores del proyecto o el creador de la tarea pueden eliminarla.');
+        }
+
         $workItemKey = ($workItem->project ? $workItem->project->identifier : '')."-{$workItem->sequence_id}";
         $title = $workItem->title;
 

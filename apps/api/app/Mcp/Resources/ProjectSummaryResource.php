@@ -38,6 +38,10 @@ class ProjectSummaryResource extends Resource implements HasUriTemplate
             return Response::text("# Error\n\nProyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return Response::text("# Acceso Denegado\n\nNo perteneces al proyecto '{$projectKey}'.");
+        }
+
         $currentCycle = Cycle::where('project_id', $project->id)
             ->where('status', 'CURRENT')
             ->first();

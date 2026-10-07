@@ -49,6 +49,10 @@ class PlanSprintPrompt extends Prompt
             return Response::text("Error: Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return Response::text("Acceso Denegado: No perteneces al proyecto '{$projectKey}'.");
+        }
+
         $sprintGoal = $request->get('sprint_goal');
         $capacityPoints = $request->get('capacity_points') ?: 'No especificada';
 

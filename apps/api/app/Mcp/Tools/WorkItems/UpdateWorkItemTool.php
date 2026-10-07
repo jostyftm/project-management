@@ -64,6 +64,10 @@ class UpdateWorkItemTool extends Tool
             return Response::error("Work item '{$itemKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $workItem->project, requiredRole: 'MEMBER')) {
+            return $authError;
+        }
+
         DB::transaction(function () use ($request, $workItem) {
             $updates = [];
 

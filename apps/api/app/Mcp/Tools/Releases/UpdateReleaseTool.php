@@ -48,6 +48,10 @@ class UpdateReleaseTool extends Tool
             return Response::error("Versión con ID '{$releaseId}' no encontrada.");
         }
 
+        if ($authError = $this->authorizeProject($request, $release->project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $release->workspace_id);
 
         $updates = [];

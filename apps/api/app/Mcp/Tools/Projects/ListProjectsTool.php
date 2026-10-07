@@ -3,7 +3,6 @@
 namespace App\Mcp\Tools\Projects;
 
 use App\Mcp\Tools\Concerns\ResolvesWorkspaceContext;
-use App\Models\Project;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -39,7 +38,7 @@ class ListProjectsTool extends Tool
             return Response::error('No se pudo determinar el workspace activo.');
         }
 
-        $query = Project::where('workspace_id', $workspace->id)
+        $query = $this->resolveProjectsQuery($request, $workspace)
             ->with(['lead:id,name,email'])
             ->withCount(['workItems', 'cycles', 'modules', 'members']);
 

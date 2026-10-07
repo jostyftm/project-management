@@ -42,6 +42,10 @@ class ListCyclesTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $query = Cycle::where('project_id', $project->id)
             ->with(['owner:id,name,email'])
             ->withCount(['workItems as total_items'])

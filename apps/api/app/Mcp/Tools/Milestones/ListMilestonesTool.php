@@ -39,6 +39,10 @@ class ListMilestonesTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $milestones = Milestone::where('project_id', $project->id)
             ->withCount(['workItems as total_items'])
             ->withCount(['workItems as completed_items' => function ($q) {

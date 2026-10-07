@@ -38,6 +38,10 @@ class GetProjectTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $project->load([
             'lead:id,name,email',
             'states' => fn ($q) => $q->orderBy('sequence'),

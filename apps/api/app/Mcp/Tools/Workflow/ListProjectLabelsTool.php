@@ -39,6 +39,10 @@ class ListProjectLabelsTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $labels = Label::where('project_id', $project->id)
             ->orderBy('name')
             ->get();

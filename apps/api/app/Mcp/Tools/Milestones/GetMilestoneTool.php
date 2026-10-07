@@ -41,6 +41,10 @@ class GetMilestoneTool extends Tool
             return Response::error("Hito con ID '{$milestoneId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $milestone->project)) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $milestone->workspace_id);
 
         $totalItems = $milestone->workItems->count();

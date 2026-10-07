@@ -41,6 +41,10 @@ class GetReleaseTool extends Tool
             return Response::error("Versión con ID '{$releaseId}' no encontrada.");
         }
 
+        if ($authError = $this->authorizeProject($request, $release->project)) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $release->workspace_id);
 
         $project = $release->project;

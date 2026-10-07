@@ -41,6 +41,10 @@ class GetModuleTool extends Tool
             return Response::error("Módulo con ID '{$moduleId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $module->project)) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $module->workspace_id);
 
         $totalItems = $module->workItems->count();

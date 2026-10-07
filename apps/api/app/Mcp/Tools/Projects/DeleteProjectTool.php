@@ -42,6 +42,10 @@ class DeleteProjectTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $confirmation = strtoupper(trim((string) $request->get('confirm_identifier')));
         if ($confirmation !== $project->identifier) {
             return Response::error("Confirmación incorrecta. Debe escribir exactamente '{$project->identifier}' para proceder.");

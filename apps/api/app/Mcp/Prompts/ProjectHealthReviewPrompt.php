@@ -39,6 +39,10 @@ class ProjectHealthReviewPrompt extends Prompt
             return Response::text("Error: Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return Response::text("Acceso Denegado: No perteneces al proyecto '{$projectKey}'.");
+        }
+
         // Tareas vencidas
         $overdueItems = WorkItem::where('project_id', $project->id)
             ->whereNotNull('target_date')

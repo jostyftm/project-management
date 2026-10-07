@@ -3,10 +3,13 @@
 namespace App\Mcp\Tools\Concerns;
 
 use App\Models\Project;
+use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
 
 trait ResolvesWorkspaceContext
 {
@@ -132,6 +135,83 @@ trait ResolvesWorkspaceContext
         }
 
         return $item;
+    }
+
+    /**
+     * Resuelve el rol del usuario en el proyecto dado (ADMIN, MEMBER, VIEWER) o null si no tiene acceso.
+     */
+    protected function getProjectRole(User $user, Project $project): ?string
+    {
+        // 1. Superadministrador de la instancia
+        if ($user->is_instance_admin) {
+            return 'ADMIN';
+        }
+
+        // 2. Dueño del workspace
+        if ($project->workspace && (int) $project->workspace->owner_id === (int) $user->id) {
+            return 'ADMIN';
+        }
+
+        // 3. Miembro registrado en project_members
+        $member = ProjectMember::where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        return $member?->role;
+    }
+
+    /**
+     * Valida si el usuario tiene permiso para operar sobre el proyecto.
+     * Retorna una Response de error de MCP si el acceso es denegado, o null si está autorizado.
+     *
+     * @param  string|null  $requiredRole  'ADMIN' o 'MEMBER' (para mutaciones) o null (para lectura)
+     */
+    protected function authorizeProject(Request $request, Project $project, ?string $requiredRole = null): ?Response
+    {
+        $user = $this->resolveUser($request);
+
+        if (! $user) {
+            return Response::error('Usuario no autenticado para realizar esta acción.');
+        }
+
+        $role = $this->getProjectRole($user, $project);
+
+        if ($role === null) {
+            return Response::error("Acceso denegado: No perteneces al proyecto '{$project->identifier}'.");
+        }
+
+        if ($requiredRole === 'ADMIN' && $role !== 'ADMIN') {
+            return Response::error("Acción denegada: Requiere rol de Administrador en el proyecto '{$project->identifier}'.");
+        }
+
+        if ($requiredRole === 'MEMBER' && $role === 'VIEWER') {
+            return Response::error("Acción denegada: Tu rol en el proyecto '{$project->identifier}' es de solo lectura.");
+        }
+
+        return null;
+    }
+
+    /**
+     * Obtiene una consulta de proyectos filtrando según la visibilidad y membresía del usuario.
+     */
+    protected function resolveProjectsQuery(Request $request, Workspace $workspace): Builder
+    {
+        $user = $this->resolveUser($request);
+        $query = Project::where('workspace_id', $workspace->id);
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        // Superadministrador y dueño del workspace ven todos los proyectos
+        if ($user->is_instance_admin || (int) $workspace->owner_id === (int) $user->id) {
+            return $query;
+        }
+
+        // Usuarios regulares solo ven proyectos donde son miembros
+        return $query->whereHas('members', function ($q) use ($user) {
+            $q->where('users.id', $user->id);
+        });
     }
 
     /**

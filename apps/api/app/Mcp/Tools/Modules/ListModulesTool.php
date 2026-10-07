@@ -42,6 +42,10 @@ class ListModulesTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $query = Module::where('project_id', $project->id)
             ->with(['lead:id,name,email'])
             ->withCount(['workItems as total_items'])

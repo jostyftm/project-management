@@ -43,6 +43,10 @@ class GetWorkItemTool extends Tool
             return Response::error("Work item '{$itemKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $workItem->project)) {
+            return $authError;
+        }
+
         $workItem->load([
             'project:id,identifier,name',
             'state:id,name,group,color',

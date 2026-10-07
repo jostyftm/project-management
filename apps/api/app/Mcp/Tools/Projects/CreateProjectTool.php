@@ -7,6 +7,7 @@ use App\Models\Label;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\State;
+use App\Models\WorkspaceMember;
 use App\Services\WorkItemTypeService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
@@ -55,6 +56,14 @@ class CreateProjectTool extends Tool
         $user = $this->resolveUser($request);
         if (! $user) {
             return Response::error('No se pudo determinar el usuario para la creación del proyecto.');
+        }
+
+        $wsMember = WorkspaceMember::where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($wsMember && $wsMember->role === 'GUEST') {
+            return Response::error('Los usuarios con rol de Invitado (GUEST) no tienen permisos para crear proyectos.');
         }
 
         $identifier = strtoupper(trim((string) $request->get('identifier')));

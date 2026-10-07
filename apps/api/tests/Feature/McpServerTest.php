@@ -26,6 +26,7 @@ use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
 use App\Models\Project;
+use App\Models\ProjectMember;
 use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
@@ -374,4 +375,171 @@ it('supports web MCP requests through the /api/mcp/project-management alias', fu
         ->assertJsonPath('id', 3);
 
     expect(count($response->json('result.tools')))->toBe(15);
+});
+
+it('enforces RBAC permissions for non-admin workspace members', function () {
+    $regularUser = User::factory()->create([
+        'is_instance_admin' => false,
+    ]);
+    $regularToken = $regularUser->createToken('regular-token')->plainTextToken;
+
+    WorkspaceMember::create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $regularUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    $projectA = Project::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Proyecto Accesible',
+        'identifier' => 'PRJA',
+        'lead_id' => $this->user->id,
+    ]);
+    ProjectMember::create([
+        'project_id' => $projectA->id,
+        'user_id' => $regularUser->id,
+        'role' => 'MEMBER',
+    ]);
+    State::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $projectA->id,
+        'name' => 'Backlog',
+        'group' => 'BACKLOG',
+        'sequence' => 1,
+        'is_default' => true,
+    ]);
+
+    $projectB = Project::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Proyecto Privado',
+        'identifier' => 'PRJB',
+        'lead_id' => $this->user->id,
+    ]);
+
+    // 1. Listar proyectos: solo debe listar PRJA, no PRJB
+    $listResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 10,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'list_projects',
+            'arguments' => [],
+        ],
+    ]);
+
+    $listResponse->assertStatus(200);
+    $textA = $listResponse->json('result.content.0.text');
+    expect($textA)->toContain('PRJA');
+    expect($textA)->not->toContain('PRJB');
+
+    // 2. Intentar consultar Proyecto Ajeno (PRJB): debe denegar acceso
+    $getResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 11,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'get_project',
+            'arguments' => ['project' => 'PRJB'],
+        ],
+    ]);
+
+    $getResponse->assertStatus(200);
+    expect($getResponse->json('result.isError'))->toBeTrue();
+    expect($getResponse->json('result.content.0.text'))->toContain('Acceso denegado');
+
+    // 3. Intentar eliminar Proyecto Accesible (PRJA) teniendo rol MEMBER: debe denegar por falta de rol ADMIN
+    $deleteResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 12,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'delete_project',
+            'arguments' => [
+                'project' => 'PRJA',
+                'confirm_identifier' => 'PRJA',
+            ],
+        ],
+    ]);
+
+    $deleteResponse->assertStatus(200);
+    expect($deleteResponse->json('result.isError'))->toBeTrue();
+    expect($deleteResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
+
+    // 4. Crear work item en Proyecto Accesible (PRJA) como MEMBER: debe permitirlo
+    $createItemResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 13,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'create_work_item',
+            'arguments' => [
+                'project' => 'PRJA',
+                'title' => 'Tarea creada por miembro regular',
+            ],
+        ],
+    ]);
+
+    $createItemResponse->assertStatus(200);
+    expect($createItemResponse->json('result.isError'))->toBeFalse();
+    expect($createItemResponse->json('result.content.0.text'))->toContain('Tarea creada por miembro regular');
+
+    // 5. Intentar actualizar configuración del proyecto (PRJA) como MEMBER: debe denegar
+    $updateProjResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 14,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'update_project',
+            'arguments' => [
+                'project' => 'PRJA',
+                'name' => 'Nombre Cambiado No Permitido',
+            ],
+        ],
+    ]);
+
+    $updateProjResponse->assertStatus(200);
+    expect($updateProjResponse->json('result.isError'))->toBeTrue();
+    expect($updateProjResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
+
+    // 6. Intentar crear un ciclo (sprint) como MEMBER: debe denegar
+    $createCycleResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 15,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'create_cycle',
+            'arguments' => [
+                'project' => 'PRJA',
+                'name' => 'Sprint No Autorizado',
+            ],
+        ],
+    ]);
+
+    $createCycleResponse->assertStatus(200);
+    expect($createCycleResponse->json('result.isError'))->toBeTrue();
+    expect($createCycleResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
 });

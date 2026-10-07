@@ -55,6 +55,10 @@ class ListWorkItemsTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project)) {
+            return $authError;
+        }
+
         $query = WorkItem::where('project_id', $project->id)
             ->with(['state:id,name,group,color', 'type:id,name,icon,color', 'lead:id,name,email', 'cycles:id,name,status', 'modules:id,name']);
 

@@ -24,9 +24,10 @@ class ProjectListResource extends Resource
 
     public function handle(Request $request): Response
     {
-        $this->resolveWorkspace($request);
+        $workspace = $this->resolveWorkspace($request);
+        $query = $workspace ? $this->resolveProjectsQuery($request, $workspace) : Project::query();
 
-        $projects = Project::with(['lead:id,name,email'])
+        $projects = $query->with(['lead:id,name,email'])
             ->withCount(['workItems', 'cycles', 'modules'])
             ->get();
 

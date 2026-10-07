@@ -52,6 +52,10 @@ class CreateModuleTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $user = $this->resolveUser($request);
 
         $module = Module::create([

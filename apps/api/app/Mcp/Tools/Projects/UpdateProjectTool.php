@@ -45,6 +45,10 @@ class UpdateProjectTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $data = [];
         if ($request->has('name')) {
             $data['name'] = trim((string) $request->get('name'));

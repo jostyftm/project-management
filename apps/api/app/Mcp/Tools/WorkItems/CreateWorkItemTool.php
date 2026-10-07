@@ -64,6 +64,10 @@ class CreateWorkItemTool extends Tool
             return Response::error("Proyecto '{$projectKey}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $project, requiredRole: 'MEMBER')) {
+            return $authError;
+        }
+
         $user = $this->resolveUser($request);
 
         $createdItem = DB::transaction(function () use ($request, $project, $user) {

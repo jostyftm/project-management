@@ -48,6 +48,10 @@ class UpdateCycleTool extends Tool
             return Response::error("Ciclo con ID '{$cycleId}' no encontrado.");
         }
 
+        if ($authError = $this->authorizeProject($request, $cycle->project, requiredRole: 'ADMIN')) {
+            return $authError;
+        }
+
         $this->resolveWorkspace($request, explicitWorkspaceId: $cycle->workspace_id);
 
         $updates = [];
