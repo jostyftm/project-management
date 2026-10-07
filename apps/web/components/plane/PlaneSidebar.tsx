@@ -41,6 +41,7 @@ import {
   Zap,
   LayoutDashboard,
   FileSpreadsheet,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -349,6 +350,22 @@ export function PlaneSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Link href={`/projects/${activeProjectId}/pages`}>
                       <BookOpen className="size-4 shrink-0 text-slate-500" />
                       <span>Páginas (Docs)</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(`/projects/${activeProjectId}/analytics`)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-slate-700 font-medium transition-colors",
+                      pathname.startsWith(`/projects/${activeProjectId}/analytics`) && "bg-indigo-50 text-indigo-700 font-semibold"
+                    )}
+                  >
+                    <Link href={`/projects/${activeProjectId}/analytics`}>
+                      <BarChart3 className="size-4 shrink-0 text-slate-500" />
+                      <span>Métricas & KPIs</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

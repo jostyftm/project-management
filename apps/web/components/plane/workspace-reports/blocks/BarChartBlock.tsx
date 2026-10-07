@@ -57,11 +57,20 @@ export function BarChartBlock({ block, data }: BarChartBlockProps) {
             <YAxis stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#18181b",
-                borderColor: "#27272a",
+                backgroundColor: "#ffffff",
+                borderColor: "#e2e8f0",
                 borderRadius: "8px",
-                color: "#f4f4f5",
+                color: "#0f172a",
                 fontSize: "12px",
+                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04)",
+              }}
+              labelStyle={{
+                color: "#0f172a",
+                fontWeight: "600",
+                marginBottom: "2px",
+              }}
+              itemStyle={{
+                color: "#334155",
               }}
               cursor={{ fill: "rgba(99, 102, 241, 0.05)" }}
             />
