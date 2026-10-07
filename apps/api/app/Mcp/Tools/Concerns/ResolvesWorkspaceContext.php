@@ -4,6 +4,7 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Models\WorkItem;
 use App\Models\Workspace;
 use Laravel\Mcp\Request;
 
@@ -93,6 +94,44 @@ trait ResolvesWorkspaceContext
         }
 
         return $project;
+    }
+
+    /**
+     * Resuelve un work item por clave combinada (ej: "ENG-101"), ID numérico o contexto de proyecto.
+     */
+    protected function resolveWorkItem(Request $request, int|string $workItemKey, ?Project $project = null): ?WorkItem
+    {
+        $item = null;
+        $keyString = trim((string) $workItemKey);
+
+        if (preg_match('/^([A-Za-z0-9_]+)-(\d+)$/', $keyString, $matches)) {
+            $identifier = strtoupper($matches[1]);
+            $sequenceId = (int) $matches[2];
+            $targetProject = Project::where('identifier', $identifier)->first();
+            if ($targetProject) {
+                $this->resolveWorkspace($request, project: $targetProject);
+                $item = WorkItem::where('project_id', $targetProject->id)
+                    ->where('sequence_id', $sequenceId)
+                    ->first();
+            }
+        }
+
+        if (! $item && $project && is_numeric($keyString)) {
+            // Primero buscar por sequence_id en el proyecto dado
+            $item = WorkItem::where('project_id', $project->id)
+                ->where('sequence_id', (int) $keyString)
+                ->first();
+        }
+
+        if (! $item && is_numeric($keyString)) {
+            $item = WorkItem::find((int) $keyString);
+        }
+
+        if ($item) {
+            $this->resolveWorkspace($request, explicitWorkspaceId: $item->workspace_id);
+        }
+
+        return $item;
     }
 
     /**

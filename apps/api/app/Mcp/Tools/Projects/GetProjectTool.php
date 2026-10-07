@@ -42,7 +42,7 @@ class GetProjectTool extends Tool
             'lead:id,name,email',
             'states' => fn ($q) => $q->orderBy('sequence'),
             'labels',
-            'members.user:id,name,email',
+            'members:id,name,email',
         ]);
 
         return Response::text($this->formatJson([
@@ -68,11 +68,11 @@ class GetProjectTool extends Tool
                 'name' => $l->name,
                 'color' => $l->color,
             ]),
-            'members' => $project->members->map(fn ($m) => [
-                'user_id' => $m->user_id,
-                'name' => $m->user?->name,
-                'email' => $m->user?->email,
-                'role' => $m->role,
+            'members' => $project->members->map(fn ($u) => [
+                'user_id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'role' => $u->pivot?->role,
             ]),
             'counts' => [
                 'work_items' => $project->workItems()->count(),
