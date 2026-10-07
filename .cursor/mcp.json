@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "plane-project-management": {
+      "command": "./scripts/mcp-server.sh"
+    }
+  }
+}
