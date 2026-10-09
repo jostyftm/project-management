@@ -27,7 +27,8 @@ import { projectMemberService, ProjectMemberUser } from "@/services/plane/projec
 import { projectService } from "@/services/plane/projectService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { WorkItemActivityTimeline } from "@/components/plane/comments/WorkItemActivityTimeline";
-import { NotionBlockEditor } from "@/components/plane/editor/NotionBlockEditor";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { formatDescriptionToHtml, extractPlainText } from "@/lib/rich-text-utils";
 import {
   WorkItemViewModeSwitcher,
   WorkItemViewMode,
@@ -35,7 +36,7 @@ import {
 import { WorkItemGitHubWidget } from "@/components/plane/work-items/WorkItemGitHubWidget";
 import { WorkItemSubtasksSection } from "@/components/plane/work-items/WorkItemSubtasksSection";
 import { WorkItemDeliverablesSection } from "@/components/plane/work-items/WorkItemDeliverablesSection";
-import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone, DocBlock } from "@/types/plane-types";
+import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone } from "@/types/plane-types";
 import {
   Plus,
   Trash2,
@@ -107,7 +108,7 @@ export function WorkItemDetailSheet({
 
   // Editable fields
   const [title, setTitle] = useState("");
-  const [docBlocks, setDocBlocks] = useState<DocBlock[]>([]);
+  const [description, setDescription] = useState("");
   const [stateId, setStateId] = useState<string>("");
   const [typeId, setTypeId] = useState<string>("");
   const [priority, setPriority] = useState<string>("NONE");
@@ -127,7 +128,7 @@ export function WorkItemDetailSheet({
   // Debounce and auto-flush state for description
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const latestBlocksRef = useRef<DocBlock[]>([]);
+  const latestDescriptionRef = useRef<string>("");
   const isDirtyRef = useRef(false);
   const loadedItemIdRef = useRef<string | number | null>(null);
 
@@ -157,8 +158,13 @@ export function WorkItemDetailSheet({
         clearTimeout(debounceTimerRef.current);
       }
       if (isDirtyRef.current && loadedItemIdRef.current) {
+        const descHtml = latestDescriptionRef.current;
+        const trimmed = descHtml.trim();
+        const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
         workItemService
-          .update(loadedItemIdRef.current, { description_json: latestBlocksRef.current })
+          .update(loadedItemIdRef.current, {
+            description_json: !isEmpty ? { html: descHtml, text: extractPlainText(descHtml) } : null,
+          })
           .catch(() => {});
       }
     };
@@ -168,8 +174,13 @@ export function WorkItemDetailSheet({
     if (!open && activeMode !== "page") {
       // Flush before clearing if dirty
       if (isDirtyRef.current && loadedItemIdRef.current) {
+        const descHtml = latestDescriptionRef.current;
+        const trimmed = descHtml.trim();
+        const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
         workItemService
-          .update(loadedItemIdRef.current, { description_json: latestBlocksRef.current })
+          .update(loadedItemIdRef.current, {
+            description_json: !isEmpty ? { html: descHtml, text: extractPlainText(descHtml) } : null,
+          })
           .catch(() => {});
         isDirtyRef.current = false;
       }
@@ -218,22 +229,10 @@ export function WorkItemDetailSheet({
 
         setTitle(itemData.title);
 
-        // Normalize description into Notion doc blocks
-        let initialBlocks: DocBlock[] = [];
-        if (Array.isArray(itemData.description_json) && itemData.description_json.length > 0) {
-          initialBlocks = itemData.description_json.map((b: any) => ({
-            ...b,
-            content: b?.content ?? "",
-          }));
-        } else if (itemData.description_json && typeof itemData.description_json === "object" && (itemData.description_json as any).text) {
-          initialBlocks = [{ id: "b-init", type: "paragraph", content: (itemData.description_json as any).text ?? "" }];
-        } else if (typeof itemData.description_json === "string" && itemData.description_json.trim()) {
-          initialBlocks = [{ id: "b-init", type: "paragraph", content: itemData.description_json }];
-        } else {
-          initialBlocks = [{ id: "b-init", type: "paragraph", content: "" }];
-        }
-        setDocBlocks(initialBlocks);
-        latestBlocksRef.current = initialBlocks;
+        // Normalize description into HTML for RichTextEditor
+        const initialHtml = formatDescriptionToHtml(itemData.description_json);
+        setDescription(initialHtml);
+        latestDescriptionRef.current = initialHtml;
         isDirtyRef.current = false;
 
         setStateId(String(itemData.state?.id || ""));
@@ -314,11 +313,20 @@ export function WorkItemDetailSheet({
   };
 
   // Debounced and silent description saving (NO toast on success)
-  const performSaveDescription = async (blocks: DocBlock[]) => {
+  const performSaveDescription = async (descHtml: string) => {
     if (!isAdmin || !item) return;
     try {
       setSaveStatus("saving");
-      const updated = await workItemService.update(item.id, { description_json: blocks });
+      const trimmed = descHtml.trim();
+      const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
+      const payloadJson = !isEmpty
+        ? {
+            html: descHtml,
+            text: extractPlainText(descHtml),
+          }
+        : null;
+
+      const updated = await workItemService.update(item.id, { description_json: payloadJson });
       setItem((prev) => ({
         ...prev,
         ...updated,
@@ -338,10 +346,10 @@ export function WorkItemDetailSheet({
     }
   };
 
-  const handleDescriptionChange = (newBlocks: DocBlock[]) => {
+  const handleDescriptionChange = (newHtml: string) => {
     if (!isAdmin) return;
-    setDocBlocks(newBlocks);
-    latestBlocksRef.current = newBlocks;
+    setDescription(newHtml);
+    latestDescriptionRef.current = newHtml;
     isDirtyRef.current = true;
     setSaveStatus("saving");
 
@@ -351,7 +359,7 @@ export function WorkItemDetailSheet({
 
     debounceTimerRef.current = setTimeout(() => {
       if (isDirtyRef.current && item) {
-        performSaveDescription(latestBlocksRef.current);
+        performSaveDescription(latestDescriptionRef.current);
       }
     }, 1000);
   };
@@ -491,11 +499,11 @@ export function WorkItemDetailSheet({
           </div>
         </div>
 
-        {/* Notion-style Block Description with Debounce and Micro-Indicator */}
+        {/* Rich Text Description with Debounce and Micro-Indicator */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Descripción (Editor en Bloque)
+              Descripción (Texto Enriquecido)
             </span>
             <div className="flex items-center gap-2">
               {saveStatus === "saving" && (
@@ -508,20 +516,17 @@ export function WorkItemDetailSheet({
                   <Check className="size-3" /> Guardado
                 </span>
               )}
-              {isAdmin && (
-                <span className="text-[11px] text-slate-400">
-                  Usa &apos;/&apos; para insertar bloques
-                </span>
-              )}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 min-h-[140px] focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400/20 transition-all shadow-2xs">
-            <NotionBlockEditor
-              blocks={docBlocks}
-              onChange={handleDescriptionChange}
-              isLocked={!isAdmin}
-            />
-          </div>
+          <RichTextEditor
+            value={description}
+            onChange={handleDescriptionChange}
+            disabled={!isAdmin}
+            placeholder={isAdmin ? "Escribe los detalles y requerimientos de la tarea..." : "Sin descripción."}
+            minHeight="140px"
+            maxHeight="320px"
+            className="border-slate-200 dark:border-slate-800"
+          />
         </div>
 
         {/* Subtareas Section (Collapsible with (n/m) counter and modal opening) */}

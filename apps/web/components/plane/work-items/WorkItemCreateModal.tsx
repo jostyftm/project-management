@@ -70,6 +70,8 @@ import {
   WorkItemViewModeSwitcher,
   WorkItemViewMode,
 } from "@/components/plane/work-items/WorkItemViewModeSwitcher";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { extractPlainText } from "@/lib/rich-text-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -316,15 +318,16 @@ export function WorkItemCreateModal({
 
     setIsSubmitting(true);
     try {
-      const descriptionJson = description.trim()
+      const trimmedDesc = description.trim();
+      const isEmptyDesc =
+        !trimmedDesc ||
+        trimmedDesc === "<p><br></p>" ||
+        trimmedDesc === "<br>";
+
+      const descriptionJson = !isEmptyDesc
         ? {
-            type: "doc",
-            content: [
-              {
-                type: "paragraph",
-                content: [{ type: "text", text: description }],
-              },
-            ],
+            html: description,
+            text: extractPlainText(description),
           }
         : null;
 
@@ -488,19 +491,16 @@ export function WorkItemCreateModal({
             />
           </div>
 
-          {/* Description Editor (Rich text / Block area with min-h-[150px]) */}
-          <div className="relative rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3 focus-within:bg-white dark:focus-within:bg-slate-900 focus-within:border-blue-500/80 transition-colors">
-            <textarea
+          {/* Description Editor with Rich Text Support */}
+          <div className="space-y-1">
+            <RichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Presiona '/' para comandos o escribe los requerimientos y contexto..."
-              rows={5}
-              className="w-full min-h-[150px] resize-y bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none leading-relaxed"
+              onChange={setDescription}
+              placeholder="Escribe los requerimientos, contexto o detalles de la tarea..."
+              minHeight="140px"
+              maxHeight="240px"
+              className="border-slate-200 dark:border-slate-800"
             />
-            <div className="flex items-center justify-between pt-1 border-t border-slate-200/50 dark:border-slate-800 text-[11px] text-slate-400">
-              <span>Soporta saltos de línea y texto enriquecido</span>
-              <span>Presiona &apos;/&apos; para atajos rápidos</span>
-            </div>
           </div>
 
           {/* Action Bar: 10 Pill Buttons with Popovers */}
