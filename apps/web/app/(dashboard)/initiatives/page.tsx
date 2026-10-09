@@ -30,11 +30,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function InitiativesPage() {
   const { projects } = useWorkspaceStore();
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle("Iniciativas");
 
   // Modal
   const [openModal, setOpenModal] = useState(false);

@@ -23,6 +23,8 @@ import { ProjectNotFoundView } from "@/components/plane/ProjectNotFoundView";
 import { ProjectGitHubSettingsTab } from "@/components/plane/integrations/ProjectGitHubSettingsTab";
 import { SlackSettingsTab } from "@/components/plane/integrations/SlackSettingsTab";
 import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectModal";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   Sliders,
   Loader2,
@@ -69,6 +71,8 @@ export default function ProjectSettingsPage() {
   const projectId = String(params.projectId);
 
   const [project, setProject] = useState<Project | null>(null);
+
+  useDocumentTitle(`Configuración - ${project?.name || "Proyecto"}`);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -136,7 +140,12 @@ export default function ProjectSettingsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div>
+      <div className="space-y-2">
+        <ProjectBreadcrumb
+          projectId={projectId}
+          projectName={project?.name || "Proyecto"}
+          sectionTitle="Configuración"
+        />
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Configuración del Proyecto</h1>
         <p className="text-sm text-slate-500 mt-1">
           Ajusta las preferencias generales, miembros, repositorios GitHub multi-repo e integraciones con Slack.

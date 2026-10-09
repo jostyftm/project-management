@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { WorkItemViewMode } from "@/components/plane/work-items/WorkItemViewModeSwitcher";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   DndContext,
   useDraggable,
@@ -293,7 +296,11 @@ function KanbanColumn({
 }
 
 export default function YourWorkPage() {
+  const router = useRouter();
   const { currentWorkspace } = useWorkspaceStore();
+
+  useDocumentTitle("Tu trabajo");
+
   const [activeTab, setActiveTab] = useState<YourWorkTab>("assigned");
   const [items, setItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -311,6 +318,32 @@ export default function YourWorkPage() {
 
   // Work Item Detail Sheet integration
   const [selectedItemId, setSelectedItemId] = useState<string | number | null>(null);
+  const [detailViewMode, setDetailViewMode] = useState<WorkItemViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_detail_view_mode") as WorkItemViewMode;
+      if (saved === "sheet" || saved === "modal") return saved;
+    }
+    return "sheet";
+  });
+
+  const handleOpenDetail = useCallback((item: WorkItem) => {
+    let preferredMode: WorkItemViewMode = "sheet";
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("plane_work_item_detail_view_mode") as WorkItemViewMode;
+      if (saved === "sheet" || saved === "modal" || saved === "page") {
+        preferredMode = saved;
+      }
+    }
+
+    if (preferredMode === "page" && item.project?.id) {
+      router.push(`/projects/${item.project.id}/work-items/${item.id}`);
+      return;
+    }
+
+    const overlayMode = preferredMode === "page" ? "sheet" : preferredMode;
+    setDetailViewMode(overlayMode);
+    setSelectedItemId(item.id);
+  }, [router]);
 
   // Cache for project states, members and cycles to enable inline updates in list view
   const [projectStatesMap, setProjectStatesMap] = useState<Record<string, State[]>>({});
@@ -837,7 +870,7 @@ export default function YourWorkPage() {
                             title={group.name}
                             color={group.color}
                             items={columnItems}
-                            onCardClick={(item) => setSelectedItemId(item.id)}
+                            onCardClick={handleOpenDetail}
                             canDrag={true}
                           />
                         );
@@ -853,7 +886,7 @@ export default function YourWorkPage() {
                             title={group.name}
                             color={group.color}
                             items={columnItems}
-                            onCardClick={(item) => setSelectedItemId(item.id)}
+                            onCardClick={handleOpenDetail}
                             canDrag={true}
                           />
                         );
@@ -887,7 +920,7 @@ export default function YourWorkPage() {
                             states={availableStates}
                             members={availableMembers}
                             cycles={availableCycles}
-                            onSelect={(selected) => setSelectedItemId(selected.id)}
+                            onSelect={(selected) => handleOpenDetail(selected)}
                             onUpdate={handleQuickUpdate}
                             isAdmin={true}
                             canModifyState={true}
@@ -904,7 +937,7 @@ export default function YourWorkPage() {
               {viewLayout === "calendar" && (
                 <CalendarView
                   items={filteredItems}
-                  onCardClick={(item) => setSelectedItemId(item.id)}
+                  onCardClick={handleOpenDetail}
                 />
               )}
 
@@ -912,7 +945,7 @@ export default function YourWorkPage() {
               {viewLayout === "gantt" && (
                 <GanttView
                   items={filteredItems}
-                  onCardClick={(item) => setSelectedItemId(item.id)}
+                  onCardClick={handleOpenDetail}
                 />
               )}
             </>
@@ -935,6 +968,8 @@ export default function YourWorkPage() {
             onOpenChange={(isOpen) => {
               if (!isOpen) setSelectedItemId(null);
             }}
+            viewMode={detailViewMode}
+            onViewModeChange={setDetailViewMode}
             onUpdated={() => {
               fetchItems(activeTab);
             }}

@@ -20,12 +20,15 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const email = searchParams.get("email") || "";
+
+  useDocumentTitle("Restablecer Contraseña");
 
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");

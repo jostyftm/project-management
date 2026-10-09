@@ -26,11 +26,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function TeamspacesPage() {
   const { projects } = useWorkspaceStore();
   const [teamspaces, setTeamspaces] = useState<Teamspace[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle("Teamspaces");
 
   // Modal
   const [openModal, setOpenModal] = useState(false);

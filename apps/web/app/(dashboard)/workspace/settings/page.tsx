@@ -56,8 +56,10 @@ import {
   Layers,
   AlertCircle,
   Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function WorkspaceSettingsPage() {
   const { currentWorkspace } = useWorkspaceStore();
@@ -66,6 +68,8 @@ export default function WorkspaceSettingsPage() {
   const isWorkspaceOwner = Boolean(
     currentWorkspace && user && (Number(currentWorkspace.owner_id) === Number(user.id) || user.is_instance_admin)
   );
+
+  useDocumentTitle("Ajustes del Workspace");
 
   const [loading, setLoading] = useState(true);
   const [gitHubData, setGitHubData] = useState<WorkspaceGitHubIntegration | null>(null);
@@ -304,11 +308,11 @@ export default function WorkspaceSettingsPage() {
       {/* Header & Breadcrumbs */}
       <div>
         <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-          <Link href={`/${currentWorkspace.slug}`} className="hover:text-indigo-600 transition-colors">
-            Workspace
+          <Link href="/your-work" className="hover:text-indigo-600 transition-colors">
+            {currentWorkspace?.name || "Workspace"}
           </Link>
-          <span>/</span>
-          <span className="text-slate-800 font-medium">Configuración de Integraciones</span>
+          <ChevronRight className="size-3 text-slate-300" />
+          <span className="text-slate-800 font-medium">Ajustes del Workspace &amp; Integraciones</span>
         </div>
         <div className="flex items-center justify-between">
           <div>

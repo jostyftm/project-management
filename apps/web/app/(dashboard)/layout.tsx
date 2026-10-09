@@ -20,7 +20,7 @@ export default function DashboardLayout({
 }>) {
   const router = useRouter();
   const { user, isLoading } = useAuth();
-  const { initWorkspaceFromStorage } = useWorkspaceStore();
+  const { currentWorkspace, initWorkspaceFromStorage } = useWorkspaceStore();
 
   useEffect(() => {
     initWorkspaceFromStorage();
@@ -45,7 +45,7 @@ export default function DashboardLayout({
             <SidebarTrigger className="-ml-1 cursor-pointer text-slate-600 hover:text-slate-900" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-              <span>Plane Workspace</span>
+              <span className="font-semibold text-slate-800">{currentWorkspace?.name || "Plane Workspace"}</span>
             </div>
           </div>
 

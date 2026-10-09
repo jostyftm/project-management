@@ -17,8 +17,11 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ForgotPasswordPage() {
+  useDocumentTitle("Recuperar Contraseña");
+
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);

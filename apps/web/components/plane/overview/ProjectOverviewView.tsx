@@ -12,6 +12,8 @@ import { projectMemberService, ProjectMemberUser } from "@/services/plane/projec
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { calculateProjectHealth } from "@/lib/project-health";
 import { WorkItemCreateModal } from "@/components/plane/work-items/WorkItemCreateModal";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ProjectOverviewHeader } from "./ProjectOverviewHeader";
 import { ProjectKpiRow } from "./ProjectKpiRow";
 import { ProjectBurnupChart } from "./ProjectBurnupChart";
@@ -39,6 +41,8 @@ export function ProjectOverviewView() {
   const [states, setStates] = useState<State[]>([]);
   const [types, setTypes] = useState<WorkItemType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useDocumentTitle(`${project?.name || "Proyecto"} - Overview`);
 
   // Floating Action Button create modal
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -110,6 +114,12 @@ export function ProjectOverviewView() {
 
   return (
     <div className="w-full space-y-6 pb-20">
+      <ProjectBreadcrumb
+        projectId={projectId}
+        projectName={project.name}
+        sectionTitle="Overview"
+      />
+
       {/* 1. Project Header */}
       <ProjectOverviewHeader
         project={project}

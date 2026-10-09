@@ -21,6 +21,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ProjectPagesPage() {
   const params = useParams();
@@ -31,6 +33,8 @@ export default function ProjectPagesPage() {
   const [pages, setPages] = useState<DocPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  useDocumentTitle(`Documentación - ${project?.name || "Proyecto"}`);
 
   const loadData = async () => {
     if (!projectId) return;
@@ -71,18 +75,12 @@ export default function ProjectPagesPage() {
     <div className="space-y-6">
       {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link href="/projects" className="hover:text-indigo-600 transition-colors">
-              Proyectos
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <Link href={`/projects/${projectId}`} className="hover:text-indigo-600 transition-colors">
-              {project?.name || "Proyecto"}
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <span className="font-semibold text-slate-800">Páginas & Docs</span>
-          </div>
+        <div className="space-y-2">
+          <ProjectBreadcrumb
+            projectId={projectId}
+            projectName={project?.name || "Proyecto"}
+            sectionTitle="Páginas & Docs"
+          />
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Documentación del Proyecto

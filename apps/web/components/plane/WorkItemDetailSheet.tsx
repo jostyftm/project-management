@@ -94,7 +94,8 @@ export function WorkItemDetailSheet({
     return "sheet";
   });
 
-  const activeMode = propViewMode || internalMode;
+  const isOverlay = Boolean(onOpenChange);
+  const activeMode = propViewMode || (isOverlay && internalMode === "page" ? "sheet" : internalMode);
 
   const [item, setItem] = useState<WorkItem | null>(null);
   const [internalProject, setInternalProject] = useState<Project | null>(null);
@@ -143,11 +144,12 @@ export function WorkItemDetailSheet({
     if (onViewModeChange) {
       onViewModeChange(newMode);
     }
-    if (newMode === "page" && project && item) {
+    const targetProject = project || internalProject || item?.project;
+    if (newMode === "page" && targetProject && item) {
       if (onOpenChange) onOpenChange(false);
-      router.push(`/projects/${project.id}/work-items/${item.id}`);
-    } else if (activeMode === "page" && (newMode === "sheet" || newMode === "modal") && project) {
-      router.push(`/projects/${project.id}?openItem=${workItemId}&detailMode=${newMode}`);
+      router.push(`/projects/${targetProject.id}/work-items/${item.id}`);
+    } else if (propViewMode === "page" && (newMode === "sheet" || newMode === "modal") && targetProject) {
+      router.push(`/projects/${targetProject.id}/work-items?openItem=${workItemId}&detailMode=${newMode}`);
     }
   };
 

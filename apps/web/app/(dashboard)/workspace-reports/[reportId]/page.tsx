@@ -9,6 +9,7 @@ import { WorkspaceReport } from "@/types/workspace-report-types";
 import { blockRegistry } from "@/registry/block-registry";
 import { ArrowLeft, Edit3, Share2, Loader2, Maximize2, Minimize2, Download, Image as ImageIcon, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ReportViewPage({
   params,
@@ -18,6 +19,8 @@ export default function ReportViewPage({
   const resolvedParams = use(params);
   const { currentWorkspace } = useWorkspaceStore();
   const [report, setReport] = useState<WorkspaceReport | null>(null);
+
+  useDocumentTitle(report?.title ? `${report.title} - Reportes` : "Reporte Dinámico");
   const [blocksData, setBlocksData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);

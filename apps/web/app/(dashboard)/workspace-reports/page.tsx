@@ -9,9 +9,12 @@ import { ReportCard } from "@/components/plane/workspace-reports/ReportCard";
 import { ReportEmptyState } from "@/components/plane/workspace-reports/ReportEmptyState";
 import { Plus, Search, Filter, Loader2, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function WorkspaceReportsPage() {
   const { currentWorkspace } = useWorkspaceStore();
+
+  useDocumentTitle("Reportes Dinámicos");
   const [reports, setReports] = useState<WorkspaceReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");

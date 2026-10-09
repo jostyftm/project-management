@@ -22,12 +22,15 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function InboxPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState("all");
+
+  useDocumentTitle("Bandeja de Entrada");
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -96,7 +99,7 @@ export default function InboxPage() {
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <Link href="/your-work" className="hover:text-indigo-600 transition-colors">
-              Workspace
+              Tu trabajo
             </Link>
             <ChevronRight className="size-3 text-slate-300" />
             <span className="font-semibold text-slate-800">Bandeja de Entrada</span>

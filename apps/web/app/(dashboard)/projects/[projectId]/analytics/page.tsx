@@ -10,6 +10,10 @@ import {
   TeamMemberKpi,
 } from "@/types/analytics-types";
 import { projectAnalyticsService } from "@/services/plane/projectAnalyticsService";
+import { projectService } from "@/services/plane/projectService";
+import { Project } from "@/types/plane-types";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ProjectKpiHeroRow } from "@/components/plane/analytics/ProjectKpiHeroRow";
 import { ProjectVelocityChart } from "@/components/plane/analytics/ProjectVelocityChart";
 import { CycleTimeDistributionChart } from "@/components/plane/analytics/CycleTimeDistributionChart";
@@ -22,6 +26,7 @@ export default function ProjectAnalyticsPage() {
   const params = useParams();
   const projectId = String(params.projectId);
 
+  const [project, setProject] = useState<Project | null>(null);
   const [period, setPeriod] = useState<KpiPeriod>("30d");
   const [overview, setOverview] = useState<ProjectKpiOverview | null>(null);
   const [velocityTrend, setVelocityTrend] = useState<VelocityTrendCycle[]>([]);
@@ -30,6 +35,8 @@ export default function ProjectAnalyticsPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useDocumentTitle(`Métricas & KPIs - ${project?.name || "Proyecto"}`);
 
   // Selected member for detail drawer
   const [selectedMember, setSelectedMember] = useState<TeamMemberKpi | null>(null);
@@ -42,6 +49,7 @@ export default function ProjectAnalyticsPage() {
     else setIsRefreshing(true);
 
     try {
+      projectService.get(projectId).then(setProject).catch(() => {});
       const [overviewData, velocityData, cycleData, membersData] = await Promise.all([
         projectAnalyticsService.getOverview(projectId, { period }),
         projectAnalyticsService.getVelocityTrend(projectId, 6),
@@ -73,8 +81,13 @@ export default function ProjectAnalyticsPage() {
   return (
     <div className="flex-1 space-y-6 p-6 max-w-7xl mx-auto w-full">
       {/* Header de la vista */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-slate-100 dark:border-neutral-800">
-        <div>
+      <div className="space-y-4 pb-2 border-b border-slate-100 dark:border-neutral-800">
+        <ProjectBreadcrumb
+          projectId={projectId}
+          projectName={project?.name || "Proyecto"}
+          sectionTitle="Métricas & KPIs"
+        />
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg text-indigo-600 dark:text-indigo-400">
               <BarChart3 className="size-5" />
@@ -88,7 +101,6 @@ export default function ProjectAnalyticsPage() {
               </p>
             </div>
           </div>
-        </div>
 
         <div className="flex items-center gap-2.5">
           {/* Selector de periodo */}
@@ -148,6 +160,7 @@ export default function ProjectAnalyticsPage() {
           </Button>
         </div>
       </div>
+    </div>
 
       {/* Fila 1: Resumen ejecutivo y 4 pilares de KPIs */}
       <ProjectKpiHeroRow overview={overview} isLoading={isLoading} />

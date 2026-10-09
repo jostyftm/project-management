@@ -34,6 +34,8 @@ import { WorkItemViewMode } from "@/components/plane/work-items/WorkItemViewMode
 import { CalendarView } from "@/components/plane/views/CalendarView";
 import { GanttView } from "@/components/plane/views/GanttView";
 import { SavedViewsBar } from "@/components/plane/views/SavedViewsBar";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   Kanban,
   List as ListIcon,
@@ -344,6 +346,8 @@ export default function ProjectWorkItemsPage() {
   const [members, setMembers] = useState<ProjectMemberOption[]>([]);
   const [cycles, setCycles] = useState<CycleOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useDocumentTitle(`${project?.name || "Proyecto"} - Work Items`);
 
   // View Layout & Display Options
   const [viewLayout, setViewLayout] = useState<"kanban" | "list" | "calendar" | "gantt">("kanban");
@@ -694,21 +698,15 @@ export default function ProjectWorkItemsPage() {
     <div className="space-y-6">
       {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link href="/projects" className="hover:text-indigo-600 transition-colors">
-              Proyectos
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <Link href={`/projects/${project?.id}`} className="hover:text-indigo-600 transition-colors">
-              {project?.name}
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <span className="font-semibold text-slate-800">Work Items</span>
-          </div>
+        <div className="space-y-2">
+          <ProjectBreadcrumb
+            projectId={projectId}
+            projectName={project?.name || "Proyecto"}
+            sectionTitle="Work Items"
+          />
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {project?.name}
+              Work Items
             </h1>
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-100 text-slate-700">
               {project?.identifier}

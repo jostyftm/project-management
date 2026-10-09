@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   PLANNED: { label: "Planificado", color: "bg-slate-100 text-slate-700 border-slate-200" },
@@ -46,6 +48,8 @@ export default function ModulesPage() {
   const [states, setStates] = useState<State[]>([]);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useDocumentTitle(`Módulos - ${project?.name || "Proyecto"}`);
 
   // Create Modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
@@ -157,7 +161,12 @@ export default function ModulesPage() {
     <div className="w-full space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
+        <div className="space-y-2">
+          <ProjectBreadcrumb
+            projectId={projectId}
+            projectName={project?.name || "Proyecto"}
+            sectionTitle="Módulos"
+          />
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Boxes className="size-6 text-indigo-600" />
             Módulos

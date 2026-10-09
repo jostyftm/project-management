@@ -3,8 +3,11 @@
 import React from "react";
 import { StickiesBoard } from "@/components/plane/stickies/StickiesBoard";
 import { StickyNote } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StickiesPage() {
+  useDocumentTitle("Stickies");
+
   return (
     <div className="flex-1 space-y-6 w-full">
       {/* Header */}

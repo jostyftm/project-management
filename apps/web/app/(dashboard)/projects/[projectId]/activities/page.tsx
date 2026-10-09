@@ -18,6 +18,8 @@ import {
   UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ProjectActivitiesPage() {
   const params = useParams();
@@ -26,6 +28,8 @@ export default function ProjectActivitiesPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useDocumentTitle(`Historial de Actividades - ${project?.name || "Proyecto"}`);
 
   useEffect(() => {
     if (!projectId) return;
@@ -122,18 +126,12 @@ export default function ProjectActivitiesPage() {
     <div className="w-full space-y-6">
       {/* Breadcrumb Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link href="/projects" className="hover:text-indigo-600 transition-colors">
-              Proyectos
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <Link href={`/projects/${projectId}`} className="hover:text-indigo-600 transition-colors">
-              {project?.name || "Proyecto"}
-            </Link>
-            <ChevronRight className="size-3 text-slate-300" />
-            <span className="font-semibold text-slate-800">Actividades</span>
-          </div>
+        <div className="space-y-2">
+          <ProjectBreadcrumb
+            projectId={projectId}
+            projectName={project?.name || "Proyecto"}
+            sectionTitle="Historial de Actividades"
+          />
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
               <History className="size-6 text-indigo-600" />

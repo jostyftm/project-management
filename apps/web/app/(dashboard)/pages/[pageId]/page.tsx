@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function PageDetailPage() {
   const params = useParams();
@@ -37,6 +38,8 @@ export default function PageDetailPage() {
   const { user } = useAuth();
 
   const [page, setPage] = useState<DocPage | null>(null);
+
+  useDocumentTitle(page?.title ? `${page.title} - Wiki` : "Wiki");
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving">("saved");

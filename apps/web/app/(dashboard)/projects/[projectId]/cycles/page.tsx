@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function CyclesPage() {
   const params = useParams();
@@ -50,6 +52,8 @@ export default function CyclesPage() {
   const [states, setStates] = useState<State[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<"current" | "upcoming" | "completed">("current");
+
+  useDocumentTitle(`Ciclos (Sprints) - ${project?.name || "Proyecto"}`);
 
   // Create / Edit Cycle Modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
@@ -296,7 +300,12 @@ export default function CyclesPage() {
     <div className="w-full space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
+        <div className="space-y-2">
+          <ProjectBreadcrumb
+            projectId={projectId}
+            projectName={project?.name || "Proyecto"}
+            sectionTitle="Ciclos de Trabajo (Sprints)"
+          />
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Repeat className="size-6 text-indigo-600" />
             Ciclos de Trabajo (Sprints)

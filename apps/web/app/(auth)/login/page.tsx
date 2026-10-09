@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 function LoginFormContent() {
   const searchParams = useSearchParams();
@@ -25,6 +26,8 @@ function LoginFormContent() {
 
   const { login, register } = useAuth();
   const [mode, setMode] = useState<"login" | "register">(initialMode);
+
+  useDocumentTitle(mode === "login" ? "Iniciar Sesión" : "Crear Cuenta");
   const [isLoading, setIsLoading] = useState(false);
 
   // Login form states

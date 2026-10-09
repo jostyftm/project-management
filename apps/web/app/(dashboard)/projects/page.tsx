@@ -22,10 +22,13 @@ import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectMod
 import { Plus, Search, FolderKanban, ArrowRight, Layers, Loader2, Hash, MoreVertical, Settings, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Project } from "@/types/plane-types";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ProjectsPage() {
   const searchParams = useSearchParams();
   const { currentWorkspace, projects, fetchProjects, isLoadingProjects } = useWorkspaceStore();
+
+  useDocumentTitle("Proyectos");
   const [search, setSearch] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

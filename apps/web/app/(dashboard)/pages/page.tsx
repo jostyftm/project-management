@@ -24,9 +24,12 @@ import {
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function PagesDashboardPage() {
   const router = useRouter();
+
+  useDocumentTitle("Pages & Wiki");
   const [pages, setPages] = useState<DocPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
