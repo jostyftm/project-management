@@ -436,3 +436,13 @@ test('instance admin sees all projects in workspace', function () {
     $superResp->assertStatus(200);
     expect($superResp->json('data'))->toHaveCount(2);
 });
+
+test('project member cannot create github branches via api', function () {
+    $this->withHeaders([
+        'Authorization' => "Bearer {$this->memberToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson("/api/v1/projects/{$this->project->id}/github/branches", [
+        'repo_full_name' => 'empresa/sdi-api',
+        'branch_name' => 'feature/CONF-1-member-branch',
+    ])->assertStatus(404);
+});

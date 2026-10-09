@@ -183,4 +183,44 @@ export const workItemDeliverableService = {
       method: "DELETE",
     });
   },
+
+  downloadFile: async (
+    projectId: string | number,
+    workItemId: string | number,
+    deliverableId: string | number,
+    fileName: string
+  ): Promise<void> => {
+    const blob = await httpRequestService<Blob>({
+      url: `${API_BASE_URL}/projects/${projectId}/work-items/${workItemId}/deliverables/${deliverableId}/download`,
+      method: "GET",
+      responseType: "blob",
+    });
+
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  getFileBlob: async (
+    projectId: string | number,
+    workItemId: string | number,
+    deliverableId: string | number
+  ): Promise<{ blobUrl: string; contentType: string }> => {
+    const blob = await httpRequestService<Blob>({
+      url: `${API_BASE_URL}/projects/${projectId}/work-items/${workItemId}/deliverables/${deliverableId}/download`,
+      method: "GET",
+      responseType: "blob",
+    });
+
+    const blobUrl = window.URL.createObjectURL(blob);
+    return {
+      blobUrl,
+      contentType: blob.type,
+    };
+  },
 };

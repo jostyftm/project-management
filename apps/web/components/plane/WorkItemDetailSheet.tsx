@@ -132,6 +132,7 @@ export function WorkItemDetailSheet({
   const latestDescriptionRef = useRef<string>("");
   const isDirtyRef = useRef(false);
   const loadedItemIdRef = useRef<string | number | null>(null);
+  const isAdminRef = useRef(false);
 
   // Handle switching view modes
   const handleModeSwitch = (newMode: WorkItemViewMode) => {
@@ -159,7 +160,7 @@ export function WorkItemDetailSheet({
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
-      if (isDirtyRef.current && loadedItemIdRef.current) {
+      if (isAdminRef.current && isDirtyRef.current && loadedItemIdRef.current) {
         const descHtml = latestDescriptionRef.current;
         const trimmed = descHtml.trim();
         const isEmpty = !trimmed || trimmed === "<p></p>" || trimmed === "<p><br></p>" || trimmed === "<br>";
@@ -178,7 +179,7 @@ export function WorkItemDetailSheet({
   useEffect(() => {
     if (!open && activeMode !== "page") {
       // Flush before clearing if dirty
-      if (isDirtyRef.current && loadedItemIdRef.current) {
+      if (isAdminRef.current && isDirtyRef.current && loadedItemIdRef.current) {
         const descHtml = latestDescriptionRef.current;
         const trimmed = descHtml.trim();
         const isEmpty = !trimmed || trimmed === "<p></p>" || trimmed === "<p><br></p>" || trimmed === "<br>";
@@ -278,6 +279,7 @@ export function WorkItemDetailSheet({
     user?.is_instance_admin ||
     Boolean((effectiveProject as any)?.workspace && (effectiveProject as any).workspace.owner_id === user?.id)
   );
+  isAdminRef.current = isAdmin;
   const isCreator = !!user && (
     String((item as any)?.created_by) === String(user.id) ||
     String((item as any)?.creator?.id) === String(user.id)
@@ -438,7 +440,10 @@ export function WorkItemDetailSheet({
       <div className="space-y-6">
         {/* Header: Identifier, Type, Switcher, Title */}
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between gap-2">
+          <div className={cn(
+            "flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap",
+            activeMode !== "page" && "pr-10 sm:pr-12"
+          )}>
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded">
                 {item.identifier}
@@ -519,12 +524,17 @@ export function WorkItemDetailSheet({
               Descripción (Texto Enriquecido)
             </span>
             <div className="flex items-center gap-2">
-              {saveStatus === "saving" && (
+              {!isAdmin && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                  Solo lectura (Admin requerido para editar)
+                </span>
+              )}
+              {isAdmin && saveStatus === "saving" && (
                 <span className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                   <Loader2 className="size-3 animate-spin" /> Guardando...
                 </span>
               )}
-              {saveStatus === "saved" && (
+              {isAdmin && saveStatus === "saved" && (
                 <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium animate-in fade-in duration-200">
                   <Check className="size-3" /> Guardado
                 </span>
@@ -534,6 +544,7 @@ export function WorkItemDetailSheet({
           <RichTextEditor
             value={description}
             onChange={handleDescriptionChange}
+            readOnly={!isAdmin}
             disabled={!isAdmin}
             placeholder={isAdmin ? "Escribe los detalles y requerimientos de la tarea..." : "Sin descripción."}
             minHeight="140px"
@@ -807,6 +818,7 @@ export function WorkItemDetailSheet({
             identifier={item.identifier}
             title={item.title}
             projectId={effectiveProject.id}
+            isAdmin={isAdmin}
             isBranchModalOpen={isGitModalOpen}
             onBranchModalOpenChange={setIsGitModalOpen}
             onWorkItemUpdated={() => {
@@ -1004,7 +1016,8 @@ export function WorkItemDetailSheet({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className={cn(
-            "w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl",
+            "w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto p-6 sm:p-7 pt-7 sm:pt-8 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl",
+            "[&>[data-slot=dialog-close]]:top-5 sm:[&>[data-slot=dialog-close]]:top-6 [&>[data-slot=dialog-close]]:right-5 sm:[&>[data-slot=dialog-close]]:right-6 [&>[data-slot=dialog-close]]:p-1.5 [&>[data-slot=dialog-close]]:rounded-md hover:[&>[data-slot=dialog-close]]:bg-slate-100 dark:hover:[&>[data-slot=dialog-close]]:bg-slate-800",
             modalZIndex
           )}
           overlayClassName={modalZIndex}
@@ -1019,7 +1032,14 @@ export function WorkItemDetailSheet({
   // Default: "sheet"
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-6 space-y-6">
+      <SheetContent
+        side="right"
+        className={cn(
+          "w-full sm:max-w-2xl overflow-y-auto p-6 sm:p-7 pt-7 sm:pt-8 bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-slate-800 shadow-2xl",
+          "[&_button[data-slot=sheet-close]]:top-5 sm:[&_button[data-slot=sheet-close]]:top-6 [&_button[data-slot=sheet-close]]:right-5 sm:[&_button[data-slot=sheet-close]]:right-6",
+          isNestedModal ? "z-[70]" : "z-[60]"
+        )}
+      >
         <SheetTitle className="sr-only">Detalle de {item?.identifier || "Work Item"}</SheetTitle>
         {renderInnerContent()}
       </SheetContent>

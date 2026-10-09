@@ -57,6 +57,9 @@ class WorkItemDeliverableService
 
         if ($file) {
             $filePath = $file->store("projects/{$project->id}/deliverables", $diskName);
+            if (! $filePath) {
+                abort(500, "No fue posible almacenar el archivo de evidencia en el sistema de almacenamiento ({$diskName}).");
+            }
             $fileName = $file->getClientOriginalName();
             $fileSize = $file->getSize();
             $fileMime = $file->getClientMimeType();
@@ -107,11 +110,15 @@ class WorkItemDeliverableService
             abort(403, 'No autorizado para eliminar este entregable.');
         }
 
-        if ($deliverable->file_path) {
+        if ($deliverable->file_path && $deliverable->file_path !== '0') {
             $diskName = $deliverable->disk ?? config('filesystems.default');
-            $disk = Storage::disk($diskName);
-            if ($disk->exists($deliverable->file_path)) {
-                $disk->delete($deliverable->file_path);
+            try {
+                $disk = Storage::disk($diskName);
+                if ($disk->exists($deliverable->file_path)) {
+                    $disk->delete($deliverable->file_path);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("No se pudo eliminar el archivo {$deliverable->file_path} en {$diskName}: ".$e->getMessage());
             }
         }
 
@@ -158,7 +165,7 @@ class WorkItemDeliverableService
             abort(404, 'Entregable no encontrado en esta historia de trabajo.');
         }
 
-        if (! $deliverable->file_path) {
+        if (! $deliverable->file_path || $deliverable->file_path === '0') {
             abort(404, 'Este entregable no contiene un archivo adjunto.');
         }
 
@@ -166,6 +173,13 @@ class WorkItemDeliverableService
         $disk = Storage::disk($diskName);
 
         if (! $disk->exists($deliverable->file_path)) {
+            // Fallback para archivos locales previos a la migración a S3
+            if ($diskName !== 'public' && Storage::disk('public')->exists($deliverable->file_path)) {
+                return Storage::disk('public')->download(
+                    $deliverable->file_path,
+                    $deliverable->file_name ?? basename($deliverable->file_path)
+                );
+            }
             abort(404, 'El archivo no fue encontrado en el sistema de almacenamiento.');
         }
 

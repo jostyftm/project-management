@@ -404,7 +404,10 @@ export function WorkItemCreateModal({
   const formContent = (
     <div className="space-y-4">
       {/* Header Title & View Mode Switcher */}
-      <div className="flex items-center justify-between gap-2 pb-1">
+      <div className={cn(
+        "flex items-center justify-between gap-2 pb-1 flex-wrap sm:flex-nowrap",
+        activeMode !== "page" && "pr-10 sm:pr-12"
+      )}>
         <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           Crear nuevo elemento de trabajo
         </h2>
@@ -1105,7 +1108,7 @@ export function WorkItemCreateModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[800px] w-full p-6 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-visible"
+        className="max-w-[800px] w-full p-6 sm:p-7 pt-7 sm:pt-8 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-visible [&>[data-slot=dialog-close]]:top-5 sm:[&>[data-slot=dialog-close]]:top-6 [&>[data-slot=dialog-close]]:right-5 sm:[&>[data-slot=dialog-close]]:right-6 [&>[data-slot=dialog-close]]:p-1.5 [&>[data-slot=dialog-close]]:rounded-md hover:[&>[data-slot=dialog-close]]:bg-slate-100 dark:hover:[&>[data-slot=dialog-close]]:bg-slate-800"
         showCloseButton={true}
       >
         <DialogTitle className="sr-only">Crear nuevo elemento de trabajo</DialogTitle>

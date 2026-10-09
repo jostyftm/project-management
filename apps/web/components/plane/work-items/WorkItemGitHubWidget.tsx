@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface WorkItemGitHubWidgetProps {
   workItemId: string | number;
@@ -43,6 +44,7 @@ interface WorkItemGitHubWidgetProps {
   title?: string;
   projectId?: string | number;
   className?: string;
+  isAdmin?: boolean;
   onWorkItemUpdated?: () => void;
   isBranchModalOpen?: boolean;
   onBranchModalOpenChange?: (open: boolean) => void;
@@ -84,6 +86,7 @@ export function WorkItemGitHubWidget({
   title = "Tarea",
   projectId,
   className,
+  isAdmin = false,
   onWorkItemUpdated,
   isBranchModalOpen: controlledModalOpen,
   onBranchModalOpenChange,
@@ -145,11 +148,15 @@ export function WorkItemGitHubWidget({
   const fullBranchName = `${branchType}/${branchSlug}`;
   const gitCommand = `git checkout -b ${fullBranchName}`;
 
-  const handleCopyCommand = () => {
-    navigator.clipboard.writeText(gitCommand);
-    setCopied(true);
-    toast.success("Comando copiado al portapapeles");
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyCommand = async () => {
+    const ok = await copyToClipboard(gitCommand);
+    if (ok) {
+      setCopied(true);
+      toast.success("Comando copiado al portapapeles");
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      toast.error("No se pudo copiar el comando al portapapeles.");
+    }
   };
 
   // Creación directa de la rama en GitHub vía API
@@ -276,7 +283,7 @@ export function WorkItemGitHubWidget({
           <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
             Para habilitar la creación de ramas, el rastreo de Pull Requests y las URLs de previsualización Dokploy, vincula al menos un repositorio en la configuración de GitHub de este proyecto.
           </p>
-          {projectId && (
+          {projectId && isAdmin && (
             <Link
               href={`/projects/${projectId}/settings`}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200 hover:text-amber-700 dark:hover:text-amber-100 underline pt-0.5"
@@ -370,7 +377,11 @@ export function WorkItemGitHubWidget({
       ) : hasRepositories ? (
         <div className="p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400 space-y-1">
           <p>Sin ramas o Pull Requests vinculadas a esta tarea.</p>
-          <p className="text-[11px] text-slate-400/80">Haz clic en &quot;Crear rama&quot; para iniciar el desarrollo.</p>
+          {isAdmin ? (
+            <p className="text-[11px] text-slate-400/80">Haz clic en &quot;Crear rama&quot; para iniciar el desarrollo.</p>
+          ) : (
+            <p className="text-[11px] text-slate-400/80">Haz clic en &quot;Crear rama&quot; para copiar el comando Git a tu terminal local.</p>
+          )}
         </div>
       ) : null}
 
@@ -380,7 +391,7 @@ export function WorkItemGitHubWidget({
           className="sm:max-w-xl md:max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto z-[80]"
           overlayClassName="z-[80]"
         >
-          <DialogHeader className="space-y-1">
+          <DialogHeader className="space-y-1 pr-8 sm:pr-10">
             <DialogTitle className="flex items-center gap-2 text-base font-semibold">
               <GitBranch className="size-5 text-indigo-600 dark:text-indigo-400" />
               Crear Rama para {identifier}
@@ -519,18 +530,20 @@ export function WorkItemGitHubWidget({
 
           <DialogFooter className="flex flex-col-reverse sm:flex-row items-center justify-between gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              {/* Botón de simulación para desarrollo local */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSimulatePR}
-                className="text-xs border-dashed text-slate-500 hover:text-indigo-600 dark:border-slate-800"
-                title="Simular apertura de PR para pruebas"
-              >
-                <Sparkles className="size-3 mr-1" />
-                Simular PR
-              </Button>
+              {/* Botón de simulación para desarrollo local (solo Admin) */}
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSimulatePR}
+                  className="text-xs border-dashed text-slate-500 hover:text-indigo-600 dark:border-slate-800"
+                  title="Simular apertura de PR para pruebas"
+                >
+                  <Sparkles className="size-3 mr-1" />
+                  Simular PR
+                </Button>
+              )}
 
               <Button
                 type="button"
@@ -544,25 +557,34 @@ export function WorkItemGitHubWidget({
               </Button>
             </div>
 
-            {/* Botón Principal: Crear Rama Directamente en GitHub */}
-            <Button
-              type="button"
-              onClick={handleCreateBranchInGitHub}
-              disabled={isCreatingBranch || !selectedRepo}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-medium shadow-xs"
-            >
-              {isCreatingBranch ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  Creando en GitHub...
-                </>
-              ) : (
-                <>
-                  <GitBranch className="size-3.5" />
-                  Crear rama en GitHub
-                </>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              {!isAdmin && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 italic">
+                  Solo Admin puede crear en GitHub
+                </span>
               )}
-            </Button>
+
+              {/* Botón Principal: Crear Rama Directamente en GitHub */}
+              <Button
+                type="button"
+                onClick={handleCreateBranchInGitHub}
+                disabled={!isAdmin || isCreatingBranch || !selectedRepo}
+                title={!isAdmin ? "Solo los administradores del proyecto pueden crear ramas directamente en GitHub" : undefined}
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-medium shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingBranch ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Creando en GitHub...
+                  </>
+                ) : (
+                  <>
+                    <GitBranch className="size-3.5" />
+                    Crear rama en GitHub
+                  </>
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

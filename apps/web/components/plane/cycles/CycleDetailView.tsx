@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 
 interface CycleDetailViewProps {
@@ -333,10 +334,14 @@ export function CycleDetailView({
                     </>
                   )}
                   <DropdownMenuItem
-                    onClick={() => {
+                    onClick={async () => {
                       if (typeof window !== "undefined") {
-                        navigator.clipboard.writeText(window.location.href);
-                        toast.success("Enlace al sprint copiado al portapapeles");
+                        const ok = await copyToClipboard(window.location.href);
+                        if (ok) {
+                          toast.success("Enlace al sprint copiado al portapapeles");
+                        } else {
+                          toast.error("No se pudo copiar el enlace");
+                        }
                       }
                     }}
                     className="text-slate-600 dark:text-slate-400 cursor-pointer"

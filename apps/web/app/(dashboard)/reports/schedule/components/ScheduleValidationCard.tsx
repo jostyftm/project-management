@@ -43,6 +43,7 @@ import { SqlEditor } from "@/components/ui/sql-editor";
 import { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { SchemaTable } from "@/types/schema-type";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface ScheduleValidationCardProps {
   validationEnabled: boolean;
@@ -197,10 +198,10 @@ export const ScheduleValidationCard: React.FC<ScheduleValidationCardProps> = ({
       toast.info("No hay consulta para copiar.");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(validationQuery);
+    const ok = await copyToClipboard(validationQuery);
+    if (ok) {
       toast.success("Consulta SQL copiada al portapapeles.");
-    } catch {
+    } else {
       toast.error("No se pudo copiar la consulta.");
     }
   };

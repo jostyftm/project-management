@@ -11,6 +11,7 @@ import { BlockConfigPanel } from "./BlockConfigPanel";
 import { ReportSnapshotsModal } from "./ReportSnapshotsModal";
 import { blockRegistry } from "@/registry/block-registry";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface ReportEditorProps {
   initialReport: WorkspaceReport;
@@ -344,11 +345,14 @@ export function ReportEditor({ initialReport, workspaceId }: ReportEditorProps) 
               />
               <button
                 type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `${window.location.origin}/r/${report.public_token}`
-                  );
-                  toast.success("Enlace copiado al portapapeles");
+                onClick={async () => {
+                  const url = `${window.location.origin}/r/${report.public_token}`;
+                  const ok = await copyToClipboard(url);
+                  if (ok) {
+                    toast.success("Enlace copiado al portapapeles");
+                  } else {
+                    toast.error("No se pudo copiar el enlace");
+                  }
                 }}
                 className="px-2.5 py-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shrink-0"
               >

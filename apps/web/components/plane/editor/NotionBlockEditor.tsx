@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface NotionBlockEditorProps {
   blocks: DocBlock[];
@@ -550,9 +551,13 @@ export function NotionBlockEditor({ blocks, onChange, isLocked = false }: Notion
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(block.content ?? "");
-                        toast.success("Código copiado al portapapeles");
+                      onClick={async () => {
+                        const ok = await copyToClipboard(block.content ?? "");
+                        if (ok) {
+                          toast.success("Código copiado al portapapeles");
+                        } else {
+                          toast.error("No se pudo copiar el código");
+                        }
                       }}
                       className="h-6 text-[10px] text-slate-400 hover:text-white"
                     >

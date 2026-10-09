@@ -10,6 +10,7 @@ import { blockRegistry } from "@/registry/block-registry";
 import { ArrowLeft, Edit3, Share2, Loader2, Maximize2, Minimize2, Download, Image as ImageIcon, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export default function ReportViewPage({
   params,
@@ -79,10 +80,14 @@ export default function ReportViewPage({
     }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (report.public_token) {
-      navigator.clipboard.writeText(`${window.location.origin}/r/${report.public_token}`);
-      toast.success("Enlace público copiado al portapapeles");
+      const ok = await copyToClipboard(`${window.location.origin}/r/${report.public_token}`);
+      if (ok) {
+        toast.success("Enlace público copiado al portapapeles");
+      } else {
+        toast.error("No se pudo copiar el enlace");
+      }
     } else {
       toast.info("Publica el reporte desde el editor para generar un enlace público");
     }

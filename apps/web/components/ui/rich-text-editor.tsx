@@ -22,6 +22,7 @@ export interface RichTextEditorProps {
   onChange?: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  readOnly?: boolean;
   className?: string;
   minHeight?: string;
   maxHeight?: string;
@@ -32,6 +33,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   onChange,
   placeholder = "Escribe el cuerpo del mensaje...",
   disabled = false,
+  readOnly = false,
   className,
   minHeight = "150px",
   maxHeight,
@@ -83,7 +85,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   const execCmd = (cmd: string, val: string | undefined = undefined) => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     if (editorRef.current) {
       editorRef.current.focus();
     }
@@ -102,12 +104,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     <div
       className={cn(
         "flex flex-col rounded-lg border border-input dark:border-slate-800 bg-background shadow-xs transition-colors overflow-hidden",
-        isFocused && "ring-1 ring-ring border-ring dark:border-indigo-500/50 dark:ring-indigo-500/20",
-        disabled && "opacity-60 cursor-not-allowed",
+        isFocused && !readOnly && "ring-1 ring-ring border-ring dark:border-indigo-500/50 dark:ring-indigo-500/20",
+        disabled && !readOnly && "opacity-60 cursor-not-allowed",
+        readOnly && "bg-slate-50/50 dark:bg-slate-900/40 border-dashed select-text",
         className
       )}
     >
-      {/* Barra de herramientas */}
+      {/* Barra de herramientas (oculta en modo solo lectura) */}
+      {!readOnly && (
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 px-2 py-1.5 text-slate-700 dark:text-slate-300">
         <button
           type="button"
@@ -303,8 +307,9 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           </button>
         </div>
       </div>
+      )}
 
-      {/* Área editable con contenedor relativo para placeholder */}
+      {/* Área de texto / editable con contenedor relativo para placeholder */}
       <div className="relative flex-1 bg-white dark:bg-slate-900 transition-colors">
         {isContentEmpty && !isFocused && (
           <span className="pointer-events-none absolute left-3 top-3 text-xs text-slate-400 dark:text-slate-500 select-none">
@@ -313,20 +318,28 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
         )}
         <div
           ref={editorRef}
-          contentEditable={!disabled}
+          contentEditable={!disabled && !readOnly}
           onFocus={() => {
+            if (readOnly || disabled) return;
             setIsFocused(true);
             updateActiveStates();
           }}
           onBlur={() => {
+            if (readOnly || disabled) return;
             setIsFocused(false);
             handleInput();
           }}
-          onInput={handleInput}
+          onInput={() => {
+            if (readOnly || disabled) return;
+            handleInput();
+          }}
           onKeyUp={updateActiveStates}
           onMouseUp={updateActiveStates}
           style={{ minHeight, maxHeight: maxHeight ?? "220px" }}
-          className="w-full p-3 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-none overflow-y-auto leading-relaxed [&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_h2]:text-slate-900 dark:[&_h2]:text-white [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_h3]:text-slate-800 dark:[&_h3]:text-slate-200 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1.5 [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-400 dark:[&_blockquote]:border-indigo-500 [&_blockquote]:pl-3 [&_blockquote]:my-1.5 [&_blockquote]:italic [&_blockquote]:text-slate-600 dark:[&_blockquote]:text-slate-400 [&_p]:my-1"
+          className={cn(
+            "w-full p-3 text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-none overflow-y-auto leading-relaxed select-text cursor-text",
+            "[&_h2]:text-base [&_h2]:font-bold [&_h2]:mt-2 [&_h2]:mb-1 [&_h2]:text-slate-900 dark:[&_h2]:text-white [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_h3]:text-slate-800 dark:[&_h3]:text-slate-200 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1.5 [&_blockquote]:border-l-2 [&_blockquote]:border-indigo-400 dark:[&_blockquote]:border-indigo-500 [&_blockquote]:pl-3 [&_blockquote]:my-1.5 [&_blockquote]:italic [&_blockquote]:text-slate-600 dark:[&_blockquote]:text-slate-400 [&_p]:my-1"
+          )}
         />
       </div>
     </div>

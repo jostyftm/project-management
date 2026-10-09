@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import BaseIcon from "@/components/ui/base-icon";
 import { ReportExecution } from "@/types/execution-type";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface Props {
   execution: ReportExecution;
@@ -23,11 +24,11 @@ const ErrorLogModal = ({ execution, open, onOpenChange }: Props) => {
   const errorLog = execution.attributes.error_log ?? "Sin detalle de error.";
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(errorLog);
+    const ok = await copyToClipboard(errorLog);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    }
   };
 
   const isSkipped = execution.attributes.status === "skipped";

@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export default function WorkspaceSettingsPage() {
   const { currentWorkspace } = useWorkspaceStore();
@@ -256,11 +257,15 @@ export default function WorkspaceSettingsPage() {
       ? `${window.location.origin}/api/v1/integrations/github/webhook`
       : "http://localhost:8000/api/v1/integrations/github/webhook";
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(webhookEndpoint);
-    setCopiedWebhook(true);
-    toast.success("URL del webhook unificado copiada al portapapeles");
-    setTimeout(() => setCopiedWebhook(false), 2000);
+  const handleCopyWebhook = async () => {
+    const ok = await copyToClipboard(webhookEndpoint);
+    if (ok) {
+      setCopiedWebhook(true);
+      toast.success("URL del webhook unificado copiada al portapapeles");
+      setTimeout(() => setCopiedWebhook(false), 2000);
+    } else {
+      toast.error("No se pudo copiar la URL");
+    }
   };
 
   const filteredRepositories = (gitHubData?.repositories || []).filter((repo: WorkspaceDiscoveredRepo) => {
@@ -531,7 +536,7 @@ export default function WorkspaceSettingsPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={copyToClipboard}
+                        onClick={handleCopyWebhook}
                         className="shrink-0 text-xs gap-1"
                       >
                         {copiedWebhook ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}

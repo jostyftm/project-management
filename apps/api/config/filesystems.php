@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('FILESYSTEM_DISK', 'local'),
+    'default' => env('FILESYSTEM_DISK', 's3'),
 
     /*
     |--------------------------------------------------------------------------
@@ -51,25 +51,25 @@ return [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'region' => env('AWS_DEFAULT_REGION'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'throw' => env('AWS_THROW', true),
             'report' => false,
         ],
 
         'rustfs' => [
             'driver' => 's3',
-            'key' => env('RUSTFS_ACCESS_KEY', 'sail'),
-            'secret' => env('RUSTFS_SECRET_KEY', 'password'),
-            'region' => env('RUSTFS_REGION', 'us-east-1'),
-            'bucket' => env('RUSTFS_BUCKET', 'sail'),
-            'url' => env('RUSTFS_URL'),
-            'endpoint' => env('RUSTFS_ENDPOINT', env('APP_ENV') === 'local' ? 'http://rustfs:9000' : null),
-            'use_path_style_endpoint' => env('RUSTFS_USE_PATH_STYLE_ENDPOINT', true),
-            'throw' => false,
+            'key' => env('RUSTFS_ACCESS_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('RUSTFS_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('RUSTFS_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+            'bucket' => env('RUSTFS_BUCKET', env('AWS_BUCKET', 'project')),
+            'url' => env('RUSTFS_URL', env('AWS_URL')),
+            'endpoint' => env('RUSTFS_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('RUSTFS_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', true)),
+            'throw' => env('AWS_THROW', true),
             'report' => false,
         ],
 

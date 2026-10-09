@@ -6,7 +6,6 @@ use App\Traits\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class WorkItemDeliverable extends Model
 {
@@ -43,7 +42,7 @@ class WorkItemDeliverable extends Model
 
     public function getFileUrlAttribute(): ?string
     {
-        if (! $this->file_path) {
+        if (! $this->file_path || $this->file_path === '0') {
             return null;
         }
 
@@ -51,13 +50,7 @@ class WorkItemDeliverable extends Model
             return $this->file_path;
         }
 
-        $diskName = $this->disk ?? config('filesystems.default');
-
-        try {
-            return Storage::disk($diskName)->url($this->file_path);
-        } catch (\Throwable) {
-            return url("/api/v1/projects/{$this->project_id}/work-items/{$this->work_item_id}/deliverables/{$this->id}/download");
-        }
+        return url("/api/v1/projects/{$this->project_id}/work-items/{$this->work_item_id}/deliverables/{$this->id}/download");
     }
 
     public function project(): BelongsTo

@@ -29,6 +29,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface Props {
   projectId: string | number;
@@ -123,13 +124,17 @@ export function ProjectMembersModal({ projectId, open, onOpenChange }: Props) {
     }
   };
 
-  const copyInviteLink = (token: string) => {
+  const copyInviteLink = async (token: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const url = `${origin}/invitations/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedToken(token);
-    toast.success("Enlace de invitación copiado al portapapeles");
-    setTimeout(() => setCopiedToken(null), 2000);
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setCopiedToken(token);
+      toast.success("Enlace de invitación copiado al portapapeles");
+      setTimeout(() => setCopiedToken(null), 2000);
+    } else {
+      toast.error("No se pudo copiar el enlace");
+    }
   };
 
   return (

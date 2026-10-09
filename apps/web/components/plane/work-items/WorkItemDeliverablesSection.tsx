@@ -27,6 +27,8 @@ import {
   ShieldCheck,
   MessageSquare,
   Upload,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +86,75 @@ export function WorkItemDeliverablesSection({
   // New DoD item state
   const [newDodTitle, setNewDodTitle] = useState("");
   const [isAddingDod, setIsAddingDod] = useState(false);
+
+  // Download and Preview states
+  const [isDownloadingId, setIsDownloadingId] = useState<number | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewDeliverable, setPreviewDeliverable] = useState<WorkItemDeliverable | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewContentType, setPreviewContentType] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  const isImageFile = (name?: string | null) => {
+    if (!name) return false;
+    return /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(name);
+  };
+
+  const isPdfFile = (name?: string | null) => {
+    if (!name) return false;
+    return /\.pdf$/i.test(name);
+  };
+
+  const handleDownloadFile = async (del: WorkItemDeliverable) => {
+    try {
+      setIsDownloadingId(del.id);
+      await workItemDeliverableService.downloadFile(
+        projectId,
+        workItemId,
+        del.id,
+        del.file_name || `evidencia-${del.id}`
+      );
+      toast.success("Archivo descargado exitosamente");
+    } catch (err) {
+      console.error("Error downloading deliverable:", err);
+      toast.error("No se pudo descargar el archivo de evidencia.");
+    } finally {
+      setIsDownloadingId(null);
+    }
+  };
+
+  const handleOpenPreview = async (del: WorkItemDeliverable) => {
+    setPreviewDeliverable(del);
+    setPreviewModalOpen(true);
+    setIsLoadingPreview(true);
+    setPreviewBlobUrl(null);
+    setPreviewContentType(null);
+
+    try {
+      const { blobUrl, contentType } = await workItemDeliverableService.getFileBlob(
+        projectId,
+        workItemId,
+        del.id
+      );
+      setPreviewBlobUrl(blobUrl);
+      setPreviewContentType(contentType);
+    } catch (err) {
+      console.error("Error loading preview:", err);
+      toast.error("No se pudo cargar la previsualización del archivo.");
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewBlobUrl) {
+      window.URL.revokeObjectURL(previewBlobUrl);
+    }
+    setPreviewModalOpen(false);
+    setPreviewDeliverable(null);
+    setPreviewBlobUrl(null);
+    setPreviewContentType(null);
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -392,27 +463,46 @@ export function WorkItemDeliverablesSection({
 
                   {/* Barra de Acciones */}
                   <div className="pt-2 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between text-xs">
-                    <div>
-                      {targetUrl && (
+                    <div className="flex items-center gap-1.5">
+                      {del.file_path ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() => handleOpenPreview(del)}
+                            className="h-7 px-2 text-xs gap-1 text-slate-700 dark:text-slate-200 hover:text-indigo-600 hover:border-indigo-300"
+                          >
+                            <Eye className="size-3 text-indigo-600" />
+                            <span>Visualizar</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            onClick={() => handleDownloadFile(del)}
+                            disabled={isDownloadingId === del.id}
+                            className="h-7 px-2 text-xs gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                          >
+                            {isDownloadingId === del.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Download className="size-3" />
+                            )}
+                            <span>Descargar</span>
+                          </Button>
+                        </>
+                      ) : del.url ? (
                         <a
-                          href={targetUrl}
+                          href={del.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline font-medium text-xs"
+                          className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline font-medium text-xs px-2 py-1"
                         >
-                          {del.file_path ? (
-                            <>
-                              <Download className="size-3" />
-                              <span>Descargar archivo</span>
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="size-3" />
-                              <span>Abrir recurso</span>
-                            </>
-                          )}
+                          <ExternalLink className="size-3" />
+                          <span>Abrir recurso</span>
                         </a>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -722,6 +812,91 @@ export function WorkItemDeliverablesSection({
                 : "Guardar Observaciones"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Previsualización de Evidencia */}
+      <Dialog
+        open={previewModalOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) handleClosePreview();
+        }}
+      >
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6 overflow-hidden">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-neutral-800">
+            <div className="flex items-center justify-between gap-3 pr-6">
+              <div className="min-w-0">
+                <DialogTitle className="text-sm font-semibold truncate text-slate-900 dark:text-slate-100">
+                  {previewDeliverable?.title}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-400 truncate mt-0.5">
+                  {previewDeliverable?.file_name}
+                  {previewDeliverable?.file_size && (
+                    <span> • {Math.round(previewDeliverable.file_size / 1024)} KB</span>
+                  )}
+                </DialogDescription>
+              </div>
+              {previewDeliverable && (
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => handleDownloadFile(previewDeliverable)}
+                  disabled={isDownloadingId === previewDeliverable.id}
+                  className="shrink-0 h-8 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  {isDownloadingId === previewDeliverable.id ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Download className="size-3.5" />
+                  )}
+                  <span>Descargar</span>
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto flex items-center justify-center p-3 min-h-[350px] max-h-[70vh] bg-slate-50 dark:bg-neutral-950 rounded-xl mt-3 border border-slate-100 dark:border-neutral-800">
+            {isLoadingPreview ? (
+              <div className="flex flex-col items-center gap-2 text-slate-400">
+                <Loader2 className="size-8 animate-spin text-indigo-600" />
+                <span className="text-xs">Cargando visualización de evidencia...</span>
+              </div>
+            ) : previewBlobUrl ? (
+              previewContentType?.startsWith("image/") || isImageFile(previewDeliverable?.file_name) ? (
+                <img
+                  src={previewBlobUrl}
+                  alt={previewDeliverable?.file_name || "Evidencia"}
+                  className="max-h-[65vh] max-w-full object-contain rounded-lg shadow-xs"
+                />
+              ) : previewContentType?.includes("pdf") || isPdfFile(previewDeliverable?.file_name) ? (
+                <iframe
+                  src={previewBlobUrl}
+                  title={previewDeliverable?.file_name || "Documento PDF"}
+                  className="w-full h-[65vh] rounded-lg border-0"
+                />
+              ) : (
+                <div className="text-center p-6 space-y-3">
+                  <FileCode className="size-12 text-slate-400 mx-auto" />
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Este tipo de archivo ({previewDeliverable?.file_mime || "binario"}) no admite visualización embebida directa.
+                  </p>
+                  <Button
+                    size="sm"
+                    type="button"
+                    onClick={() => handleDownloadFile(previewDeliverable!)}
+                    className="text-xs"
+                  >
+                    <Download className="size-3.5 mr-1.5" />
+                    <span>Descargar archivo para ver</span>
+                  </Button>
+                </div>
+              )
+            ) : (
+              <div className="text-center text-xs text-slate-400">
+                No se pudo cargar la vista previa del archivo.
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
