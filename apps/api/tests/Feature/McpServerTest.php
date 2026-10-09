@@ -7,6 +7,10 @@ use App\Mcp\Resources\ProjectSummaryResource;
 use App\Mcp\Servers\ProjectManagementServer;
 use App\Mcp\Tools\Cycles\CreateCycleTool;
 use App\Mcp\Tools\Cycles\ListCyclesTool;
+use App\Mcp\Tools\Members\AddProjectMemberTool;
+use App\Mcp\Tools\Members\ListProjectMembersTool;
+use App\Mcp\Tools\Members\RemoveProjectMemberTool;
+use App\Mcp\Tools\Members\UpdateProjectMemberRoleTool;
 use App\Mcp\Tools\Milestones\CreateMilestoneTool;
 use App\Mcp\Tools\Milestones\ListMilestonesTool;
 use App\Mcp\Tools\Modules\CreateModuleTool;
@@ -26,6 +30,7 @@ use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
 use App\Models\Project;
+use App\Models\ProjectInvitation;
 use App\Models\ProjectMember;
 use App\Models\State;
 use App\Models\User;
@@ -104,6 +109,10 @@ it('discovers all registered tools, resources, and prompts on the MCP server', f
         ListReleasesTool::class,
         ListProjectStatesTool::class,
         ListProjectLabelsTool::class,
+        ListProjectMembersTool::class,
+        AddProjectMemberTool::class,
+        UpdateProjectMemberRoleTool::class,
+        RemoveProjectMemberTool::class,
     ]);
 
     $resources = ProjectManagementServer::resources();
@@ -542,4 +551,158 @@ it('enforces RBAC permissions for non-admin workspace members', function () {
     $createCycleResponse->assertStatus(200);
     expect($createCycleResponse->json('result.isError'))->toBeTrue();
     expect($createCycleResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
+});
+
+it('manages project members and invitations via MCP tools', function () {
+    // 1. Listar miembros iniciales del proyecto
+    $listResponse = ProjectManagementServer::tool(ListProjectMembersTool::class, [
+        'project' => 'ENG',
+    ]);
+    $listResponse->assertOk()
+        ->assertSee('Backend Engineering');
+
+    // 2. Agregar un usuario existente por email
+    $developer = User::factory()->create([
+        'name' => 'Alice Dev',
+        'email' => 'alice@example.com',
+    ]);
+
+    $addExistingResponse = ProjectManagementServer::tool(AddProjectMemberTool::class, [
+        'project' => 'ENG',
+        'email' => 'alice@example.com',
+        'role' => 'MEMBER',
+    ]);
+    $addExistingResponse->assertOk()
+        ->assertSee('MEMBER_ADDED')
+        ->assertSee('alice@example.com');
+
+    $this->assertDatabaseHas('project_members', [
+        'project_id' => $this->project->id,
+        'user_id' => $developer->id,
+        'role' => 'MEMBER',
+    ]);
+
+    // 3. Invitar un correo que no existe en el sistema
+    $inviteResponse = ProjectManagementServer::tool(AddProjectMemberTool::class, [
+        'project' => 'ENG',
+        'email' => 'newuser@example.com',
+        'role' => 'VIEWER',
+    ]);
+    $inviteResponse->assertOk()
+        ->assertSee('INVITATION_SENT')
+        ->assertSee('newuser@example.com');
+
+    $this->assertDatabaseHas('project_invitations', [
+        'project_id' => $this->project->id,
+        'email' => 'newuser@example.com',
+        'role' => 'VIEWER',
+        'status' => 'PENDING',
+    ]);
+
+    $invitation = ProjectInvitation::where('project_id', $this->project->id)
+        ->where('email', 'newuser@example.com')
+        ->first();
+
+    // 4. Actualizar el rol de Alice a ADMIN
+    $updateRoleResponse = ProjectManagementServer::tool(UpdateProjectMemberRoleTool::class, [
+        'project' => 'ENG',
+        'user' => 'alice@example.com',
+        'role' => 'ADMIN',
+    ]);
+    $updateRoleResponse->assertOk()
+        ->assertSee('ADMIN');
+
+    $this->assertDatabaseHas('project_members', [
+        'project_id' => $this->project->id,
+        'user_id' => $developer->id,
+        'role' => 'ADMIN',
+    ]);
+
+    // 5. Cancelar la invitación pendiente
+    $cancelInvResponse = ProjectManagementServer::tool(RemoveProjectMemberTool::class, [
+        'project' => 'ENG',
+        'invitation_id' => $invitation->id,
+    ]);
+    $cancelInvResponse->assertOk()
+        ->assertSee("Invitación #{$invitation->id} cancelada exitosamente");
+
+    $this->assertDatabaseMissing('project_invitations', [
+        'id' => $invitation->id,
+    ]);
+
+    // 6. Remover a Alice del proyecto
+    $removeMemberResponse = ProjectManagementServer::tool(RemoveProjectMemberTool::class, [
+        'project' => 'ENG',
+        'user' => (string) $developer->id,
+    ]);
+    $removeMemberResponse->assertOk()
+        ->assertSee('desvinculado del proyecto');
+
+    $this->assertDatabaseMissing('project_members', [
+        'project_id' => $this->project->id,
+        'user_id' => $developer->id,
+    ]);
+});
+
+it('enforces RBAC for member management in MCP', function () {
+    $regularUser = User::factory()->create([
+        'is_instance_admin' => false,
+    ]);
+    $regularToken = $regularUser->createToken('regular-member-token')->plainTextToken;
+
+    WorkspaceMember::create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $regularUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    ProjectMember::create([
+        'project_id' => $this->project->id,
+        'user_id' => $regularUser->id,
+        'role' => 'MEMBER',
+    ]);
+
+    // 1. Usuario regular PUEDE listar miembros del proyecto
+    $listResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 101,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'list_project_members',
+            'arguments' => [
+                'project' => 'ENG',
+            ],
+        ],
+    ]);
+
+    $listResponse->assertStatus(200);
+    expect($listResponse->json('result.isError'))->toBeFalsy();
+    expect($listResponse->json('result.content.0.text'))->toContain('Backend Engineering');
+
+    // 2. Usuario regular NO PUEDE agregar miembros al proyecto (requiere ADMIN)
+    $addResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$regularToken}",
+        'X-Workspace-Id' => $this->workspace->id,
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 102,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'add_project_member',
+            'arguments' => [
+                'project' => 'ENG',
+                'email' => 'candidate@example.com',
+                'role' => 'MEMBER',
+            ],
+        ],
+    ]);
+
+    $addResponse->assertStatus(200);
+    expect($addResponse->json('result.isError'))->toBeTrue();
+    expect($addResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
 });

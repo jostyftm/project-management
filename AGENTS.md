@@ -11,7 +11,7 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 ./scripts/mcp-server.sh
 ```
 
-### Herramientas Disponibles (21 Tools):
+### Herramientas Disponibles (25 Tools):
 - **Proyectos:** `list_projects`, `get_project`, `create_project`, `update_project`, `delete_project`.
 - **Work Items (Tareas, Historias, Bugs):** `list_work_items`, `get_work_item`, `create_work_item`, `update_work_item`, `delete_work_item`.
 - **Ciclos / Sprints:** `list_cycles`, `get_cycle`, `create_cycle`, `update_cycle`.
@@ -19,6 +19,7 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 - **Hitos (Milestones):** `list_milestones`, `get_milestone`, `create_milestone`, `update_milestone`.
 - **Versiones / Releases:** `list_releases`, `get_release`, `create_release`, `update_release`.
 - **Flujos de Trabajo:** `list_project_states`, `list_project_labels`.
+- **Miembros e Invitaciones:** `list_project_members`, `add_project_member`, `update_project_member_role`, `remove_project_member`.
 
 ### Recursos Contextuales:
 - `projects://list`: Catálogo estructurado de proyectos activos.

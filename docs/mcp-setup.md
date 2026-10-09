@@ -183,6 +183,10 @@ Ejemplo de payload JSON-RPC 2.0:
 | `update_release` | Escritura | Publica o actualiza una versión | `release_id`, `status`, `changelog`, `version` |
 | `list_project_states` | Lectura | Lista los estados del proyecto y sus grupos canónicos | `project` |
 | `list_project_labels` | Lectura | Lista las etiquetas disponibles para categorización | `project` |
+| `list_project_members` | Lectura | Lista miembros activos y solicitudes de invitación pendientes | `project` |
+| `add_project_member` | Escritura | Añade un miembro existente o genera y envía una invitación por email | `project`, `email`, `role` (ADMIN, MEMBER, VIEWER) |
+| `update_project_member_role` | Escritura | Modifica el rol de un miembro registrado en el proyecto | `project`, `user`, `role` (ADMIN, MEMBER, VIEWER) |
+| `remove_project_member` | Destructiva | Desvincula a un miembro o cancela una invitación pendiente | `project`, `user` (opcional), `invitation_id` (opcional) |
 
 ---
 

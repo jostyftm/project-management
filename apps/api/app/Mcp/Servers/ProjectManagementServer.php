@@ -10,6 +10,10 @@ use App\Mcp\Tools\Cycles\CreateCycleTool;
 use App\Mcp\Tools\Cycles\GetCycleTool;
 use App\Mcp\Tools\Cycles\ListCyclesTool;
 use App\Mcp\Tools\Cycles\UpdateCycleTool;
+use App\Mcp\Tools\Members\AddProjectMemberTool;
+use App\Mcp\Tools\Members\ListProjectMembersTool;
+use App\Mcp\Tools\Members\RemoveProjectMemberTool;
+use App\Mcp\Tools\Members\UpdateProjectMemberRoleTool;
 use App\Mcp\Tools\Milestones\CreateMilestoneTool;
 use App\Mcp\Tools\Milestones\GetMilestoneTool;
 use App\Mcp\Tools\Milestones\ListMilestonesTool;
@@ -89,6 +93,12 @@ class ProjectManagementServer extends Server
         // Workflow (States & Labels)
         ListProjectStatesTool::class,
         ListProjectLabelsTool::class,
+
+        // Project Members & Invitations
+        ListProjectMembersTool::class,
+        AddProjectMemberTool::class,
+        UpdateProjectMemberRoleTool::class,
+        RemoveProjectMemberTool::class,
     ];
 
     /**

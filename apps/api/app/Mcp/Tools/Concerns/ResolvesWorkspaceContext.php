@@ -80,6 +80,20 @@ trait ResolvesWorkspaceContext
     }
 
     /**
+     * Resuelve un usuario objetivo por ID numérico o dirección de correo electrónico.
+     */
+    protected function resolveTargetUser(int|string $userKey): ?User
+    {
+        $key = trim((string) $userKey);
+
+        if (is_numeric($key)) {
+            return User::find((int) $key);
+        }
+
+        return User::where('email', strtolower($key))->first();
+    }
+
+    /**
      * Resuelve un proyecto por su ID numérico o identificador de prefijo (ej: "ENG" o 1).
      */
     protected function resolveProject(Request $request, int|string $projectIdOrIdentifier): ?Project
