@@ -287,4 +287,3 @@ test('it deletes cycle and all associated work items', function () {
     $this->assertDatabaseMissing('cycles', ['id' => $cycle->id]);
     $this->assertDatabaseMissing('work_items', ['id' => $item1->id]);
 });
-

@@ -78,6 +78,8 @@ class GetWorkItemTool extends Tool
                 'name' => $projectRef->name,
             ] : null,
             'title' => $workItem->title,
+            'description_html' => $workItem->description_html,
+            'description' => $workItem->description_html,
             'description_json' => $workItem->description_json,
             'priority' => $workItem->priority,
             'estimate_points' => $workItem->estimate_points,

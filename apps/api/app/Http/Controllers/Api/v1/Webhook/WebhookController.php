@@ -39,12 +39,14 @@ class WebhookController extends Controller
     public function destroy(Request $request, string|int $id): JsonResponse
     {
         $this->webhookService->delete($id);
+
         return response()->json(null, 204);
     }
 
     public function test(Request $request, string|int $id): JsonResponse
     {
         $result = $this->webhookService->testWebhook($id);
+
         return response()->json($result);
     }
 }

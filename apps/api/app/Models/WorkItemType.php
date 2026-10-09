@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkItemType extends Model
 {
-    use HasFactory, BelongsToWorkspace, HasSearchable;
+    use BelongsToWorkspace, HasFactory, HasSearchable;
 
     protected $fillable = [
         'workspace_id',

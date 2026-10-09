@@ -14,8 +14,8 @@ class ReorderBlocksRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'order'            => ['required', 'array'],
-            'order.*.id'       => ['required', 'integer'],
+            'order' => ['required', 'array'],
+            'order.*.id' => ['required', 'integer'],
             'order.*.position' => ['required', 'integer', 'min:0'],
         ];
     }

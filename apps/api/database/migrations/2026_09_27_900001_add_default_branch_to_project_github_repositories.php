@@ -10,7 +10,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('project_github_repositories')) {
             Schema::table('project_github_repositories', function (Blueprint $table) {
-                if (!Schema::hasColumn('project_github_repositories', 'default_branch')) {
+                if (! Schema::hasColumn('project_github_repositories', 'default_branch')) {
                     $table->string('default_branch')->default('main')->after('repo_url');
                 }
             });

@@ -13,7 +13,7 @@ class ProjectSummaryResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config    = $block->config ?? [];
+        $config = $block->config ?? [];
         $projectId = $config['project_id'] ?? null;
 
         $project = null;
@@ -21,16 +21,16 @@ class ProjectSummaryResolver
             $project = Project::with(['members', 'cycles'])->find($projectId);
         }
 
-        if (!$project && !empty($scope['workspace_id'])) {
+        if (! $project && ! empty($scope['workspace_id'])) {
             $project = Project::where('workspace_id', $scope['workspace_id'])
                 ->with(['members', 'cycles'])
                 ->first();
         }
 
-        if (!$project) {
+        if (! $project) {
             return [
                 'has_project' => false,
-                'message'     => 'No hay proyectos disponibles en este workspace',
+                'message' => 'No hay proyectos disponibles en este workspace',
             ];
         }
 
@@ -55,25 +55,25 @@ class ProjectSummaryResolver
         }
 
         return [
-            'has_project'      => true,
-            'id'               => $project->id,
-            'name'             => $project->name,
-            'identifier'       => $project->identifier,
-            'description'      => $project->description,
-            'total_items'      => $totalItems,
-            'completed_items'  => $completedItems,
+            'has_project' => true,
+            'id' => $project->id,
+            'name' => $project->name,
+            'identifier' => $project->identifier,
+            'description' => $project->description,
+            'total_items' => $totalItems,
+            'completed_items' => $completedItems,
             'progress_percent' => $progressPercent,
-            'overdue_items'    => $overdueItems,
-            'health'           => $health,
-            'cycles_count'     => $project->cycles->count(),
-            'members_count'    => $project->members->count(),
-            'members'          => $project->members->take(5)->map(fn ($u) => [
-                'id'     => $u->id,
-                'name'   => $u->name,
+            'overdue_items' => $overdueItems,
+            'health' => $health,
+            'cycles_count' => $project->cycles->count(),
+            'members_count' => $project->members->count(),
+            'members' => $project->members->take(5)->map(fn ($u) => [
+                'id' => $u->id,
+                'name' => $u->name,
                 'avatar' => $u->avatar ?? null,
             ])->values()->all(),
-            'start_date'       => $project->start_date?->toDateString(),
-            'target_date'      => $project->target_date?->toDateString(),
+            'start_date' => $project->start_date?->toDateString(),
+            'target_date' => $project->target_date?->toDateString(),
         ];
     }
 }

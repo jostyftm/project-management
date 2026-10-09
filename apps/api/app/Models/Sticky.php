@@ -48,10 +48,10 @@ class Sticky extends Model
     {
         return $query->where(function (Builder $q) use ($userId) {
             $q->where('is_private', false)
-              ->orWhere(function (Builder $sub) use ($userId) {
-                  $sub->where('is_private', true)
-                      ->where('created_by', $userId);
-              });
+                ->orWhere(function (Builder $sub) use ($userId) {
+                    $sub->where('is_private', true)
+                        ->where('created_by', $userId);
+                });
         });
     }
 }

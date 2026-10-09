@@ -209,6 +209,8 @@ export interface WorkItem {
   sequence_id: number;
   identifier: string; // e.g. PLN-1
   title: string;
+  description_html?: string | null;
+  description?: string | null;
   description_json?: any;
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
   estimate_points?: number | null;

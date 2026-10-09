@@ -14,9 +14,9 @@ class UpdateReportBlockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'      => ['nullable', 'string', 'max:255'],
-            'width'      => ['nullable', 'integer', 'min:1', 'max:12'],
-            'config'     => ['nullable', 'array'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'width' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'config' => ['nullable', 'array'],
             'is_visible' => ['nullable', 'boolean'],
         ];
     }

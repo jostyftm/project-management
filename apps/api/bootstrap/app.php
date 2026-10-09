@@ -2,6 +2,9 @@
 
 use App\Exceptions\ApiHandlerException;
 use App\Http\Middleware\AuthenticateSdiUser;
+use App\Http\Middleware\AuthorizeProjectAccess;
+use App\Http\Middleware\AuthorizeWorkspaceOwner;
+use App\Http\Middleware\IdentifyWorkspace;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,9 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'auth.sdi' => AuthenticateSdiUser::class,
-            'workspace' => \App\Http\Middleware\IdentifyWorkspace::class,
-            'project.member' => \App\Http\Middleware\AuthorizeProjectAccess::class,
-            'workspace.owner' => \App\Http\Middleware\AuthorizeWorkspaceOwner::class,
+            'workspace' => IdentifyWorkspace::class,
+            'project.member' => AuthorizeProjectAccess::class,
+            'workspace.owner' => AuthorizeWorkspaceOwner::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -11,7 +11,6 @@ use App\Models\Webhook;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class IntegrationsAndAutomationsTest extends TestCase
@@ -19,9 +18,13 @@ class IntegrationsAndAutomationsTest extends TestCase
     use RefreshDatabase;
 
     protected Workspace $workspace;
+
     protected Project $project;
+
     protected State $defaultState;
+
     protected State $targetState;
+
     protected User $user;
 
     protected function setUp(): void
@@ -63,8 +66,8 @@ class IntegrationsAndAutomationsTest extends TestCase
 
     public function test_csv_preview_and_import(): void
     {
-        $csvContent = "Título,Descripción,Prioridad,Estado\n" .
-                      "Implementar autenticación,Detalle técnico de JWT,HIGH,Backlog\n" .
+        $csvContent = "Título,Descripción,Prioridad,Estado\n".
+                      "Implementar autenticación,Detalle técnico de JWT,HIGH,Backlog\n".
                       "Crear dashboard,Vista principal,MEDIUM,Done\n";
 
         // 1. Preview
@@ -100,7 +103,7 @@ class IntegrationsAndAutomationsTest extends TestCase
     public function test_slack_integration_and_outgoing_webhook_ping(): void
     {
         // 1. Crear integración de Slack
-        $slackRes = $this->postJson("/api/v1/integrations", [
+        $slackRes = $this->postJson('/api/v1/integrations', [
             'provider' => 'SLACK',
             'name' => 'Canal Dev Alerts',
             'config' => [

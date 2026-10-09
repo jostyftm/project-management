@@ -15,7 +15,7 @@ class NarrativeResolver
         $config = $block->config ?? [];
 
         return [
-            'content'   => $config['content'] ?? '',
+            'content' => $config['content'] ?? '',
             'alignment' => $config['alignment'] ?? 'left',
         ];
     }

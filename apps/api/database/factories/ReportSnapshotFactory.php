@@ -14,22 +14,22 @@ class ReportSnapshotFactory extends Factory
     public function definition(): array
     {
         return [
-            'report_id'       => WorkspaceReport::factory(),
-            'created_by'      => User::factory(),
-            'title'           => 'Snapshot ' . $this->faker->words(2, true),
+            'report_id' => WorkspaceReport::factory(),
+            'created_by' => User::factory(),
+            'title' => 'Snapshot '.$this->faker->words(2, true),
             'blocks_snapshot' => [
                 [
-                    'id'       => '1',
-                    'type'     => 'kpi_row',
-                    'title'    => 'KPIs Congelados',
-                    'width'    => 12,
+                    'id' => '1',
+                    'type' => 'kpi_row',
+                    'title' => 'KPIs Congelados',
+                    'width' => 12,
                     'position' => 0,
-                    'config'   => [],
-                    'data'     => ['kpis' => []],
+                    'config' => [],
+                    'data' => ['kpis' => []],
                 ],
             ],
-            'theme_snapshot'  => ['primaryColor' => '#6366f1'],
-            'note'            => $this->faker->sentence(),
+            'theme_snapshot' => ['primaryColor' => '#6366f1'],
+            'note' => $this->faker->sentence(),
         ];
     }
 }

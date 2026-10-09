@@ -43,11 +43,11 @@ class ProjectInvitationMail extends Mailable
             view: 'emails.project_invitation',
             with: [
                 'invitation' => $this->invitation,
-                'inviteUrl'  => $this->inviteUrl,
+                'inviteUrl' => $this->inviteUrl,
                 'projectName' => $this->invitation->project?->name ?? 'el proyecto',
                 'inviterName' => $this->invitation->inviter?->name ?? 'Un administrador',
-                'role'        => $this->invitation->role,
-                'expiresAt'   => $this->invitation->expires_at?->format('d/m/Y'),
+                'role' => $this->invitation->role,
+                'expiresAt' => $this->invitation->expires_at?->format('d/m/Y'),
             ],
         );
     }

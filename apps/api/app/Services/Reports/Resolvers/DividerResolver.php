@@ -15,9 +15,9 @@ class DividerResolver
         $config = $block->config ?? [];
 
         return [
-            'style'  => $config['style'] ?? 'solid',
-            'height' => (int)($config['height'] ?? 24),
-            'color'  => $config['color'] ?? '#e2e8f0',
+            'style' => $config['style'] ?? 'solid',
+            'height' => (int) ($config['height'] ?? 24),
+            'color' => $config['color'] ?? '#e2e8f0',
         ];
     }
 }

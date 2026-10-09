@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendNotificationEmailJob;
 use App\Mail\ProjectInvitationMail;
 use App\Mail\ProjectMemberAddedMail;
 use App\Models\Project;
@@ -9,13 +10,11 @@ use App\Models\ProjectInvitation;
 use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\WorkspaceMember;
-use App\Services\NotificationService;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class ProjectMemberService
@@ -89,14 +88,14 @@ class ProjectMemberService
                     targetUrl: "/projects/{$project->id}"
                 );
             } catch (Exception $e) {
-                Log::warning("Error creando notificación in-app para usuario {$existingUser->id}: " . $e->getMessage());
+                Log::warning("Error creando notificación in-app para usuario {$existingUser->id}: ".$e->getMessage());
             }
 
             // 2. Notificación por Correo Electrónico (Encolada mediante Job)
             try {
                 $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                 $projectUrl = "{$frontendUrl}/projects/{$project->id}";
-                \App\Jobs\SendNotificationEmailJob::dispatch(
+                SendNotificationEmailJob::dispatch(
                     $existingUser->email,
                     new ProjectMemberAddedMail(
                         project: $project->loadMissing('workspace'),
@@ -107,7 +106,7 @@ class ProjectMemberService
                     )
                 );
             } catch (Exception $e) {
-                Log::warning("No se pudo encolar correo a {$existingUser->email}: " . $e->getMessage());
+                Log::warning("No se pudo encolar correo a {$existingUser->email}: ".$e->getMessage());
             }
 
             return [
@@ -127,12 +126,12 @@ class ProjectMemberService
         $invitation = ProjectInvitation::updateOrCreate(
             [
                 'project_id' => $project->id,
-                'email'      => $email,
-                'status'     => 'PENDING',
+                'email' => $email,
+                'status' => 'PENDING',
             ],
             [
-                'role'       => $role,
-                'token'      => $token,
+                'role' => $role,
+                'token' => $token,
                 'invited_by' => $inviter->id,
                 'expires_at' => now()->addDays(7),
             ]
@@ -143,14 +142,14 @@ class ProjectMemberService
         $frontendUrl = null;
         if (app()->bound('request') && request()) {
             $origin = request()->header('Origin');
-            if (!empty($origin)) {
+            if (! empty($origin)) {
                 $frontendUrl = rtrim($origin, '/');
             } else {
                 $referer = request()->header('Referer');
-                if (!empty($referer)) {
+                if (! empty($referer)) {
                     $parsed = parse_url($referer);
-                    if (!empty($parsed['scheme']) && !empty($parsed['host'])) {
-                        $frontendUrl = $parsed['scheme'] . '://' . $parsed['host'] . (!empty($parsed['port']) ? ':' . $parsed['port'] : '');
+                    if (! empty($parsed['scheme']) && ! empty($parsed['host'])) {
+                        $frontendUrl = $parsed['scheme'].'://'.$parsed['host'].(! empty($parsed['port']) ? ':'.$parsed['port'] : '');
                     }
                 }
             }
@@ -167,21 +166,21 @@ class ProjectMemberService
 
         // Encolar correo de invitación usando el Job en segundo plano (cero impacto visual)
         try {
-            \App\Jobs\SendNotificationEmailJob::dispatch(
+            SendNotificationEmailJob::dispatch(
                 $email,
                 new ProjectInvitationMail($invitation, $inviteUrl)
             );
         } catch (Exception $e) {
-            Log::warning("No se pudo encolar correo de invitación a {$email}: " . $e->getMessage());
+            Log::warning("No se pudo encolar correo de invitación a {$email}: ".$e->getMessage());
         }
 
         return [
             'type' => 'INVITATION_SENT',
             'invitation' => [
-                'id'         => $invitation->id,
-                'email'      => $invitation->email,
-                'role'       => $invitation->role,
-                'token'      => $invitation->token,
+                'id' => $invitation->id,
+                'email' => $invitation->email,
+                'role' => $invitation->role,
+                'token' => $invitation->token,
                 'expires_at' => $invitation->expires_at->toIso8601String(),
                 'invite_url' => $inviteUrl,
             ],
@@ -295,7 +294,7 @@ class ProjectMemberService
                     targetUrl: "/projects/{$project->id}"
                 );
             } catch (Exception $e) {
-                Log::warning("Error creando notificación de bienvenida para invitación: " . $e->getMessage());
+                Log::warning('Error creando notificación de bienvenida para invitación: '.$e->getMessage());
             }
 
             return $project;
@@ -318,8 +317,8 @@ class ProjectMemberService
 
             // 1. Crear nuevo usuario con el correo de la invitación
             $user = User::create([
-                'name'     => trim($data['name']),
-                'email'    => $email,
+                'name' => trim($data['name']),
+                'email' => $email,
                 'password' => Hash::make($data['password']),
             ]);
 
@@ -330,16 +329,16 @@ class ProjectMemberService
             $project = $this->acceptInvitation($token, $user);
 
             return [
-                'token'             => $authToken,
-                'user'              => $user->load('workspaces'),
+                'token' => $authToken,
+                'user' => $user->load('workspaces'),
                 'current_workspace' => $project->workspace,
-                'project'           => [
-                    'id'             => (string) $project->id,
-                    'name'           => $project->name,
-                    'identifier'     => $project->identifier,
+                'project' => [
+                    'id' => (string) $project->id,
+                    'name' => $project->name,
+                    'identifier' => $project->identifier,
                     'workspace_slug' => $project->workspace->slug,
                 ],
-                'message'           => '¡Cuenta creada y acceso al proyecto configurado con éxito!',
+                'message' => '¡Cuenta creada y acceso al proyecto configurado con éxito!',
             ];
         });
     }

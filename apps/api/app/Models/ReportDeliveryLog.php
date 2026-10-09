@@ -21,7 +21,7 @@ class ReportDeliveryLog extends Model
 
     protected $casts = [
         'recipients' => 'array',
-        'sent_at'    => 'datetime',
+        'sent_at' => 'datetime',
     ];
 
     public function report(): BelongsTo

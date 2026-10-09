@@ -52,8 +52,8 @@ return [
 
     'browsershot' => [
         'chrome_path' => env('CHROME_PATH', '/usr/bin/chromium'),
-        'node_path'   => env('NODE_PATH', '/usr/bin/node'),
-        'npm_path'    => env('NPM_PATH', '/usr/lib/node_modules'),
+        'node_path' => env('NODE_PATH', '/usr/bin/node'),
+        'npm_path' => env('NPM_PATH', '/usr/lib/node_modules'),
     ],
 
 ];

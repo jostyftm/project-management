@@ -30,7 +30,7 @@ class MilestoneService
             'completed_at' => ($data['status'] ?? null) === 'COMPLETED' ? now() : null,
         ]);
 
-        if (!empty($data['work_item_ids'])) {
+        if (! empty($data['work_item_ids'])) {
             $milestone->workItems()->sync($data['work_item_ids']);
         }
 

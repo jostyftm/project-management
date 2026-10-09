@@ -14,7 +14,7 @@ class ExportReportPdfAction
 
     public function __construct(
         private BlockResolverService $resolverService,
-        private ReportHtmlRenderer   $htmlRenderer,
+        private ReportHtmlRenderer $htmlRenderer,
     ) {}
 
     /**
@@ -25,7 +25,7 @@ class ExportReportPdfAction
         // 1. Resolver los datos en tiempo real de todos los bloques
         $scope = [
             'workspace_id' => $report->workspace_id,
-            'user_id'      => auth()->id() ?? $report->owner_id,
+            'user_id' => auth()->id() ?? $report->owner_id,
         ];
         $resolvedData = $this->resolverService->resolveAll($report, $scope);
 
@@ -34,10 +34,10 @@ class ExportReportPdfAction
 
         // 3. Ejecutar Browsershot sobre Chromium headless
         $chromePath = config('services.browsershot.chrome_path', '/usr/bin/chromium');
-        $nodePath   = config('services.browsershot.node_path', '/usr/bin/node');
-        $npmPath    = config('services.browsershot.npm_path', '/usr/lib/node_modules');
+        $nodePath = config('services.browsershot.node_path', '/usr/bin/node');
+        $npmPath = config('services.browsershot.npm_path', '/usr/lib/node_modules');
 
-        if (app()->environment('testing') || ! file_exists($chromePath) || ! file_exists($nodePath) || ! file_exists($npmPath . '/puppeteer')) {
+        if (app()->environment('testing') || ! file_exists($chromePath) || ! file_exists($nodePath) || ! file_exists($npmPath.'/puppeteer')) {
             return self::FALLBACK_PDF;
         }
 
@@ -59,7 +59,8 @@ class ExportReportPdfAction
                 ->margins(10, 12, 12, 12, 'mm')
                 ->pdf();
         } catch (\Throwable $e) {
-            Log::warning('Browsershot PDF export failed: ' . $e->getMessage());
+            Log::warning('Browsershot PDF export failed: '.$e->getMessage());
+
             return self::FALLBACK_PDF;
         }
     }

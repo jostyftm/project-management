@@ -20,6 +20,7 @@ class WorkItem extends Model
         'project_id',
         'sequence_id',
         'title',
+        'description_html',
         'description_json',
         'state_id',
         'type_id',
@@ -167,5 +168,130 @@ class WorkItem extends Model
     public function dodItems(): HasMany
     {
         return $this->hasMany(WorkItemDodItem::class)->oldest();
+    }
+
+    /**
+     * Accesor para description_html con fallback a description_json legado.
+     */
+    public function getDescriptionHtmlAttribute(?string $value): ?string
+    {
+        if ($value !== null) {
+            return $value;
+        }
+
+        if (! empty($this->description_json)) {
+            return $this->resolveLegacyJsonToHtml($this->description_json);
+        }
+
+        return null;
+    }
+
+    /**
+     * Alias amigable para la descripción en HTML.
+     */
+    public function getDescriptionAttribute(): ?string
+    {
+        return $this->description_html;
+    }
+
+    /**
+     * Mutador para el alias description.
+     */
+    public function setDescriptionAttribute(?string $value): void
+    {
+        $this->attributes['description_html'] = $value;
+    }
+
+    /**
+     * Convierte estructuras legadas de description_json a HTML.
+     */
+    public function resolveLegacyJsonToHtml(mixed $data): string
+    {
+        if (is_string($data)) {
+            $trimmed = trim($data);
+            if (empty($trimmed)) {
+                return '';
+            }
+            if (preg_match('/<[a-z][\s\S]*>/i', $trimmed)) {
+                return $trimmed;
+            }
+
+            return '<p>'.htmlspecialchars($trimmed, ENT_QUOTES, 'UTF-8').'</p>';
+        }
+
+        if (is_array($data)) {
+            if (isset($data['html']) && is_string($data['html'])) {
+                return $data['html'];
+            }
+            if (isset($data['text']) && is_string($data['text'])) {
+                return '<p>'.htmlspecialchars($data['text'], ENT_QUOTES, 'UTF-8').'</p>';
+            }
+
+            $htmlParts = [];
+            foreach ($data as $block) {
+                if (! is_array($block)) {
+                    continue;
+                }
+                $type = $block['type'] ?? 'paragraph';
+                $content = htmlspecialchars($block['content'] ?? '', ENT_QUOTES, 'UTF-8');
+
+                switch ($type) {
+                    case 'heading_1':
+                        $htmlParts[] = "<h1>{$content}</h1>";
+                        break;
+                    case 'heading_2':
+                    case 'heading':
+                        $htmlParts[] = "<h2>{$content}</h2>";
+                        break;
+                    case 'heading_3':
+                        $htmlParts[] = "<h3>{$content}</h3>";
+                        break;
+                    case 'bullet_list':
+                        $htmlParts[] = "<ul><li>{$content}</li></ul>";
+                        break;
+                    case 'numbered_list':
+                        $htmlParts[] = "<ol><li>{$content}</li></ol>";
+                        break;
+                    case 'todo':
+                        $checked = ! empty($block['checked']) ? '☑' : '☐';
+                        $htmlParts[] = "<p>{$checked} {$content}</p>";
+                        break;
+                    case 'quote':
+                    case 'callout':
+                        $htmlParts[] = "<blockquote>{$content}</blockquote>";
+                        break;
+                    case 'code':
+                        $htmlParts[] = "<pre><code>{$content}</code></pre>";
+                        break;
+                    case 'divider':
+                        $htmlParts[] = '<hr />';
+                        break;
+                    case 'table':
+                        if (! empty($block['tableData']) && is_array($block['tableData'])) {
+                            $rowsHtml = [];
+                            foreach ($block['tableData'] as $rowIndex => $row) {
+                                if (! is_array($row)) {
+                                    continue;
+                                }
+                                $tag = $rowIndex === 0 ? 'th' : 'td';
+                                $cells = array_map(fn ($cell) => "<{$tag}>".htmlspecialchars((string) $cell, ENT_QUOTES, 'UTF-8')."</{$tag}>", $row);
+                                $rowsHtml[] = '<tr>'.implode('', $cells).'</tr>';
+                            }
+                            $htmlParts[] = '<table>'.implode('', $rowsHtml).'</table>';
+                        }
+                        break;
+                    case 'paragraph':
+                    default:
+                        if (! empty($content)) {
+                            $htmlParts[] = "<p>{$content}</p>";
+                        }
+                        break;
+                }
+            }
+
+            return implode('', $htmlParts);
+        }
+
+        return '';
     }
 }

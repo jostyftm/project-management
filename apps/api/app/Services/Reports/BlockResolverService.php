@@ -5,25 +5,25 @@ namespace App\Services\Reports;
 use App\Enums\BlockType;
 use App\Models\ReportBlock;
 use App\Models\WorkspaceReport;
+use App\Services\Reports\Resolvers\AreaChartResolver;
+use App\Services\Reports\Resolvers\BarChartResolver;
+use App\Services\Reports\Resolvers\CalloutResolver;
+use App\Services\Reports\Resolvers\CyclesOverviewResolver;
+use App\Services\Reports\Resolvers\DividerResolver;
+use App\Services\Reports\Resolvers\DonutChartResolver;
+use App\Services\Reports\Resolvers\HeatmapResolver;
+use App\Services\Reports\Resolvers\ImageResolver;
 use App\Services\Reports\Resolvers\KpiRowResolver;
 use App\Services\Reports\Resolvers\LineChartResolver;
-use App\Services\Reports\Resolvers\NarrativeResolver;
-use App\Services\Reports\Resolvers\BarChartResolver;
-use App\Services\Reports\Resolvers\DonutChartResolver;
-use App\Services\Reports\Resolvers\AreaChartResolver;
-use App\Services\Reports\Resolvers\ProjectSummaryResolver;
-use App\Services\Reports\Resolvers\TableResolver;
-use App\Services\Reports\Resolvers\WorkItemsListResolver;
-use App\Services\Reports\Resolvers\CyclesOverviewResolver;
-use App\Services\Reports\Resolvers\ReleasesTimelineResolver;
 use App\Services\Reports\Resolvers\MilestonesProgressResolver;
-use App\Services\Reports\Resolvers\TeamWorkloadResolver;
+use App\Services\Reports\Resolvers\NarrativeResolver;
+use App\Services\Reports\Resolvers\ProjectSummaryResolver;
 use App\Services\Reports\Resolvers\RecentActivityResolver;
+use App\Services\Reports\Resolvers\ReleasesTimelineResolver;
 use App\Services\Reports\Resolvers\RisksBlockersResolver;
-use App\Services\Reports\Resolvers\HeatmapResolver;
-use App\Services\Reports\Resolvers\DividerResolver;
-use App\Services\Reports\Resolvers\ImageResolver;
-use App\Services\Reports\Resolvers\CalloutResolver;
+use App\Services\Reports\Resolvers\TableResolver;
+use App\Services\Reports\Resolvers\TeamWorkloadResolver;
+use App\Services\Reports\Resolvers\WorkItemsListResolver;
 use Illuminate\Support\Facades\Cache;
 
 class BlockResolverService
@@ -32,25 +32,25 @@ class BlockResolverService
      * Registro de resolvers por tipo de bloque (19 tipos completos).
      */
     protected array $resolvers = [
-        BlockType::KPI_ROW->value             => KpiRowResolver::class,
-        BlockType::NARRATIVE->value           => NarrativeResolver::class,
-        BlockType::LINE_CHART->value          => LineChartResolver::class,
-        BlockType::BAR_CHART->value           => BarChartResolver::class,
-        BlockType::DONUT_CHART->value         => DonutChartResolver::class,
-        BlockType::AREA_CHART->value          => AreaChartResolver::class,
-        BlockType::PROJECT_SUMMARY->value     => ProjectSummaryResolver::class,
-        BlockType::TABLE->value               => TableResolver::class,
-        BlockType::WORK_ITEMS_LIST->value     => WorkItemsListResolver::class,
-        BlockType::CYCLES_OVERVIEW->value     => CyclesOverviewResolver::class,
-        BlockType::RELEASES_TIMELINE->value   => ReleasesTimelineResolver::class,
+        BlockType::KPI_ROW->value => KpiRowResolver::class,
+        BlockType::NARRATIVE->value => NarrativeResolver::class,
+        BlockType::LINE_CHART->value => LineChartResolver::class,
+        BlockType::BAR_CHART->value => BarChartResolver::class,
+        BlockType::DONUT_CHART->value => DonutChartResolver::class,
+        BlockType::AREA_CHART->value => AreaChartResolver::class,
+        BlockType::PROJECT_SUMMARY->value => ProjectSummaryResolver::class,
+        BlockType::TABLE->value => TableResolver::class,
+        BlockType::WORK_ITEMS_LIST->value => WorkItemsListResolver::class,
+        BlockType::CYCLES_OVERVIEW->value => CyclesOverviewResolver::class,
+        BlockType::RELEASES_TIMELINE->value => ReleasesTimelineResolver::class,
         BlockType::MILESTONES_PROGRESS->value => MilestonesProgressResolver::class,
-        BlockType::TEAM_WORKLOAD->value       => TeamWorkloadResolver::class,
-        BlockType::RECENT_ACTIVITY->value     => RecentActivityResolver::class,
-        BlockType::RISKS_BLOCKERS->value      => RisksBlockersResolver::class,
-        BlockType::HEATMAP->value             => HeatmapResolver::class,
-        BlockType::DIVIDER->value             => DividerResolver::class,
-        BlockType::IMAGE->value               => ImageResolver::class,
-        BlockType::CALLOUT->value             => CalloutResolver::class,
+        BlockType::TEAM_WORKLOAD->value => TeamWorkloadResolver::class,
+        BlockType::RECENT_ACTIVITY->value => RecentActivityResolver::class,
+        BlockType::RISKS_BLOCKERS->value => RisksBlockersResolver::class,
+        BlockType::HEATMAP->value => HeatmapResolver::class,
+        BlockType::DIVIDER->value => DividerResolver::class,
+        BlockType::IMAGE->value => ImageResolver::class,
+        BlockType::CALLOUT->value => CalloutResolver::class,
     ];
 
     /**
@@ -63,7 +63,7 @@ class BlockResolverService
             return $this->runResolver($block, $scope);
         }
 
-        $cacheKey = 'report_block:' . $block->id . ':' . md5(json_encode($scope) . json_encode($block->config));
+        $cacheKey = 'report_block:'.$block->id.':'.md5(json_encode($scope).json_encode($block->config));
 
         return Cache::remember($cacheKey, 300, function () use ($block, $scope) {
             return $this->runResolver($block, $scope);
@@ -92,12 +92,13 @@ class BlockResolverService
     {
         $resolverClass = $this->resolvers[$block->type->value] ?? null;
 
-        if (!$resolverClass) {
+        if (! $resolverClass) {
             // Bloque sin resolver implementado aún
-            return ['message' => 'Resolver no implementado para tipo: ' . $block->type->value];
+            return ['message' => 'Resolver no implementado para tipo: '.$block->type->value];
         }
 
         $resolver = app($resolverClass);
+
         return $resolver->resolve($block, $scope);
     }
 
@@ -106,6 +107,6 @@ class BlockResolverService
      */
     public function invalidateBlock(ReportBlock $block): void
     {
-        Cache::forget('report_block:' . $block->id . ':*');
+        Cache::forget('report_block:'.$block->id.':*');
     }
 }

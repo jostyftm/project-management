@@ -3,7 +3,6 @@
 use App\Jobs\SendNotificationEmailJob;
 use App\Mail\ResetPasswordMail;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;

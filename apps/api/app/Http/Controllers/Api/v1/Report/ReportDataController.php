@@ -26,7 +26,7 @@ class ReportDataController extends Controller
 
         $scope = [
             'workspace_id' => $workspace->id,
-            'user_id'      => auth()->id(),
+            'user_id' => auth()->id(),
         ];
 
         $data = $this->resolverService->resolve($block, $scope);
@@ -43,7 +43,7 @@ class ReportDataController extends Controller
 
         $scope = [
             'workspace_id' => $workspace->id,
-            'user_id'      => auth()->id(),
+            'user_id' => auth()->id(),
         ];
 
         $data = $this->resolverService->resolveAll($workspaceReport, $scope);

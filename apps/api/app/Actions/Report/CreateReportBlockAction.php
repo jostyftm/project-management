@@ -16,12 +16,12 @@ class CreateReportBlockAction
             $nextPosition = ($maxPosition !== null) ? $maxPosition + 1 : 0;
 
             return ReportBlock::create([
-                'report_id'  => $report->id,
-                'type'       => $data['type'],
-                'title'      => $data['title'] ?? null,
-                'position'   => $data['position'] ?? $nextPosition,
-                'width'      => $data['width'] ?? 12,
-                'config'     => $data['config'] ?? [],
+                'report_id' => $report->id,
+                'type' => $data['type'],
+                'title' => $data['title'] ?? null,
+                'position' => $data['position'] ?? $nextPosition,
+                'width' => $data['width'] ?? 12,
+                'config' => $data['config'] ?? [],
                 'is_visible' => $data['is_visible'] ?? true,
             ]);
         });

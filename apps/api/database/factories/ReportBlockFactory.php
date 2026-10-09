@@ -14,15 +14,15 @@ class ReportBlockFactory extends Factory
     public function definition(): array
     {
         return [
-            'report_id'   => WorkspaceReport::factory(),
-            'type'        => BlockType::NARRATIVE->value,
-            'title'       => $this->faker->words(3, true),
-            'position'    => 0,
-            'width'       => 12,
-            'config'      => ['content' => 'Contenido de prueba'],
-            'data_cache'  => null,
-            'cached_at'   => null,
-            'is_visible'  => true,
+            'report_id' => WorkspaceReport::factory(),
+            'type' => BlockType::NARRATIVE->value,
+            'title' => $this->faker->words(3, true),
+            'position' => 0,
+            'width' => 12,
+            'config' => ['content' => 'Contenido de prueba'],
+            'data_cache' => null,
+            'cached_at' => null,
+            'is_visible' => true,
         ];
     }
 }

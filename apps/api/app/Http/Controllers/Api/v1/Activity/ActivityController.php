@@ -17,12 +17,14 @@ class ActivityController extends Controller
     public function indexByWorkItem(Request $request, string|int $workItemId): AnonymousResourceCollection
     {
         $activities = $this->activityService->listForWorkItem($workItemId);
+
         return ActivityResource::collection($activities);
     }
 
     public function indexByProject(Request $request, string|int $projectId): AnonymousResourceCollection
     {
         $activities = $this->activityService->listForProject($projectId);
+
         return ActivityResource::collection($activities);
     }
 }

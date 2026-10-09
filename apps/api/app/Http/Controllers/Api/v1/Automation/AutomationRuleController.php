@@ -18,6 +18,7 @@ class AutomationRuleController extends Controller
     public function index(Project $project): JsonResponse
     {
         $rules = $this->ruleService->listByProject($project->id);
+
         return response()->json($rules);
     }
 

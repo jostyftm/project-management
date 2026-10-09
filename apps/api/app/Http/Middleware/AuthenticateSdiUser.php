@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateSdiUser
@@ -75,7 +76,7 @@ class AuthenticateSdiUser
 
         $token = $request->bearerToken() ?: $request->query('token') ?: $request->query('bearer_token');
         if ($token && ! $request->headers->has('Authorization')) {
-            $request->headers->set('Authorization', 'Bearer ' . $token);
+            $request->headers->set('Authorization', 'Bearer '.$token);
         }
 
         if (! $token) {
@@ -96,8 +97,8 @@ class AuthenticateSdiUser
         }
 
         // 1. Verificar si es un Personal Access Token de Sanctum local
-        if (class_exists(\Laravel\Sanctum\PersonalAccessToken::class)) {
-            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+        if (class_exists(PersonalAccessToken::class)) {
+            $accessToken = PersonalAccessToken::findToken($token);
             if ($accessToken && $accessToken->tokenable instanceof User) {
                 return $accessToken->tokenable;
             }

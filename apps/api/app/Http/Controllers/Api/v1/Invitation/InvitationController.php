@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\v1\Invitation;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\ProjectMemberService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +42,7 @@ class InvitationController extends Controller
                         'name' => $invitation->inviter->name,
                         'email' => $invitation->inviter->email,
                     ] : null,
-                    'user_exists' => \App\Models\User::where('email', strtolower(trim($invitation->email)))->exists(),
+                    'user_exists' => User::where('email', strtolower(trim($invitation->email)))->exists(),
                     'expires_at' => $invitation->expires_at->toISOString(),
                 ],
             ]);
@@ -58,7 +59,7 @@ class InvitationController extends Controller
     public function onboard(Request $request, string $token): JsonResponse
     {
         $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8'],
         ]);
 
@@ -66,11 +67,11 @@ class InvitationController extends Controller
             $result = $this->memberService->onboardAndAccept($token, $validated);
 
             return response()->json([
-                'message'           => $result['message'],
-                'token'             => $result['token'],
-                'user'              => $result['user'],
+                'message' => $result['message'],
+                'token' => $result['token'],
+                'user' => $result['user'],
                 'current_workspace' => $result['current_workspace'],
-                'data'              => [
+                'data' => [
                     'project' => $result['project'],
                 ],
             ], 201);
@@ -109,4 +110,3 @@ class InvitationController extends Controller
         }
     }
 }
-

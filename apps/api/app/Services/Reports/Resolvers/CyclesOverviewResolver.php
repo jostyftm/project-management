@@ -13,16 +13,16 @@ class CyclesOverviewResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
+        $config = $block->config ?? [];
         $projectIds = $config['project_ids'] ?? [];
-        $status     = $config['status'] ?? 'all';
-        $limit      = min(max((int)($config['limit'] ?? 5), 1), 20);
+        $status = $config['status'] ?? 'all';
+        $limit = min(max((int) ($config['limit'] ?? 5), 1), 20);
 
         $query = Cycle::query();
 
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->where('workspace_id', $scope['workspace_id']);
         }
 
@@ -36,35 +36,35 @@ class CyclesOverviewResolver
                 $q->whereNotNull('completed_at');
             },
         ])
-        ->orderByRaw("CASE 
+            ->orderByRaw("CASE 
             WHEN status = 'CURRENT' THEN 1 
             WHEN status = 'UPCOMING' THEN 2 
             WHEN status = 'COMPLETED' THEN 3 
             ELSE 4 END")
-        ->orderBy('start_date', 'desc')
-        ->limit($limit)
-        ->get();
+            ->orderBy('start_date', 'desc')
+            ->limit($limit)
+            ->get();
 
         $items = $cycles->map(function ($c) {
-            $total = (int)$c->total_items;
-            $completed = (int)$c->completed_items;
+            $total = (int) $c->total_items;
+            $completed = (int) $c->completed_items;
             $progress = $total > 0 ? round(($completed / $total) * 100, 1) : 0;
 
             return [
-                'id'              => (string)$c->id,
-                'name'            => $c->name,
-                'status'          => $c->status,
-                'start_date'      => $c->start_date?->toDateString(),
-                'end_date'        => $c->end_date?->toDateString(),
-                'total_items'     => $total,
+                'id' => (string) $c->id,
+                'name' => $c->name,
+                'status' => $c->status,
+                'start_date' => $c->start_date?->toDateString(),
+                'end_date' => $c->end_date?->toDateString(),
+                'total_items' => $total,
                 'completed_items' => $completed,
-                'progress'        => $progress,
+                'progress' => $progress,
             ];
         });
 
         return [
             'cycles' => $items->values()->toArray(),
-            'total'  => $cycles->count(),
+            'total' => $cycles->count(),
             'status' => $status,
         ];
     }

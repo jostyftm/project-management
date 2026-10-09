@@ -61,7 +61,7 @@ class WorkspaceService
             $counter = 1;
 
             while (Workspace::where('slug', $slug)->exists()) {
-                $slug = $baseSlug . '-' . $counter++;
+                $slug = $baseSlug.'-'.$counter++;
             }
 
             $workspace = Workspace::create([

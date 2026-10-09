@@ -22,12 +22,14 @@ class ViewController extends Controller
     public function index(Request $request, ?Project $project = null): AnonymousResourceCollection
     {
         $views = $this->viewService->list($request, $project);
+
         return ViewResource::collection($views);
     }
 
     public function store(ViewCreateRequest $request, ?Project $project = null): JsonResponse
     {
         $view = $this->viewService->save($request, $project);
+
         return (new ViewResource($view))
             ->response()
             ->setStatusCode(201);
@@ -36,18 +38,21 @@ class ViewController extends Controller
     public function show(Request $request, View $view): ViewResource
     {
         $view = $this->viewService->get($view, $request->user()->id);
+
         return new ViewResource($view);
     }
 
     public function update(ViewUpdateRequest $request, View $view): ViewResource
     {
         $view = $this->viewService->update($request, $view);
+
         return new ViewResource($view);
     }
 
     public function destroy(Request $request, View $view): JsonResponse
     {
         $this->viewService->delete($view, $request->user()->id);
+
         return response()->json(['message' => 'Vista eliminada exitosamente']);
     }
 }

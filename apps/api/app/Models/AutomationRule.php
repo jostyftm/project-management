@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AutomationRule extends Model
 {
-    use HasFactory, BelongsToWorkspace;
+    use BelongsToWorkspace, HasFactory;
 
     protected $fillable = [
         'workspace_id',

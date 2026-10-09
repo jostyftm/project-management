@@ -43,7 +43,7 @@ class SendNotificationEmailJob implements ShouldQueue
             $mailer = $adminService->getInstanceMailer();
             $mailer->to($this->recipientEmail)->send($this->mailable);
         } catch (Throwable $e) {
-            Log::warning("Fallo al enviar correo en cola a {$this->recipientEmail}: " . $e->getMessage());
+            Log::warning("Fallo al enviar correo en cola a {$this->recipientEmail}: ".$e->getMessage());
 
             // En entornos reales permitir reintentos del worker; en testing registrar sin bloquear
             if (! app()->environment('testing')) {

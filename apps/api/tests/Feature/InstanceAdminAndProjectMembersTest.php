@@ -1,21 +1,19 @@
 <?php
 
-use App\Mail\ProjectInvitationMail;
-use App\Mail\ProjectMemberAddedMail;
+use App\Jobs\SendNotificationEmailJob;
 use App\Models\InstanceSetting;
 use App\Models\Milestone;
 use App\Models\Notification;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
-use App\Jobs\SendNotificationEmailJob;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
-
 
 beforeEach(function () {
     $this->superAdmin = User::factory()->create([
@@ -61,7 +59,7 @@ beforeEach(function () {
         'role' => 'ADMIN',
     ]);
 
-    \App\Models\State::create([
+    State::create([
         'workspace_id' => $this->workspace->id,
         'project_id' => $this->project->id,
         'name' => 'Backlog',
@@ -232,7 +230,7 @@ it('allows unregistered user to complete onboarding and auto-accept invitation',
 
     // 2. Ejecutar onboarding con creación de cuenta
     $onboardResp = $this->postJson("/api/v1/invitations/{$token}/onboard", [
-        'name'     => 'Carlos Invitado',
+        'name' => 'Carlos Invitado',
         'password' => 'secretPassword123',
     ]);
 

@@ -41,7 +41,7 @@ class AutomationRuleService
      */
     public function evaluateAndExecute(AutomationRule $rule, ?WorkItem $workItem = null): int
     {
-        if (!$rule->is_active) {
+        if (! $rule->is_active) {
             return 0;
         }
 
@@ -102,7 +102,7 @@ class AutomationRuleService
         }
 
         if (isset($conditions['is_overdue']) && $conditions['is_overdue']) {
-            if (!$item->target_date || $item->target_date->isFuture()) {
+            if (! $item->target_date || $item->target_date->isFuture()) {
                 return false;
             }
         }
@@ -130,7 +130,7 @@ class AutomationRuleService
             $item->assignees()->syncWithoutDetaching([$actions['assign_to_user']]);
         }
 
-        if (!empty($updates)) {
+        if (! empty($updates)) {
             $item->update($updates);
 
             Activity::create([
@@ -145,7 +145,7 @@ class AutomationRuleService
             ]);
         }
 
-        if (!empty($actions['add_labels']) && is_array($actions['add_labels'])) {
+        if (! empty($actions['add_labels']) && is_array($actions['add_labels'])) {
             $item->labels()->syncWithoutDetaching($actions['add_labels']);
         }
     }

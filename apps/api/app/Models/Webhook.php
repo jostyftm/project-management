@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Webhook extends Model
 {
-    use HasFactory, BelongsToWorkspace;
+    use BelongsToWorkspace, HasFactory;
 
     protected $fillable = [
         'workspace_id',

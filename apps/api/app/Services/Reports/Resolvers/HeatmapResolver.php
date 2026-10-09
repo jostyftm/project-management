@@ -15,13 +15,13 @@ class HeatmapResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
+        $config = $block->config ?? [];
         $projectIds = $config['project_ids'] ?? [];
-        $metric     = $config['metric'] ?? 'completed';
-        $weeks      = min(max((int)($config['weeks'] ?? 12), 4), 24);
+        $metric = $config['metric'] ?? 'completed';
+        $weeks = min(max((int) ($config['weeks'] ?? 12), 4), 24);
 
         $daysCount = $weeks * 7;
-        $endDate   = Carbon::now()->endOfDay();
+        $endDate = Carbon::now()->endOfDay();
         $startDate = Carbon::now()->subDays($daysCount - 1)->startOfDay();
 
         $dateField = $metric === 'created' ? 'created_at' : 'completed_at';
@@ -30,9 +30,9 @@ class HeatmapResolver
             ->whereNotNull($dateField)
             ->whereBetween($dateField, [$startDate, $endDate]);
 
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->where('workspace_id', $scope['workspace_id']);
         }
 
@@ -50,16 +50,16 @@ class HeatmapResolver
 
         foreach ($period as $date) {
             $dateString = $date->toDateString();
-            $count = (int)($results[$dateString] ?? 0);
+            $count = (int) ($results[$dateString] ?? 0);
             if ($count > $maxCount) {
                 $maxCount = $count;
             }
             $totalEvents += $count;
 
             $matrix[] = [
-                'date'        => $dateString,
-                'day_of_week' => (int)$date->dayOfWeek, // 0 (Domingo) a 6 (Sábado)
-                'count'       => $count,
+                'date' => $dateString,
+                'day_of_week' => (int) $date->dayOfWeek, // 0 (Domingo) a 6 (Sábado)
+                'count' => $count,
             ];
         }
 
@@ -76,21 +76,21 @@ class HeatmapResolver
                     $pct >= 0.75 => 4,
                     $pct >= 0.50 => 3,
                     $pct >= 0.25 => 2,
-                    default      => 1,
+                    default => 1,
                 };
             }
         }
         unset($item);
 
         return [
-            'matrix'       => $matrix,
+            'matrix' => $matrix,
             'total_events' => $totalEvents,
-            'max_count'    => $maxCount,
-            'metric'       => $metric,
-            'weeks'        => $weeks,
-            'period'       => [
+            'max_count' => $maxCount,
+            'metric' => $metric,
+            'weeks' => $weeks,
+            'period' => [
                 'from' => $startDate->toDateString(),
-                'to'   => $endDate->toDateString(),
+                'to' => $endDate->toDateString(),
             ],
         ];
     }

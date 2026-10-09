@@ -16,20 +16,20 @@ class AreaChartResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
-        $grouping   = $config['grouping'] ?? 'week';
-        $dateFrom   = Carbon::parse($config['date_from'] ?? now()->subDays(60)->toDateString());
-        $dateTo     = Carbon::parse($config['date_to'] ?? now()->toDateString());
+        $config = $block->config ?? [];
+        $grouping = $config['grouping'] ?? 'week';
+        $dateFrom = Carbon::parse($config['date_from'] ?? now()->subDays(60)->toDateString());
+        $dateTo = Carbon::parse($config['date_to'] ?? now()->toDateString());
         $projectIds = $config['project_ids'] ?? [];
 
         $query = WorkItem::query();
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
         }
 
-        $createdExpr   = $this->getDateFormatExpression('created_at', $grouping);
+        $createdExpr = $this->getDateFormatExpression('created_at', $grouping);
         $completedExpr = $this->getDateFormatExpression('completed_at', $grouping);
 
         $createdResults = (clone $query)
@@ -47,8 +47,8 @@ class AreaChartResolver
             ->toArray();
 
         $interval = match ($grouping) {
-            'day'   => '1 day',
-            'week'  => '1 week',
+            'day' => '1 day',
+            'week' => '1 week',
             'month' => '1 month',
             default => '1 day',
         };
@@ -60,18 +60,18 @@ class AreaChartResolver
             $key = $this->formatPeriodKey($date, $grouping);
 
             $data[] = [
-                'date'      => $key,
-                'created'   => (int)($createdResults[$key] ?? 0),
-                'completed' => (int)($completedResults[$key] ?? 0),
+                'date' => $key,
+                'created' => (int) ($createdResults[$key] ?? 0),
+                'completed' => (int) ($completedResults[$key] ?? 0),
             ];
         }
 
         return [
-            'series'   => $data,
+            'series' => $data,
             'grouping' => $grouping,
-            'period'   => [
+            'period' => [
                 'from' => $dateFrom->toDateString(),
-                'to'   => $dateTo->toDateString(),
+                'to' => $dateTo->toDateString(),
             ],
         ];
     }
@@ -82,16 +82,16 @@ class AreaChartResolver
 
         if ($isSqlite) {
             return match ($grouping) {
-                'day'   => "strftime('%Y-%m-%d', {$column})",
-                'week'  => "strftime('%Y-%W', {$column})",
+                'day' => "strftime('%Y-%m-%d', {$column})",
+                'week' => "strftime('%Y-%W', {$column})",
                 'month' => "strftime('%Y-%m', {$column})",
                 default => "strftime('%Y-%m-%d', {$column})",
             };
         }
 
         return match ($grouping) {
-            'day'   => "TO_CHAR({$column}, 'YYYY-MM-DD')",
-            'week'  => "TO_CHAR({$column}, 'IYYY-IW')",
+            'day' => "TO_CHAR({$column}, 'YYYY-MM-DD')",
+            'week' => "TO_CHAR({$column}, 'IYYY-IW')",
             'month' => "TO_CHAR({$column}, 'YYYY-MM')",
             default => "TO_CHAR({$column}, 'YYYY-MM-DD')",
         };
@@ -102,12 +102,12 @@ class AreaChartResolver
         $isSqlite = DB::getDriverName() === 'sqlite';
 
         if ($isSqlite && $grouping === 'week') {
-            return $date->format('Y-') . str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT);
+            return $date->format('Y-').str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT);
         }
 
         return match ($grouping) {
-            'day'   => $date->format('Y-m-d'),
-            'week'  => $date->format('o-') . str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT),
+            'day' => $date->format('Y-m-d'),
+            'week' => $date->format('o-').str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT),
             'month' => $date->format('Y-m'),
             default => $date->format('Y-m-d'),
         };

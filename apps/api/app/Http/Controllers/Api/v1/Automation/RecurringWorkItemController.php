@@ -18,6 +18,7 @@ class RecurringWorkItemController extends Controller
     public function index(Project $project): JsonResponse
     {
         $items = $this->recurringService->listByProject($project->id);
+
         return response()->json($items);
     }
 

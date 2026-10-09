@@ -43,13 +43,13 @@ class ProjectMemberAddedMail extends Mailable
         return new Content(
             view: 'emails.project_member_added',
             with: [
-                'projectName'   => $this->project->name,
+                'projectName' => $this->project->name,
                 'projectIdentifier' => $this->project->identifier,
                 'workspaceName' => $this->project->workspace?->name ?? 'Plane Workspace',
-                'userName'      => $this->member->name,
-                'inviterName'   => $this->inviter->name,
-                'role'          => $this->role,
-                'projectUrl'    => $this->projectUrl,
+                'userName' => $this->member->name,
+                'inviterName' => $this->inviter->name,
+                'role' => $this->role,
+                'projectUrl' => $this->projectUrl,
             ],
         );
     }

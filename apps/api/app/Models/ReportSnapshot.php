@@ -21,7 +21,7 @@ class ReportSnapshot extends Model
 
     protected $casts = [
         'blocks_snapshot' => 'array',
-        'theme_snapshot'  => 'array',
+        'theme_snapshot' => 'array',
     ];
 
     public function report(): BelongsTo

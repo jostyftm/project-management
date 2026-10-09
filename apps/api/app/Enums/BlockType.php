@@ -33,7 +33,7 @@ enum BlockType: string
     /** Retorna la etiqueta legible del tipo */
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::KPI_ROW => 'Fila de KPIs',
             self::PROJECT_SUMMARY => 'Resumen de Proyecto',
             self::NARRATIVE => 'Texto Enriquecido',

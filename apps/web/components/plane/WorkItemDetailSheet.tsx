@@ -160,10 +160,13 @@ export function WorkItemDetailSheet({
       if (isDirtyRef.current && loadedItemIdRef.current) {
         const descHtml = latestDescriptionRef.current;
         const trimmed = descHtml.trim();
-        const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
+        const isEmpty = !trimmed || trimmed === "<p></p>" || trimmed === "<p><br></p>" || trimmed === "<br>";
+        const cleanHtml = !isEmpty ? descHtml : null;
         workItemService
           .update(loadedItemIdRef.current, {
-            description_json: !isEmpty ? { html: descHtml, text: extractPlainText(descHtml) } : null,
+            description_html: cleanHtml,
+            description: cleanHtml,
+            description_json: cleanHtml ? { html: cleanHtml, text: extractPlainText(cleanHtml) } : null,
           })
           .catch(() => {});
       }
@@ -176,10 +179,13 @@ export function WorkItemDetailSheet({
       if (isDirtyRef.current && loadedItemIdRef.current) {
         const descHtml = latestDescriptionRef.current;
         const trimmed = descHtml.trim();
-        const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
+        const isEmpty = !trimmed || trimmed === "<p></p>" || trimmed === "<p><br></p>" || trimmed === "<br>";
+        const cleanHtml = !isEmpty ? descHtml : null;
         workItemService
           .update(loadedItemIdRef.current, {
-            description_json: !isEmpty ? { html: descHtml, text: extractPlainText(descHtml) } : null,
+            description_html: cleanHtml,
+            description: cleanHtml,
+            description_json: cleanHtml ? { html: cleanHtml, text: extractPlainText(cleanHtml) } : null,
           })
           .catch(() => {});
         isDirtyRef.current = false;
@@ -230,7 +236,7 @@ export function WorkItemDetailSheet({
         setTitle(itemData.title);
 
         // Normalize description into HTML for RichTextEditor
-        const initialHtml = formatDescriptionToHtml(itemData.description_json);
+        const initialHtml = itemData.description_html || formatDescriptionToHtml(itemData.description_json);
         setDescription(initialHtml);
         latestDescriptionRef.current = initialHtml;
         isDirtyRef.current = false;
@@ -318,15 +324,20 @@ export function WorkItemDetailSheet({
     try {
       setSaveStatus("saving");
       const trimmed = descHtml.trim();
-      const isEmpty = !trimmed || trimmed === "<p><br></p>" || trimmed === "<br>";
-      const payloadJson = !isEmpty
+      const isEmpty = !trimmed || trimmed === "<p></p>" || trimmed === "<p><br></p>" || trimmed === "<br>";
+      const cleanHtml = !isEmpty ? descHtml : null;
+      const payloadJson = cleanHtml
         ? {
-            html: descHtml,
-            text: extractPlainText(descHtml),
+            html: cleanHtml,
+            text: extractPlainText(cleanHtml),
           }
         : null;
 
-      const updated = await workItemService.update(item.id, { description_json: payloadJson });
+      const updated = await workItemService.update(item.id, {
+        description_html: cleanHtml,
+        description: cleanHtml,
+        description_json: payloadJson,
+      });
       setItem((prev) => ({
         ...prev,
         ...updated,

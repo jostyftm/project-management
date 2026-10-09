@@ -233,4 +233,3 @@ it('prohibits project deletion for non-admin members', function () {
     // Asegurar que el proyecto sigue existiendo
     $this->assertDatabaseHas('projects', ['id' => $project->id]);
 });
-

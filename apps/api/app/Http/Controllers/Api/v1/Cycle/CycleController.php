@@ -24,12 +24,14 @@ class CycleController extends Controller
     public function index(Request $request, Project $project): AnonymousResourceCollection
     {
         $cycles = $this->cycleService->list($request, $project);
+
         return CycleResource::collection($cycles);
     }
 
     public function store(CycleCreateRequest $request, Project $project): JsonResponse
     {
         $cycle = $this->cycleService->save($request, $project);
+
         return (new CycleResource($cycle))
             ->response()
             ->setStatusCode(201);
@@ -38,12 +40,14 @@ class CycleController extends Controller
     public function show(Cycle $cycle): CycleResource
     {
         $cycle = $this->cycleService->get($cycle);
+
         return new CycleResource($cycle);
     }
 
     public function update(CycleUpdateRequest $request, Cycle $cycle): CycleResource
     {
         $cycle = $this->cycleService->update($request, $cycle);
+
         return new CycleResource($cycle);
     }
 
@@ -64,6 +68,7 @@ class CycleController extends Controller
     public function analytics(Cycle $cycle): JsonResponse
     {
         $analytics = $this->cycleService->getAnalytics($cycle);
+
         return response()->json([
             'data' => $analytics,
         ]);

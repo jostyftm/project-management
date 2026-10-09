@@ -21,12 +21,14 @@ class MilestoneController extends Controller
     public function index(Project $project): AnonymousResourceCollection
     {
         $milestones = $this->milestoneService->list($project->id);
+
         return MilestoneResource::collection($milestones);
     }
 
     public function store(MilestoneCreateRequest $request, Project $project): JsonResponse
     {
         $milestone = $this->milestoneService->create($project->id, $request->validated());
+
         return (new MilestoneResource($milestone))
             ->response()
             ->setStatusCode(201);
@@ -40,18 +42,21 @@ class MilestoneController extends Controller
     public function update(Request $request, Milestone $milestone): MilestoneResource
     {
         $updated = $this->milestoneService->update($milestone, $request->all());
+
         return new MilestoneResource($updated);
     }
 
     public function toggleComplete(Milestone $milestone): MilestoneResource
     {
         $updated = $this->milestoneService->toggleComplete($milestone);
+
         return new MilestoneResource($updated);
     }
 
     public function destroy(Milestone $milestone): JsonResponse
     {
         $this->milestoneService->delete($milestone);
+
         return response()->json(['message' => 'Hito eliminado exitosamente']);
     }
 }

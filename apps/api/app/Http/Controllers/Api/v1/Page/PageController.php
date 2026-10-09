@@ -23,12 +23,14 @@ class PageController extends Controller
     public function index(Request $request, ?Project $project = null): AnonymousResourceCollection
     {
         $pages = $this->pageService->list($request, $project?->id);
+
         return PageResource::collection($pages);
     }
 
     public function tree(Request $request, ?Project $project = null): AnonymousResourceCollection
     {
         $tree = $this->pageService->getTree($project?->id);
+
         return PageTreeResource::collection($tree);
     }
 
@@ -40,6 +42,7 @@ class PageController extends Controller
         }
 
         $page = $this->pageService->create($data);
+
         return (new PageResource($page))
             ->response()
             ->setStatusCode(201);
@@ -48,18 +51,21 @@ class PageController extends Controller
     public function show(Request $request, Page $page): PageResource
     {
         $loaded = $this->pageService->get($page);
+
         return new PageResource($loaded);
     }
 
     public function update(PageUpdateRequest $request, Page $page): PageResource
     {
         $updated = $this->pageService->update($page, $request->validated());
+
         return new PageResource($updated);
     }
 
     public function destroy(Request $request, Page $page): JsonResponse
     {
         $this->pageService->delete($page, $request->user());
+
         return response()->json(['message' => 'Página eliminada exitosamente']);
     }
 
@@ -70,6 +76,7 @@ class PageController extends Controller
         ]);
 
         $page = $this->pageService->generateReport((int) $request->input('project_id'));
+
         return (new PageResource($page))
             ->response()
             ->setStatusCode(201);

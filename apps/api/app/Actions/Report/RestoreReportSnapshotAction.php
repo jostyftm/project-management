@@ -16,7 +16,7 @@ class RestoreReportSnapshotAction
     {
         return DB::transaction(function () use ($report, $snapshot) {
             // Restaurar tema si existe en el snapshot
-            if (!empty($snapshot->theme_snapshot)) {
+            if (! empty($snapshot->theme_snapshot)) {
                 $report->theme = $snapshot->theme_snapshot;
                 $report->save();
             }
@@ -28,15 +28,15 @@ class RestoreReportSnapshotAction
             $blocks = $snapshot->blocks_snapshot ?? [];
             foreach ($blocks as $idx => $b) {
                 ReportBlock::create([
-                    'report_id'   => $report->id,
-                    'type'        => $b['type'],
-                    'title'       => $b['title'] ?? null,
-                    'position'    => $b['position'] ?? $idx,
-                    'width'       => $b['width'] ?? 12,
-                    'config'      => $b['config'] ?? [],
-                    'is_visible'  => $b['is_visible'] ?? true,
-                    'data_cache'  => $b['data'] ?? null,
-                    'cached_at'   => now(),
+                    'report_id' => $report->id,
+                    'type' => $b['type'],
+                    'title' => $b['title'] ?? null,
+                    'position' => $b['position'] ?? $idx,
+                    'width' => $b['width'] ?? 12,
+                    'config' => $b['config'] ?? [],
+                    'is_visible' => $b['is_visible'] ?? true,
+                    'data_cache' => $b['data'] ?? null,
+                    'cached_at' => now(),
                 ]);
             }
 

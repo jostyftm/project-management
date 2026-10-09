@@ -15,12 +15,12 @@ class CreateReportAction
     {
         return DB::transaction(function () use ($workspaceId, $ownerId, $data) {
             return WorkspaceReport::create([
-                'workspace_id'  => $workspaceId,
-                'owner_id'      => $ownerId,
-                'title'         => $data['title'],
-                'description'   => $data['description'] ?? null,
-                'visibility'    => $data['visibility'] ?? ReportVisibility::DRAFT->value,
-                'theme'         => $data['theme'] ?? $this->defaultTheme(),
+                'workspace_id' => $workspaceId,
+                'owner_id' => $ownerId,
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'visibility' => $data['visibility'] ?? ReportVisibility::DRAFT->value,
+                'theme' => $data['theme'] ?? $this->defaultTheme(),
                 'layout_config' => $data['layout_config'] ?? [],
             ]);
         });
@@ -30,14 +30,14 @@ class CreateReportAction
     private function defaultTheme(): array
     {
         return [
-            'primaryColor'    => '#6366f1',
-            'accentColor'     => '#8b5cf6',
+            'primaryColor' => '#6366f1',
+            'accentColor' => '#8b5cf6',
             'backgroundColor' => '#ffffff',
-            'surfaceColor'    => '#f8fafc',
-            'textColor'       => '#0f172a',
-            'fontFamily'      => 'Inter, sans-serif',
-            'borderRadius'    => '8px',
-            'shadow'          => 'sm',
+            'surfaceColor' => '#f8fafc',
+            'textColor' => '#0f172a',
+            'fontFamily' => 'Inter, sans-serif',
+            'borderRadius' => '8px',
+            'shadow' => 'sm',
         ];
     }
 }

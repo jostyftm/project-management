@@ -28,7 +28,7 @@ class WorkspaceUpdateRequest extends FormRequest
              *
              * @example acquis-engineering-labs
              */
-            'slug' => ['sometimes', 'string', 'max:100', 'unique:workspaces,slug,' . $workspaceId],
+            'slug' => ['sometimes', 'string', 'max:100', 'unique:workspaces,slug,'.$workspaceId],
 
             /**
              * URL del logo

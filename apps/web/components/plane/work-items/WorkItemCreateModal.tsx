@@ -321,18 +321,22 @@ export function WorkItemCreateModal({
       const trimmedDesc = description.trim();
       const isEmptyDesc =
         !trimmedDesc ||
+        trimmedDesc === "<p></p>" ||
         trimmedDesc === "<p><br></p>" ||
         trimmedDesc === "<br>";
 
-      const descriptionJson = !isEmptyDesc
+      const cleanHtml = !isEmptyDesc ? description : null;
+      const descriptionJson = cleanHtml
         ? {
-            html: description,
-            text: extractPlainText(description),
+            html: cleanHtml,
+            text: extractPlainText(cleanHtml),
           }
         : null;
 
       const payload: any = {
         title: title.trim(),
+        description_html: cleanHtml,
+        description: cleanHtml,
         description_json: descriptionJson,
         priority: selectedPriority,
         state_id: selectedStateId || undefined,

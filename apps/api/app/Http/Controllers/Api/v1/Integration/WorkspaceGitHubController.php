@@ -8,7 +8,6 @@ use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class WorkspaceGitHubController extends Controller
@@ -26,7 +25,7 @@ class WorkspaceGitHubController extends Controller
             ->whereNull('project_id')
             ->first();
 
-        if (!$integration || !$integration->is_active) {
+        if (! $integration || ! $integration->is_active) {
             return response()->json([
                 'connected' => false,
                 'org_name' => null,
@@ -81,7 +80,7 @@ class WorkspaceGitHubController extends Controller
             ]);
         }
 
-        if (!$userResponse->successful()) {
+        if (! $userResponse->successful()) {
             $msg = $userResponse->json('message') ?? 'Error al comunicarse con la API de GitHub.';
             throw ValidationException::withMessages([
                 'access_token' => ["GitHub API error: {$msg}"],
@@ -137,13 +136,13 @@ class WorkspaceGitHubController extends Controller
             'avatar_url' => 'nullable|string|url|max:255',
         ]);
 
-        $accessToken = !empty($validated['access_token']) ? trim($validated['access_token']) : null;
+        $accessToken = ! empty($validated['access_token']) ? trim($validated['access_token']) : null;
         $authMethod = $validated['auth_method'] ?? 'token';
         $installationId = $validated['installation_id'] ?? null;
         $appId = $validated['app_id'] ?? null;
 
         // Si se provee token y no se indica org_name, intentar autodetectar usuario autenticado
-        $orgName = !empty($validated['org_name']) ? trim($validated['org_name']) : null;
+        $orgName = ! empty($validated['org_name']) ? trim($validated['org_name']) : null;
         $accountType = $validated['account_type'] ?? 'Organization';
         $detectedAvatar = null;
 
@@ -303,18 +302,19 @@ class WorkspaceGitHubController extends Controller
             'Accept' => 'application/vnd.github.v3+json',
         ];
 
-        if (!empty($token)) {
+        if (! empty($token)) {
             $headers['Authorization'] = "Bearer {$token}";
         }
 
         // 1. Caso Dokploy / GitHub App: Consulta /installation/repositories
-        if ($authMethod === 'app' && !empty($token)) {
+        if ($authMethod === 'app' && ! empty($token)) {
             $response = Http::withHeaders($headers)
                 ->timeout(10)
                 ->get('https://api.github.com/installation/repositories?per_page=100');
 
             if ($response->successful()) {
                 $repos = $response->json('repositories') ?? [];
+
                 return $this->formatRepositories($repos);
             }
 
@@ -326,7 +326,7 @@ class WorkspaceGitHubController extends Controller
         }
 
         // 2. Caso Personal Access Token (PAT)
-        if (!empty($token)) {
+        if (! empty($token)) {
             // Si el accountType es 'All' o la orgName coincide con el usuario autenticado:
             if ($accountType === 'All') {
                 $response = Http::withHeaders($headers)
@@ -342,11 +342,11 @@ class WorkspaceGitHubController extends Controller
             $endpoints = [];
             if ($accountType === 'User') {
                 $endpoints[] = "https://api.github.com/users/{$orgName}/repos?per_page=100&type=all&sort=updated";
-                $endpoints[] = "https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated";
+                $endpoints[] = 'https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated';
             } else {
                 $endpoints[] = "https://api.github.com/orgs/{$orgName}/repos?per_page=100&type=all&sort=updated";
                 $endpoints[] = "https://api.github.com/users/{$orgName}/repos?per_page=100&type=all&sort=updated";
-                $endpoints[] = "https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated";
+                $endpoints[] = 'https://api.github.com/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=updated';
             }
 
             foreach ($endpoints as $url) {
@@ -354,7 +354,7 @@ class WorkspaceGitHubController extends Controller
 
                 if ($response->successful() && is_array($response->json())) {
                     $raw = $response->json();
-                    if (!empty($raw)) {
+                    if (! empty($raw)) {
                         return $this->formatRepositories($raw);
                     }
                 } elseif ($response->status() === 401) {
@@ -406,7 +406,7 @@ class WorkspaceGitHubController extends Controller
     protected function formatRepositories(array $rawRepos): array
     {
         return collect($rawRepos)
-            ->filter(fn($r) => is_array($r) && !empty($r['name']))
+            ->filter(fn ($r) => is_array($r) && ! empty($r['name']))
             ->map(function ($r) {
                 return [
                     'id' => (int) ($r['id'] ?? 0),

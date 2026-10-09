@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use Exception;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -142,10 +143,8 @@ class InstanceAdminService
      * Construye un mailer SMTP dinámico usando la configuración guardada en la BD.
      * Esto asegura que el correo siempre use el servidor SMTP configurado por el admin,
      * independientemente del valor de MAIL_MAILER en el .env.
-     *
-     * @return \Illuminate\Contracts\Mail\Mailer
      */
-    private function getSmtpMailer(): \Illuminate\Contracts\Mail\Mailer
+    private function getSmtpMailer(): Mailer
     {
         $settings = $this->getSettings();
 
@@ -156,16 +155,16 @@ class InstanceAdminService
         // Registrar un mailer temporal con la config de la instancia
         config([
             'mail.mailers.smtp_instance' => [
-                'transport'  => 'smtp',
-                'host'       => $settings->smtp_host ?: '127.0.0.1',
-                'port'       => $settings->smtp_port ?: 587,
-                'username'   => $settings->smtp_username ?: null,
-                'password'   => $settings->smtp_password ?: null,
+                'transport' => 'smtp',
+                'host' => $settings->smtp_host ?: '127.0.0.1',
+                'port' => $settings->smtp_port ?: 587,
+                'username' => $settings->smtp_username ?: null,
+                'password' => $settings->smtp_password ?: null,
                 'encryption' => $encryption,
-                'timeout'    => 10,
+                'timeout' => 10,
             ],
             'mail.from.address' => $settings->smtp_from_email ?: config('mail.from.address'),
-            'mail.from.name'    => $settings->smtp_from_name ?: config('mail.from.name'),
+            'mail.from.name' => $settings->smtp_from_name ?: config('mail.from.name'),
         ]);
 
         return Mail::mailer('smtp_instance');
@@ -203,10 +202,8 @@ class InstanceAdminService
     /**
      * Retorna el mailer configurado en la instancia para uso externo (invitaciones, etc.).
      * Expuesto como público para que otros servicios puedan usarlo.
-     *
-     * @return \Illuminate\Contracts\Mail\Mailer
      */
-    public function getInstanceMailer(): \Illuminate\Contracts\Mail\Mailer
+    public function getInstanceMailer(): Mailer
     {
         return $this->getSmtpMailer();
     }

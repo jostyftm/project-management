@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Page;
 use App\Models\PageView;
 use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\User;
 use App\Models\WorkItem;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
@@ -90,9 +92,9 @@ class PageService
         $user = auth()->user();
 
         // If page is locked and content update is attempted without unlocking
-        if ($page->is_locked && !($data['is_locked'] ?? true)) {
+        if ($page->is_locked && ! ($data['is_locked'] ?? true)) {
             // Unlocking is permitted
-        } elseif ($page->is_locked && isset($data['content_json']) && !isset($data['is_locked'])) {
+        } elseif ($page->is_locked && isset($data['content_json']) && ! isset($data['is_locked'])) {
             abort(423, 'La página está bloqueada para edición.');
         }
 
@@ -103,7 +105,7 @@ class PageService
         return $page->load(['children', 'creator', 'lastEditor', 'project']);
     }
 
-    public function delete(Page $page, ?\App\Models\User $user = null): void
+    public function delete(Page $page, ?User $user = null): void
     {
         $user = $user ?? auth()->user();
 
@@ -114,7 +116,7 @@ class PageService
             if (! $isInstanceAdmin && ! $isWorkspaceOwner) {
                 $isProjectAdmin = false;
                 if ($page->project_id) {
-                    $isProjectAdmin = \App\Models\ProjectMember::where('project_id', $page->project_id)
+                    $isProjectAdmin = ProjectMember::where('project_id', $page->project_id)
                         ->where('user_id', $user->id)
                         ->where('role', 'ADMIN')
                         ->exists();

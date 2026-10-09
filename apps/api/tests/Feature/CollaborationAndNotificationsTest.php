@@ -5,13 +5,15 @@ use App\Mail\CycleCompletedMail;
 use App\Mail\UserMentionedMail;
 use App\Mail\WorkItemAssignedMail;
 use App\Mail\WorkItemStatusChangedMail;
+use App\Models\Cycle;
 use App\Models\Page;
 use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\State;
 use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WorkItem;
 use App\Models\Workspace;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
@@ -35,7 +37,7 @@ beforeEach(function () {
         'created_by' => $this->user->id,
     ]);
 
-    $this->state = \App\Models\State::create([
+    $this->state = State::create([
         'workspace_id' => $this->workspace->id,
         'project_id' => $this->project->id,
         'name' => 'To Do',
@@ -333,7 +335,7 @@ test('it enqueues SendNotificationEmailJob when work item status changes', funct
     $token = $this->user->createToken('admin-token')->plainTextToken;
 
     // Crear un segundo estado
-    $doneState = \App\Models\State::create([
+    $doneState = State::create([
         'workspace_id' => $this->workspace->id,
         'project_id' => $this->project->id,
         'name' => 'Done',
@@ -392,7 +394,7 @@ test('it enqueues SendNotificationEmailJob when cycle is completed', function ()
     $token = $this->user->createToken('admin-token')->plainTextToken;
 
     // Crear ciclo
-    $cycle = \App\Models\Cycle::create([
+    $cycle = Cycle::create([
         'workspace_id' => $this->workspace->id,
         'project_id' => $this->project->id,
         'name' => 'Sprint 1',
@@ -403,7 +405,7 @@ test('it enqueues SendNotificationEmailJob when cycle is completed', function ()
     ]);
 
     // Añadir miembro al proyecto
-    \App\Models\ProjectMember::create([
+    ProjectMember::create([
         'project_id' => $this->project->id,
         'user_id' => $this->otherUser->id,
         'role' => 'MEMBER',
@@ -427,5 +429,3 @@ test('it enqueues SendNotificationEmailJob when cycle is completed', function ()
         'type' => 'CYCLE_COMPLETED',
     ]);
 });
-
-

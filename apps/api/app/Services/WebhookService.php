@@ -54,7 +54,7 @@ class WebhookService
                         'data' => $payload,
                     ]);
                 } catch (\Throwable $e) {
-                    Log::warning("Failed to dispatch webhook {$webhook->id} for event {$event}: " . $e->getMessage());
+                    Log::warning("Failed to dispatch webhook {$webhook->id} for event {$event}: ".$e->getMessage());
                 }
             }
         }
@@ -96,7 +96,7 @@ class WebhookService
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'message' => 'Fallo de conexión: ' . $e->getMessage(),
+                'message' => 'Fallo de conexión: '.$e->getMessage(),
                 'latency_ms' => 0,
                 'status_code' => 500,
             ];

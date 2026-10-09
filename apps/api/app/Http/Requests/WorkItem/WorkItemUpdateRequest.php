@@ -22,7 +22,17 @@ class WorkItemUpdateRequest extends FormRequest
             'title' => ['sometimes', 'string', 'max:255'],
 
             /**
-             * Descripción en formato JSON o texto
+             * Descripción en formato HTML puro
+             */
+            'description_html' => ['nullable', 'string'],
+
+            /**
+             * Alias de descripción (HTML o texto)
+             */
+            'description' => ['nullable', 'string'],
+
+            /**
+             * Descripción en formato JSON o texto (legacy)
              */
             'description_json' => ['nullable'],
 

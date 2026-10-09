@@ -14,23 +14,23 @@ class KpiRowResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
+        $config = $block->config ?? [];
         $projectIds = $config['project_ids'] ?? [];
-        $dateFrom   = Carbon::parse($config['date_from'] ?? now()->subDays(30)->toDateString());
-        $dateTo     = Carbon::parse($config['date_to'] ?? now()->toDateString());
-        $metrics    = $config['metrics'] ?? ['total', 'completed', 'in_progress', 'overdue'];
+        $dateFrom = Carbon::parse($config['date_from'] ?? now()->subDays(30)->toDateString());
+        $dateTo = Carbon::parse($config['date_to'] ?? now()->toDateString());
+        $metrics = $config['metrics'] ?? ['total', 'completed', 'in_progress', 'overdue'];
 
         // Período anterior para calcular deltas
-        $periodDays   = $dateFrom->diffInDays($dateTo);
+        $periodDays = $dateFrom->diffInDays($dateTo);
         $prevDateFrom = $dateFrom->copy()->subDays($periodDays);
-        $prevDateTo   = $dateFrom->copy()->subDay();
+        $prevDateTo = $dateFrom->copy()->subDay();
 
         $query = WorkItem::query();
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
         } else {
             // Si no hay proyectos específicos, usar el workspace completo
-            if (!empty($scope['workspace_id'])) {
+            if (! empty($scope['workspace_id'])) {
                 $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
             }
         }
@@ -38,13 +38,13 @@ class KpiRowResolver
         $kpis = [];
 
         if (in_array('total', $metrics)) {
-            $current  = (clone $query)->whereBetween('created_at', [$dateFrom, $dateTo])->count();
+            $current = (clone $query)->whereBetween('created_at', [$dateFrom, $dateTo])->count();
             $previous = (clone $query)->whereBetween('created_at', [$prevDateFrom, $prevDateTo])->count();
             $kpis[] = $this->buildKpi('total', 'Total Work Items', $current, $previous, '📋');
         }
 
         if (in_array('completed', $metrics)) {
-            $current  = (clone $query)->whereBetween('completed_at', [$dateFrom, $dateTo])->count();
+            $current = (clone $query)->whereBetween('completed_at', [$dateFrom, $dateTo])->count();
             $previous = (clone $query)->whereBetween('completed_at', [$prevDateFrom, $prevDateTo])->count();
             $kpis[] = $this->buildKpi('completed', 'Completadas', $current, $previous, '✅');
         }
@@ -75,11 +75,11 @@ class KpiRowResolver
         }
 
         return [
-            'kpis'      => $kpis,
+            'kpis' => $kpis,
             'sparkline' => $sparkline,
-            'period'    => [
+            'period' => [
                 'from' => $dateFrom->toDateString(),
-                'to'   => $dateTo->toDateString(),
+                'to' => $dateTo->toDateString(),
             ],
         ];
     }
@@ -95,14 +95,14 @@ class KpiRowResolver
         }
 
         return [
-            'key'           => $key,
-            'label'         => $label,
-            'value'         => $current,
-            'previous'      => $previous,
-            'delta'         => $delta,
+            'key' => $key,
+            'label' => $label,
+            'value' => $current,
+            'previous' => $previous,
+            'delta' => $delta,
             'delta_percent' => $deltaPercent,
-            'icon'          => $icon,
-            'variant'       => $variant,
+            'icon' => $icon,
+            'variant' => $variant,
         ];
     }
 }

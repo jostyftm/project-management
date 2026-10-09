@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Models\Workspace;
 
 it('registers a new user and automatically creates their default workspace', function () {
     $payload = [

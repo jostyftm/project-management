@@ -34,7 +34,7 @@ class TeamspaceService
             'created_by' => $user?->id,
         ]);
 
-        if (!empty($data['project_ids'])) {
+        if (! empty($data['project_ids'])) {
             $teamspace->projects()->sync($data['project_ids']);
         }
 
@@ -43,7 +43,7 @@ class TeamspaceService
 
     public function update(Teamspace $teamspace, array $data): Teamspace
     {
-        if (isset($data['name']) && !isset($data['slug'])) {
+        if (isset($data['name']) && ! isset($data['slug'])) {
             $data['slug'] = Str::slug($data['name']);
         }
 

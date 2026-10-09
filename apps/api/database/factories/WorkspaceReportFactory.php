@@ -15,22 +15,23 @@ class WorkspaceReportFactory extends Factory
     public function definition(): array
     {
         return [
-            'workspace_id'  => function () {
+            'workspace_id' => function () {
                 $user = User::factory()->create();
+
                 return Workspace::create([
-                    'name'     => 'Test Workspace',
-                    'slug'     => 'test-ws-' . uniqid(),
+                    'name' => 'Test Workspace',
+                    'slug' => 'test-ws-'.uniqid(),
                     'owner_id' => $user->id,
                 ])->id;
             },
-            'owner_id'      => User::factory(),
-            'title'         => $this->faker->sentence(3),
-            'description'   => $this->faker->paragraph(),
-            'visibility'    => ReportVisibility::WORKSPACE->value,
-            'theme'         => [],
+            'owner_id' => User::factory(),
+            'title' => $this->faker->sentence(3),
+            'description' => $this->faker->paragraph(),
+            'visibility' => ReportVisibility::WORKSPACE->value,
+            'theme' => [],
             'layout_config' => ['columns' => 12],
-            'public_token'  => null,
-            'published_at'  => null,
+            'public_token' => null,
+            'published_at' => null,
         ];
     }
 }

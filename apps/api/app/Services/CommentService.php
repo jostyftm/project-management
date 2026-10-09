@@ -36,7 +36,7 @@ class CommentService
 
             // If string contains @mention, also lookup user by username or email
             preg_match_all('/@([a-zA-Z0-9_.-]+)/', $content, $matches);
-            if (!empty($matches[1])) {
+            if (! empty($matches[1])) {
                 $matchedHandles = $matches[1];
                 $foundUsers = User::query()
                     ->where(function ($q) use ($matchedHandles) {
@@ -51,7 +51,7 @@ class CommentService
             }
 
             // Remove author from mentioned list to avoid self-notification
-            $mentionedUserIds = array_values(array_filter($mentionedUserIds, fn($id) => (string) $id !== (string) $author->id));
+            $mentionedUserIds = array_values(array_filter($mentionedUserIds, fn ($id) => (string) $id !== (string) $author->id));
 
             $workItem = null;
             if ($workItemId) {
@@ -93,13 +93,13 @@ class CommentService
 
                 $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                 $targetUrl = "/projects/{$projectId}?item={$workItem->id}";
-                $fullWorkItemUrl = $frontendUrl . $targetUrl;
+                $fullWorkItemUrl = $frontendUrl.$targetUrl;
 
                 // 2. Notify assignee or creator if not the author
                 $candidateRecipients = array_filter([
                     $workItem->created_by,
                     $workItem->lead_id,
-                ], fn($id) => $id && (string) $id !== (string) $author->id && !in_array($id, $mentionedUserIds));
+                ], fn ($id) => $id && (string) $id !== (string) $author->id && ! in_array($id, $mentionedUserIds));
 
                 foreach (array_unique($candidateRecipients) as $recipientId) {
                     $commentMailable = new WorkItemCommentMail(
@@ -116,7 +116,7 @@ class CommentService
                         'WORK_ITEM',
                         $workItem->id,
                         "Nuevo comentario en [{$workItem->identifier}] {$workItem->title}",
-                        "{$author->name} comentó: \"" . Str::limit($content, 80) . "\"",
+                        "{$author->name} comentó: \"".Str::limit($content, 80).'"',
                         $targetUrl,
                         $commentMailable
                     );
@@ -141,7 +141,7 @@ class CommentService
                         'WORK_ITEM',
                         $workItem->id,
                         "Te mencionaron en [{$workItem->identifier}] {$workItem->title}",
-                        "{$author->name} te mencionó en una discusión: \"" . Str::limit($content, 80) . "\"",
+                        "{$author->name} te mencionó en una discusión: \"".Str::limit($content, 80).'"',
                         $targetUrl,
                         $mentionMailable
                     );
@@ -152,9 +152,9 @@ class CommentService
             if ($page) {
                 $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                 $targetUrl = "/pages/{$page->id}";
-                $fullPageUrl = $frontendUrl . $targetUrl;
+                $fullPageUrl = $frontendUrl.$targetUrl;
 
-                if ($page->created_by && (string) $page->created_by !== (string) $author->id && !in_array($page->created_by, $mentionedUserIds)) {
+                if ($page->created_by && (string) $page->created_by !== (string) $author->id && ! in_array($page->created_by, $mentionedUserIds)) {
                     $this->notificationService->sendNotification(
                         $workspaceId,
                         $page->created_by,
@@ -163,7 +163,7 @@ class CommentService
                         'PAGE',
                         $page->id,
                         "Nuevo comentario en la página \"{$page->title}\"",
-                        "{$author->name} comentó en tu página: \"" . Str::limit($content, 80) . "\"",
+                        "{$author->name} comentó en tu página: \"".Str::limit($content, 80).'"',
                         $targetUrl
                     );
                 }
@@ -187,7 +187,7 @@ class CommentService
                         'PAGE',
                         $page->id,
                         "Te mencionaron en la página \"{$page->title}\"",
-                        "{$author->name} te mencionó: \"" . Str::limit($content, 80) . "\"",
+                        "{$author->name} te mencionó: \"".Str::limit($content, 80).'"',
                         $targetUrl,
                         $mentionMailable
                     );

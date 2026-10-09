@@ -54,7 +54,7 @@ class StickyService
 
     public function togglePin(Sticky $sticky): Sticky
     {
-        $sticky->is_pinned = !$sticky->is_pinned;
+        $sticky->is_pinned = ! $sticky->is_pinned;
         $sticky->save();
 
         return $sticky->load('creator');
@@ -67,7 +67,7 @@ class StickyService
             abort(403, 'Solo el autor puede cambiar la privacidad de esta nota.');
         }
 
-        $sticky->is_private = !$sticky->is_private;
+        $sticky->is_private = ! $sticky->is_private;
         $sticky->save();
 
         return $sticky->load('creator');

@@ -12,15 +12,15 @@ class ReportSnapshotResource extends JsonResource
     {
         return [
             'type' => 'report_snapshots',
-            'id'   => (string)$this->id,
+            'id' => (string) $this->id,
             'attributes' => [
-                'report_id'        => (string)$this->report_id,
-                'title'            => $this->title,
-                'blocks_snapshot'  => $this->blocks_snapshot ?? [],
-                'theme_snapshot'   => $this->theme_snapshot ?? [],
-                'note'             => $this->note,
-                'blocks_count'     => count($this->blocks_snapshot ?? []),
-                'created_at'       => $this->created_at?->toISOString(),
+                'report_id' => (string) $this->report_id,
+                'title' => $this->title,
+                'blocks_snapshot' => $this->blocks_snapshot ?? [],
+                'theme_snapshot' => $this->theme_snapshot ?? [],
+                'note' => $this->note,
+                'blocks_count' => count($this->blocks_snapshot ?? []),
+                'created_at' => $this->created_at?->toISOString(),
             ],
             'relationships' => [
                 'creator' => new UserResource($this->whenLoaded('creator')),

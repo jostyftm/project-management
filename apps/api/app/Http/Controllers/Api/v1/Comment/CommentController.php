@@ -19,12 +19,14 @@ class CommentController extends Controller
     public function indexByWorkItem(Request $request, string|int $workItemId): AnonymousResourceCollection
     {
         $comments = $this->commentService->listForWorkItem($workItemId);
+
         return CommentResource::collection($comments);
     }
 
     public function indexByPage(Request $request, string|int $pageId): AnonymousResourceCollection
     {
         $comments = $this->commentService->listForPage($pageId);
+
         return CommentResource::collection($comments);
     }
 
@@ -44,6 +46,7 @@ class CommentController extends Controller
     public function destroy(Request $request, string|int $id): JsonResponse
     {
         $this->commentService->deleteComment($id, $request->user());
+
         return response()->json(null, 204);
     }
 }

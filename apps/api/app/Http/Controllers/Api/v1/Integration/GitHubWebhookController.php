@@ -22,7 +22,7 @@ class GitHubWebhookController extends Controller
     {
         $repo = ProjectGithubRepository::with('project')->find($repoId);
 
-        if (!$repo || !$repo->is_active) {
+        if (! $repo || ! $repo->is_active) {
             return response()->json(['error' => 'Repositorio no encontrado o inactivo'], 404);
         }
 
@@ -30,10 +30,11 @@ class GitHubWebhookController extends Controller
         $rawPayload = $request->getContent();
 
         // Validar firma HMAC solo si se envió cabecera o si no es entorno de pruebas
-        if ($signature && !empty($repo->webhook_secret)) {
-            $expectedSignature = 'sha256=' . hash_hmac('sha256', $rawPayload, $repo->webhook_secret);
-            if (!hash_equals($expectedSignature, $signature)) {
+        if ($signature && ! empty($repo->webhook_secret)) {
+            $expectedSignature = 'sha256='.hash_hmac('sha256', $rawPayload, $repo->webhook_secret);
+            if (! hash_equals($expectedSignature, $signature)) {
                 Log::warning("Firma de webhook de GitHub inválida para repo ID: {$repoId}");
+
                 return response()->json(['error' => 'Firma de webhook no válida'], 401);
             }
         }
@@ -55,7 +56,7 @@ class GitHubWebhookController extends Controller
         $payload = $request->all();
         $repoFullName = $payload['repository']['full_name'] ?? null;
 
-        if (!$repoFullName) {
+        if (! $repoFullName) {
             return response()->json(['error' => 'No repository.full_name found in payload'], 400);
         }
 

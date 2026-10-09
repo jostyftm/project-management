@@ -26,10 +26,10 @@ class WorkspaceReport extends Model
     ];
 
     protected $casts = [
-        'theme'         => 'array',
+        'theme' => 'array',
         'layout_config' => 'array',
-        'visibility'    => ReportVisibility::class,
-        'published_at'  => 'datetime',
+        'visibility' => ReportVisibility::class,
+        'published_at' => 'datetime',
     ];
 
     // Relaciones
@@ -73,7 +73,7 @@ class WorkspaceReport extends Model
     {
         return $query->where(function ($q) use ($userId) {
             $q->where('owner_id', $userId)
-              ->orWhereIn('visibility', [ReportVisibility::WORKSPACE->value, ReportVisibility::PUBLIC->value]);
+                ->orWhereIn('visibility', [ReportVisibility::WORKSPACE->value, ReportVisibility::PUBLIC->value]);
         });
     }
 
@@ -82,6 +82,7 @@ class WorkspaceReport extends Model
     {
         $this->public_token = Str::random(32);
         $this->save();
+
         return $this->public_token;
     }
 }

@@ -33,11 +33,11 @@ class UserMentionedMail extends Mailable
         return new Content(
             view: 'emails.user_mentioned',
             with: [
-                'recipient'      => $this->recipient,
-                'actor'          => $this->actor,
-                'contextTitle'   => $this->contextTitle,
+                'recipient' => $this->recipient,
+                'actor' => $this->actor,
+                'contextTitle' => $this->contextTitle,
                 'contentSnippet' => $this->contentSnippet,
-                'targetUrl'      => $this->targetUrl,
+                'targetUrl' => $this->targetUrl,
             ],
         );
     }

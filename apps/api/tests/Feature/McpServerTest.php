@@ -188,23 +188,32 @@ it('manages work items lifecycle via MCP tools', function () {
         'priority' => 'HIGH',
     ]);
 
-    // 2. Consultar WorkItem
+    // 2. Consultar WorkItem y verificar que description_html contiene HTML puro
     $getResponse = ProjectManagementServer::tool(GetWorkItemTool::class, [
         'item' => 'ENG-1',
     ]);
     $getResponse->assertOk()
         ->assertSee('ENG-1')
-        ->assertSee('Diseñar arquitectura MCP');
+        ->assertSee('Diseñar arquitectura MCP')
+        ->assertSee('description_html')
+        ->assertSee('<p>Definir protocolo stdio y web con Laravel MCP</p>', false);
 
-    // 3. Actualizar WorkItem (cambio a completado)
+    // 3. Actualizar WorkItem (cambio a completado y nueva descripción en Markdown)
     $updateResponse = ProjectManagementServer::tool(UpdateWorkItemTool::class, [
         'item' => 'ENG-1',
+        'description' => "### Nueva Especificación\n- Tarea validada",
         'state_id' => $this->stateDone->id,
         'priority' => 'URGENT',
     ]);
     $updateResponse->assertOk()
         ->assertSee('ENG-1')
         ->assertSee('URGENT');
+
+    $this->assertDatabaseHas('work_items', [
+        'project_id' => $this->project->id,
+        'sequence_id' => 1,
+        'description_html' => "<h3>Nueva Especificación</h3>\n<ul>\n<li>Tarea validada</li>\n</ul>\n",
+    ]);
 
     $item = WorkItem::where('project_id', $this->project->id)->where('sequence_id', 1)->first();
     expect($item->completed_at)->not->toBeNull();

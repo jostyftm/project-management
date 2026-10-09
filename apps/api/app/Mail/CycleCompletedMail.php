@@ -36,12 +36,12 @@ class CycleCompletedMail extends Mailable
         return new Content(
             view: 'emails.cycle_completed',
             with: [
-                'cycle'            => $this->cycle,
-                'project'          => $this->project,
-                'completedBy'      => $this->completedBy,
-                'completedCount'   => $this->completedCount,
+                'cycle' => $this->cycle,
+                'project' => $this->project,
+                'completedBy' => $this->completedBy,
+                'completedCount' => $this->completedCount,
                 'transferredCount' => $this->transferredCount,
-                'cycleUrl'         => $this->cycleUrl,
+                'cycleUrl' => $this->cycleUrl,
             ],
         );
     }

@@ -11,9 +11,9 @@ use App\Http\Requests\Report\CreateReportBlockRequest;
 use App\Http\Requests\Report\ReorderBlocksRequest;
 use App\Http\Requests\Report\UpdateReportBlockRequest;
 use App\Http\Resources\Report\ReportBlockResource;
+use App\Models\ReportBlock;
 use App\Models\Workspace;
 use App\Models\WorkspaceReport;
-use App\Models\ReportBlock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -23,13 +23,14 @@ class ReportBlockController extends Controller
         private CreateReportBlockAction $createAction,
         private UpdateReportBlockAction $updateAction,
         private DeleteReportBlockAction $deleteAction,
-        private ReorderBlocksAction     $reorderAction,
+        private ReorderBlocksAction $reorderAction,
     ) {}
 
     public function index(Workspace $workspace, WorkspaceReport $workspaceReport): AnonymousResourceCollection
     {
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         $blocks = $workspaceReport->blocks()->ordered()->get();
+
         return ReportBlockResource::collection($blocks);
     }
 
@@ -37,6 +38,7 @@ class ReportBlockController extends Controller
     {
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         $block = $this->createAction->handle($workspaceReport, $request->validated());
+
         return (new ReportBlockResource($block))->response()->setStatusCode(201);
     }
 
@@ -44,6 +46,7 @@ class ReportBlockController extends Controller
     {
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         abort_if($block->report_id !== $workspaceReport->id, 404);
+
         return new ReportBlockResource($block);
     }
 
@@ -52,6 +55,7 @@ class ReportBlockController extends Controller
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         abort_if($block->report_id !== $workspaceReport->id, 404);
         $block = $this->updateAction->handle($block, $request->validated());
+
         return new ReportBlockResource($block);
     }
 
@@ -60,6 +64,7 @@ class ReportBlockController extends Controller
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         abort_if($block->report_id !== $workspaceReport->id, 404);
         $this->deleteAction->handle($block);
+
         return response()->json(null, 204);
     }
 
@@ -67,6 +72,7 @@ class ReportBlockController extends Controller
     {
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
         $this->reorderAction->handle($workspaceReport, $request->validated()['order']);
+
         return response()->json(['message' => 'Bloques reordenados correctamente']);
     }
 }

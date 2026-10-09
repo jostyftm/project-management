@@ -16,39 +16,39 @@ class LineChartResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
+        $config = $block->config ?? [];
         $projectIds = $config['project_ids'] ?? [];
-        $metric     = $config['metric'] ?? 'work_items_completed';
-        $grouping   = $config['grouping'] ?? 'week';
-        $dateFrom   = Carbon::parse($config['date_from'] ?? now()->subDays(30)->toDateString());
-        $dateTo     = Carbon::parse($config['date_to'] ?? now()->toDateString());
-        $color      = $config['color'] ?? '#6366f1';
+        $metric = $config['metric'] ?? 'work_items_completed';
+        $grouping = $config['grouping'] ?? 'week';
+        $dateFrom = Carbon::parse($config['date_from'] ?? now()->subDays(30)->toDateString());
+        $dateTo = Carbon::parse($config['date_to'] ?? now()->toDateString());
+        $color = $config['color'] ?? '#6366f1';
 
         $query = WorkItem::query();
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
         }
 
         $series = match ($metric) {
             'work_items_completed' => $this->getCompletedSeries($query, $dateFrom, $dateTo, $grouping),
-            'work_items_created'   => $this->getCreatedSeries($query, $dateFrom, $dateTo, $grouping),
-            default                => $this->getCompletedSeries($query, $dateFrom, $dateTo, $grouping),
+            'work_items_created' => $this->getCreatedSeries($query, $dateFrom, $dateTo, $grouping),
+            default => $this->getCompletedSeries($query, $dateFrom, $dateTo, $grouping),
         };
 
         return [
-            'series'   => [
+            'series' => [
                 [
-                    'name'  => $this->metricLabel($metric),
-                    'data'  => $series,
+                    'name' => $this->metricLabel($metric),
+                    'data' => $series,
                     'color' => $color,
-                ]
+                ],
             ],
             'grouping' => $grouping,
-            'period'   => [
+            'period' => [
                 'from' => $dateFrom->toDateString(),
-                'to'   => $dateTo->toDateString(),
+                'to' => $dateTo->toDateString(),
             ],
         ];
     }
@@ -87,16 +87,16 @@ class LineChartResolver
 
         if ($isSqlite) {
             return match ($grouping) {
-                'day'   => "strftime('%Y-%m-%d', {$column})",
-                'week'  => "strftime('%Y-%W', {$column})",
+                'day' => "strftime('%Y-%m-%d', {$column})",
+                'week' => "strftime('%Y-%W', {$column})",
                 'month' => "strftime('%Y-%m', {$column})",
                 default => "strftime('%Y-%m-%d', {$column})",
             };
         }
 
         return match ($grouping) {
-            'day'   => "TO_CHAR({$column}, 'YYYY-MM-DD')",
-            'week'  => "TO_CHAR({$column}, 'IYYY-IW')",
+            'day' => "TO_CHAR({$column}, 'YYYY-MM-DD')",
+            'week' => "TO_CHAR({$column}, 'IYYY-IW')",
             'month' => "TO_CHAR({$column}, 'YYYY-MM')",
             default => "TO_CHAR({$column}, 'YYYY-MM-DD')",
         };
@@ -105,8 +105,8 @@ class LineChartResolver
     private function fillPeriods(Carbon $from, Carbon $to, string $grouping, array $results): array
     {
         $interval = match ($grouping) {
-            'day'   => '1 day',
-            'week'  => '1 week',
+            'day' => '1 day',
+            'week' => '1 week',
             'month' => '1 month',
             default => '1 day',
         };
@@ -117,8 +117,8 @@ class LineChartResolver
         foreach ($period as $date) {
             $key = $this->formatPeriodKey($date, $grouping);
             $series[] = [
-                'date'  => $key,
-                'value' => (int)($results[$key] ?? 0),
+                'date' => $key,
+                'value' => (int) ($results[$key] ?? 0),
             ];
         }
 
@@ -130,12 +130,12 @@ class LineChartResolver
         $isSqlite = DB::getDriverName() === 'sqlite';
 
         if ($isSqlite && $grouping === 'week') {
-            return $date->format('Y-') . str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT);
+            return $date->format('Y-').str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT);
         }
 
         return match ($grouping) {
-            'day'   => $date->format('Y-m-d'),
-            'week'  => $date->format('o-') . str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT),
+            'day' => $date->format('Y-m-d'),
+            'week' => $date->format('o-').str_pad($date->weekOfYear, 2, '0', STR_PAD_LEFT),
             'month' => $date->format('Y-m'),
             default => $date->format('Y-m-d'),
         };
@@ -145,8 +145,8 @@ class LineChartResolver
     {
         return match ($metric) {
             'work_items_completed' => 'Items Completados',
-            'work_items_created'   => 'Items Creados',
-            default                => $metric,
+            'work_items_created' => 'Items Creados',
+            default => $metric,
         };
     }
 }

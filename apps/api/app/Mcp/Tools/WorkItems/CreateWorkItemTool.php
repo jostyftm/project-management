@@ -7,6 +7,7 @@ use App\Models\State;
 use App\Models\WorkItem;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -31,7 +32,7 @@ class CreateWorkItemTool extends Tool
                 ->description('Título o resumen descriptivo de la tarea')
                 ->required(),
             'description' => $schema->string()
-                ->description('Descripción detallada o criterios de aceptación en texto o Markdown'),
+                ->description('Descripción detallada o criterios de aceptación en HTML puro o Markdown'),
             'priority' => $schema->string()
                 ->enum(['URGENT', 'HIGH', 'MEDIUM', 'LOW', 'NONE'])
                 ->description('Nivel de prioridad (por defecto NONE)')
@@ -89,15 +90,14 @@ class CreateWorkItemTool extends Tool
             $completedAt = ($state && in_array(strtoupper($state->group), ['COMPLETED', 'CANCELLED'])) ? now() : null;
 
             $descriptionRaw = $request->get('description');
-            $descriptionJson = null;
+            $descriptionHtml = null;
             if ($descriptionRaw) {
-                $descriptionJson = [
-                    [
-                        'id' => 'b1',
-                        'type' => 'paragraph',
-                        'content' => $descriptionRaw,
-                    ],
-                ];
+                $trimmed = trim($descriptionRaw);
+                if (preg_match('/<[a-z][\s\S]*>/i', $trimmed)) {
+                    $descriptionHtml = $trimmed;
+                } else {
+                    $descriptionHtml = Str::markdown($trimmed);
+                }
             }
 
             $item = WorkItem::create([
@@ -105,7 +105,8 @@ class CreateWorkItemTool extends Tool
                 'project_id' => $project->id,
                 'sequence_id' => $sequenceId,
                 'title' => $request->get('title'),
-                'description_json' => $descriptionJson,
+                'description_html' => $descriptionHtml,
+                'description_json' => $descriptionHtml ? ['html' => $descriptionHtml] : null,
                 'state_id' => $stateId,
                 'type_id' => $request->get('type_id'),
                 'priority' => strtoupper($request->get('priority', 'NONE')),

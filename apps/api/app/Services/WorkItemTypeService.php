@@ -21,7 +21,7 @@ class WorkItemTypeService
         if ($project) {
             $query->where(function ($q) use ($project) {
                 $q->whereNull('project_id')
-                  ->orWhere('project_id', $project->id);
+                    ->orWhere('project_id', $project->id);
             });
         }
 

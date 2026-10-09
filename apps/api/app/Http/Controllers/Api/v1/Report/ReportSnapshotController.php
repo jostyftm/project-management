@@ -17,7 +17,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class ReportSnapshotController extends Controller
 {
     public function __construct(
-        private CreateReportSnapshotAction  $createSnapshotAction,
+        private CreateReportSnapshotAction $createSnapshotAction,
         private RestoreReportSnapshotAction $restoreSnapshotAction
     ) {}
 
@@ -45,7 +45,7 @@ class ReportSnapshotController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'note'  => ['nullable', 'string', 'max:2000'],
+            'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $snapshot = $this->createSnapshotAction->handle(
@@ -70,6 +70,7 @@ class ReportSnapshotController extends Controller
         abort_if($snapshot->report_id !== $workspaceReport->id, 404);
 
         $snapshot->load('creator');
+
         return new ReportSnapshotResource($snapshot);
     }
 
@@ -82,6 +83,7 @@ class ReportSnapshotController extends Controller
         abort_if($snapshot->report_id !== $workspaceReport->id, 404);
 
         $snapshot->delete();
+
         return response()->json(null, 204);
     }
 

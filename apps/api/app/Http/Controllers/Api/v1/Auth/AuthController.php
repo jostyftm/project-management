@@ -80,4 +80,3 @@ class AuthController extends Controller
         return $this->successResponse($result, 200);
     }
 }
-

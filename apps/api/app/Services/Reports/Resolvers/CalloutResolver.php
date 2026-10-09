@@ -16,9 +16,9 @@ class CalloutResolver
 
         return [
             'variant' => $config['variant'] ?? 'info',
-            'title'   => $config['title'] ?? 'Nota importante',
+            'title' => $config['title'] ?? 'Nota importante',
             'content' => $config['content'] ?? '',
-            'icon'    => $config['icon'] ?? 'info',
+            'icon' => $config['icon'] ?? 'info',
         ];
     }
 }

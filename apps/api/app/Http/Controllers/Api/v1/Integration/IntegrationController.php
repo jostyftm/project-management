@@ -19,6 +19,7 @@ class IntegrationController extends Controller
         $workspaceId = $request->header('X-Workspace-Id') ?? 1;
 
         $integrations = Integration::where('workspace_id', $workspaceId)->get();
+
         return response()->json($integrations);
     }
 
@@ -67,6 +68,7 @@ class IntegrationController extends Controller
         if ($integration->provider === 'SLACK') {
             $webhookUrl = $integration->config['webhook_url'] ?? '';
             $result = $this->slackService->testConnection($webhookUrl);
+
             return response()->json($result);
         }
 

@@ -1,9 +1,9 @@
 <?php
 
 use App\Models\Project;
+use App\Models\ProjectMember;
 use App\Models\State;
 use App\Models\User;
-use App\Models\View;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
@@ -39,7 +39,7 @@ beforeEach(function () {
         'identifier' => 'ACM',
     ]);
 
-    \App\Models\ProjectMember::create([
+    ProjectMember::create([
         'project_id' => $this->project->id,
         'user_id' => $this->otherUser->id,
         'role' => 'MEMBER',

@@ -20,12 +20,14 @@ class StickyController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $stickies = $this->stickyService->list($request);
+
         return StickyResource::collection($stickies);
     }
 
     public function store(StickyCreateRequest $request): JsonResponse
     {
         $sticky = $this->stickyService->create($request->validated());
+
         return (new StickyResource($sticky))
             ->response()
             ->setStatusCode(201);
@@ -34,24 +36,28 @@ class StickyController extends Controller
     public function update(Request $request, Sticky $sticky): StickyResource
     {
         $updated = $this->stickyService->update($sticky, $request->all());
+
         return new StickyResource($updated);
     }
 
     public function togglePin(Sticky $sticky): StickyResource
     {
         $updated = $this->stickyService->togglePin($sticky);
+
         return new StickyResource($updated);
     }
 
     public function togglePrivacy(Sticky $sticky): StickyResource
     {
         $updated = $this->stickyService->togglePrivacy($sticky);
+
         return new StickyResource($updated);
     }
 
     public function destroy(Sticky $sticky): JsonResponse
     {
         $this->stickyService->delete($sticky);
+
         return response()->json(['message' => 'Nota adhesiva eliminada']);
     }
 }

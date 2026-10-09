@@ -16,10 +16,10 @@ class UpdateReportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'         => ['sometimes', 'string', 'max:255'],
-            'description'   => ['nullable', 'string', 'max:2000'],
-            'visibility'    => ['nullable', Rule::in(ReportVisibility::values())],
-            'theme'         => ['nullable', 'array'],
+            'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'visibility' => ['nullable', Rule::in(ReportVisibility::values())],
+            'theme' => ['nullable', 'array'],
             'layout_config' => ['nullable', 'array'],
         ];
     }

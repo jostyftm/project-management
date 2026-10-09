@@ -36,12 +36,12 @@ class WorkItemAssignedMail extends Mailable
         return new Content(
             view: 'emails.work_item_assigned',
             with: [
-                'workItem'    => $this->workItem,
-                'assignee'    => $this->assignee,
-                'actor'       => $this->actor,
+                'workItem' => $this->workItem,
+                'assignee' => $this->assignee,
+                'actor' => $this->actor,
                 'projectName' => $this->workItem->project?->name ?? 'Proyecto',
-                'priority'    => $this->workItem->priority ?? 'NONE',
-                'stateName'   => $this->workItem->state?->name ?? 'Por hacer',
+                'priority' => $this->workItem->priority ?? 'NONE',
+                'stateName' => $this->workItem->state?->name ?? 'Por hacer',
                 'workItemUrl' => $this->workItemUrl,
             ],
         );

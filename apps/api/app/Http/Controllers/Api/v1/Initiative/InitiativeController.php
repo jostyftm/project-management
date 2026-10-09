@@ -20,12 +20,14 @@ class InitiativeController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $initiatives = $this->initiativeService->list($request);
+
         return InitiativeResource::collection($initiatives);
     }
 
     public function store(InitiativeCreateRequest $request): JsonResponse
     {
         $initiative = $this->initiativeService->create($request->validated());
+
         return (new InitiativeResource($initiative))
             ->response()
             ->setStatusCode(201);
@@ -34,6 +36,7 @@ class InitiativeController extends Controller
     public function show(Request $request, Initiative $initiative): JsonResponse
     {
         $data = $this->initiativeService->get($initiative);
+
         return response()->json([
             'data' => (new InitiativeResource($data['initiative']))->toArray($request),
             'metrics' => $data['metrics'],
@@ -43,12 +46,14 @@ class InitiativeController extends Controller
     public function update(Request $request, Initiative $initiative): InitiativeResource
     {
         $updated = $this->initiativeService->update($initiative, $request->all());
+
         return new InitiativeResource($updated);
     }
 
     public function destroy(Request $request, Initiative $initiative): JsonResponse
     {
         $this->initiativeService->delete($initiative);
+
         return response()->json(['message' => 'Iniciativa eliminada exitosamente']);
     }
 }

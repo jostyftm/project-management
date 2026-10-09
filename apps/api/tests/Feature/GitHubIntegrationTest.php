@@ -18,12 +18,19 @@ class GitHubIntegrationTest extends TestCase
     use RefreshDatabase;
 
     protected Workspace $workspace;
+
     protected Project $project;
+
     protected State $unstartedState;
+
     protected State $startedState;
+
     protected State $completedState;
+
     protected WorkItem $workItem;
+
     protected ProjectGithubRepository $backendRepo;
+
     protected ProjectGithubRepository $frontendRepo;
 
     protected function setUp(): void
@@ -121,7 +128,7 @@ class GitHubIntegrationTest extends TestCase
         ];
 
         $rawBody = json_encode($payload);
-        $validSignature = 'sha256=' . hash_hmac('sha256', $rawBody, $this->backendRepo->webhook_secret);
+        $validSignature = 'sha256='.hash_hmac('sha256', $rawBody, $this->backendRepo->webhook_secret);
 
         // 1. Firma inválida debe retornar 401
         $responseBad = $this->call(

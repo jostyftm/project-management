@@ -10,7 +10,6 @@ use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemRelation;
-use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -46,7 +45,7 @@ class WorkItemService
                 if ($request->has('milestone_id')) {
                     $builder->where(function ($q) use ($request) {
                         $q->where('milestone_id', $request->milestone_id)
-                            ->orWhereHas('milestones', fn($mq) => $mq->where('milestones.id', $request->milestone_id));
+                            ->orWhereHas('milestones', fn ($mq) => $mq->where('milestones.id', $request->milestone_id));
                     });
                 }
 
@@ -118,12 +117,19 @@ class WorkItemService
             $initialState = $stateId ? State::find($stateId) : null;
             $completedAt = ($initialState && in_array(strtoupper($initialState->group), ['COMPLETED', 'CANCELLED'])) ? now() : null;
 
+            $descHtml = $data['description_html'] ?? $data['description'] ?? null;
+            $descJson = $data['description_json'] ?? null;
+            if ($descHtml && ! $descJson) {
+                $descJson = ['html' => $descHtml];
+            }
+
             $workItem = WorkItem::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
                 'sequence_id' => $sequenceId,
                 'title' => $data['title'],
-                'description_json' => $data['description_json'] ?? null,
+                'description_html' => $descHtml,
+                'description_json' => $descJson,
                 'state_id' => $stateId,
                 'type_id' => $data['type_id'] ?? null,
                 'priority' => $data['priority'] ?? 'NONE',
@@ -205,14 +211,14 @@ class WorkItemService
                             entityType: 'WORK_ITEM',
                             entityId: $workItem->id,
                             title: 'Nueva tarea asignada',
-                            message: "{$user->name} te ha asignado la tarea «{$workItem->name}».",
+                            message: "{$user->name} te ha asignado la tarea «{$workItem->title}».",
                             targetUrl: $workItemUrl,
                             mailable: $mailable
                         );
                     }
                 }
             } catch (Throwable $e) {
-                Log::warning("Error despachando notificaciones de creación de work item: " . $e->getMessage());
+                Log::warning('Error despachando notificaciones de creación de work item: '.$e->getMessage());
             }
 
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'cycles', 'modules']);
@@ -275,6 +281,14 @@ class WorkItemService
                 }
             }
 
+            if (array_key_exists('description_html', $data) || array_key_exists('description', $data)) {
+                $descHtml = $data['description_html'] ?? $data['description'] ?? null;
+                $data['description_html'] = $descHtml;
+                if (! array_key_exists('description_json', $data)) {
+                    $data['description_json'] = $descHtml ? ['html' => $descHtml] : null;
+                }
+            }
+
             $workItem->update($data);
 
             if (array_key_exists('assignee_ids', $data)) {
@@ -316,8 +330,8 @@ class WorkItemService
                 $action = 'STATE_CHANGED';
             }
 
-            // Excluir description_json y updated_at del historial de actividades
-            $relevantChanges = collect($changes)->except(['description_json', 'updated_at'])->all();
+            // Excluir description_json, description_html y updated_at del historial de actividades
+            $relevantChanges = collect($changes)->except(['description_json', 'description_html', 'updated_at'])->all();
 
             if (! empty($relevantChanges)) {
                 Activity::create([
@@ -341,7 +355,7 @@ class WorkItemService
 
                     $subscribers = collect([$workItem->created_by, $workItem->lead_id])
                         ->merge($workItem->assignees->pluck('id'))
-                        ->filter(fn($id) => ! empty($id) && (int) $id !== (int) $user->id)
+                        ->filter(fn ($id) => ! empty($id) && (int) $id !== (int) $user->id)
                         ->unique();
 
                     $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
@@ -366,14 +380,14 @@ class WorkItemService
                                 entityType: 'WORK_ITEM',
                                 entityId: $workItem->id,
                                 title: 'Cambio de estado en tarea',
-                                message: "{$user->name} cambió el estado de «{$workItem->name}» a «{$newStateName}».",
+                                message: "{$user->name} cambió el estado de «{$workItem->title}» a «{$newStateName}».",
                                 targetUrl: $workItemUrl,
                                 mailable: $mailable
                             );
                         }
                     }
                 } catch (Throwable $e) {
-                    Log::warning("Error notificando cambio de estado: " . $e->getMessage());
+                    Log::warning('Error notificando cambio de estado: '.$e->getMessage());
                 }
             }
 
@@ -415,7 +429,7 @@ class WorkItemService
                                 entityType: 'WORK_ITEM',
                                 entityId: $workItem->id,
                                 title: 'Nueva tarea asignada',
-                                message: "{$user->name} te ha asignado la tarea «{$workItem->name}».",
+                                message: "{$user->name} te ha asignado la tarea «{$workItem->title}».",
                                 targetUrl: $workItemUrl,
                                 mailable: $mailable
                             );
@@ -423,7 +437,7 @@ class WorkItemService
                     }
                 }
             } catch (Throwable $e) {
-                Log::warning("Error notificando nuevas asignaciones: " . $e->getMessage());
+                Log::warning('Error notificando nuevas asignaciones: '.$e->getMessage());
             }
 
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules']);

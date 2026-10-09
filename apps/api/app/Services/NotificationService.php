@@ -2,9 +2,13 @@
 
 namespace App\Services;
 
+use App\Jobs\SendNotificationEmailJob;
 use App\Models\Notification;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -19,11 +23,11 @@ class NotificationService
             ->with(['actor'])
             ->latest();
 
-        if (!empty($filters['unread']) && filter_var($filters['unread'], FILTER_VALIDATE_BOOLEAN)) {
+        if (! empty($filters['unread']) && filter_var($filters['unread'], FILTER_VALIDATE_BOOLEAN)) {
             $query->where('is_read', false);
         }
 
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $query->where('type', strtoupper($filters['type']));
         }
 
@@ -82,7 +86,7 @@ class NotificationService
         string $title,
         string $message,
         ?string $targetUrl = null,
-        ?\Illuminate\Mail\Mailable $mailable = null
+        ?Mailable $mailable = null
     ): Notification {
         $notification = DB::transaction(function () use (
             $workspaceId,
@@ -111,12 +115,12 @@ class NotificationService
 
         // Si se provee mailable, encolar el Job de correo en segundo plano
         if ($mailable) {
-            $recipient = \App\Models\User::find($recipientId);
+            $recipient = User::find($recipientId);
             if ($recipient && ! empty($recipient->email)) {
                 try {
-                    \App\Jobs\SendNotificationEmailJob::dispatch($recipient->email, $mailable);
+                    SendNotificationEmailJob::dispatch($recipient->email, $mailable);
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning("No se pudo encolar correo para {$recipient->email}: " . $e->getMessage());
+                    Log::warning("No se pudo encolar correo para {$recipient->email}: ".$e->getMessage());
                 }
             }
         }

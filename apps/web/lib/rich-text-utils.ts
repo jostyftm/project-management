@@ -36,14 +36,21 @@ export function extractPlainText(html: string): string {
  * Doc/Tiptap structure, HTML string, or plain text) into a valid HTML string
  * suitable for RichTextEditor.
  */
-export function formatDescriptionToHtml(descriptionJson: any): string {
-  if (!descriptionJson) {
+export function formatDescriptionToHtml(descriptionInput: any): string {
+  if (!descriptionInput) {
     return "";
   }
 
+  // 0. If a WorkItem object was passed directly with description_html
+  if (typeof descriptionInput === "object" && typeof descriptionInput.description_html === "string") {
+    return descriptionInput.description_html;
+  }
+
+  const descriptionJson = descriptionInput;
+
   // 1. Direct HTML or plain text string
-  if (typeof descriptionJson === "string") {
-    const trimmed = descriptionJson.trim();
+  if (typeof descriptionInput === "string") {
+    const trimmed = descriptionInput.trim();
     if (!trimmed) return "";
     // If it already contains HTML tags
     if (/<[a-z][\s\S]*>/i.test(trimmed)) {

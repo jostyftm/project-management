@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\State;
 use App\Models\WorkItemDeliverable;
+use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -24,7 +25,7 @@ class ProjectService
         $user = $request->user();
         $workspace = app()->has('current_workspace')
             ? app('current_workspace')
-            : ($request->attributes->get('workspace') ?? \App\Models\Workspace::find(app('current_workspace_id')));
+            : ($request->attributes->get('workspace') ?? Workspace::find(app('current_workspace_id')));
 
         return (new Project)->search(
             request: $request,
@@ -32,6 +33,7 @@ class ProjectService
             callback: function ($builder) use ($user, $workspace) {
                 if (! $user) {
                     $builder->whereRaw('1 = 0');
+
                     return;
                 }
 

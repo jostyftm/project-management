@@ -28,7 +28,7 @@ class InitiativeService
         $totalItems = 0;
         $completedItems = 0;
 
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $workItems = WorkItem::whereIn('project_id', $projectIds)->with('state')->get();
             $totalItems = $workItems->count();
             $completedItems = $workItems->filter(fn ($i) => $i->state?->group === 'COMPLETED')->count();
@@ -61,7 +61,7 @@ class InitiativeService
             'created_by' => $user?->id,
         ]);
 
-        if (!empty($data['project_ids'])) {
+        if (! empty($data['project_ids'])) {
             $initiative->projects()->sync($data['project_ids']);
         }
 

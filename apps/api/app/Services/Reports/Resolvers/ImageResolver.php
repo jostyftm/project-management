@@ -15,9 +15,9 @@ class ImageResolver
         $config = $block->config ?? [];
 
         return [
-            'url'       => $config['url'] ?? '',
-            'alt'       => $config['alt'] ?? 'Imagen del reporte',
-            'caption'   => $config['caption'] ?? null,
+            'url' => $config['url'] ?? '',
+            'alt' => $config['alt'] ?? 'Imagen del reporte',
+            'caption' => $config['caption'] ?? null,
             'alignment' => $config['alignment'] ?? 'center',
             'max_width' => $config['max_width'] ?? '100%',
         ];

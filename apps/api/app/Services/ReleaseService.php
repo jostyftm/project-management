@@ -34,7 +34,7 @@ class ReleaseService
             'created_by' => $user?->id,
         ]);
 
-        if (!empty($data['work_item_ids'])) {
+        if (! empty($data['work_item_ids'])) {
             $release->workItems()->sync($data['work_item_ids']);
         }
 
@@ -137,33 +137,33 @@ class ReleaseService
 
         $sections = [];
         $sections[] = "# Notas de la Versión — {$release->version} ({$release->name})";
-        $sections[] = "*Publicado el ".now()->format('Y-m-d')."*\n";
+        $sections[] = '*Publicado el '.now()->format('Y-m-d')."*\n";
 
         if ($release->description) {
             $sections[] = "{$release->description}\n";
         }
 
-        $sections[] = "### 🚀 Nuevas Características";
-        if (!empty($features)) {
+        $sections[] = '### 🚀 Nuevas Características';
+        if (! empty($features)) {
             $sections[] = implode("\n", $features);
         } else {
-            $sections[] = "_Sin nuevas características registradas en este release._";
+            $sections[] = '_Sin nuevas características registradas en este release._';
         }
-        $sections[] = "";
+        $sections[] = '';
 
-        $sections[] = "### 🐛 Corrección de Errores";
-        if (!empty($fixes)) {
+        $sections[] = '### 🐛 Corrección de Errores';
+        if (! empty($fixes)) {
             $sections[] = implode("\n", $fixes);
         } else {
-            $sections[] = "_Sin correcciones de errores registradas en este release._";
+            $sections[] = '_Sin correcciones de errores registradas en este release._';
         }
-        $sections[] = "";
+        $sections[] = '';
 
-        $sections[] = "### ⚡ Mejoras y Tareas";
-        if (!empty($improvements)) {
+        $sections[] = '### ⚡ Mejoras y Tareas';
+        if (! empty($improvements)) {
             $sections[] = implode("\n", $improvements);
         } else {
-            $sections[] = "_Sin tareas adicionales en este release._";
+            $sections[] = '_Sin tareas adicionales en este release._';
         }
 
         return implode("\n", $sections);

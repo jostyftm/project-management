@@ -36,6 +36,7 @@ class WorkItemImportController extends Controller
         }
 
         $result = $this->importService->preview($content, $request->input('delimiter'));
+
         return response()->json($result);
     }
 

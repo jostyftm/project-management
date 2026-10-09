@@ -15,6 +15,8 @@ use App\Http\Resources\Report\WorkspaceReportCollection;
 use App\Http\Resources\Report\WorkspaceReportResource;
 use App\Models\Workspace;
 use App\Models\WorkspaceReport;
+use App\Services\Reports\BlockResolverService;
+use App\Services\Reports\ReportTemplateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,13 +25,13 @@ use Illuminate\Support\Str;
 class WorkspaceReportController extends Controller
 {
     public function __construct(
-        private CreateReportAction    $createAction,
-        private UpdateReportAction    $updateAction,
-        private DeleteReportAction    $deleteAction,
+        private CreateReportAction $createAction,
+        private UpdateReportAction $updateAction,
+        private DeleteReportAction $deleteAction,
         private DuplicateReportAction $duplicateAction,
         private ExportReportPdfAction $exportPdfAction,
         private ExportReportPngAction $exportPngAction,
-        private \App\Services\Reports\ReportTemplateService $templateService,
+        private ReportTemplateService $templateService,
     ) {}
 
     /**
@@ -73,7 +75,7 @@ class WorkspaceReportController extends Controller
             $data
         );
 
-        if (!empty($data['template'])) {
+        if (! empty($data['template'])) {
             $this->templateService->apply($report, $data['template']);
         }
 
@@ -110,6 +112,7 @@ class WorkspaceReportController extends Controller
         );
 
         $workspaceReport->load(['owner', 'blocks']);
+
         return new WorkspaceReportResource($workspaceReport);
     }
 
@@ -136,6 +139,7 @@ class WorkspaceReportController extends Controller
         $this->authorizeOwner($workspaceReport);
 
         $this->deleteAction->handle($workspaceReport);
+
         return response()->json(null, 204);
     }
 
@@ -148,7 +152,7 @@ class WorkspaceReportController extends Controller
         $this->authorizeOwner($workspaceReport);
 
         $workspaceReport->published_at = now();
-        if (!$workspaceReport->public_token) {
+        if (! $workspaceReport->public_token) {
             $workspaceReport->generatePublicToken();
         } else {
             $workspaceReport->save();
@@ -183,7 +187,7 @@ class WorkspaceReportController extends Controller
 
         $report->load(['owner', 'blocks']);
 
-        $resolverService = app(\App\Services\Reports\BlockResolverService::class);
+        $resolverService = app(BlockResolverService::class);
         $allData = $resolverService->resolveAll($report, ['workspace_id' => $report->workspace_id]);
 
         foreach ($report->blocks as $block) {
@@ -201,11 +205,11 @@ class WorkspaceReportController extends Controller
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
 
         $pdf = $this->exportPdfAction->handle($workspaceReport);
-        $filename = Str::slug($workspaceReport->title ?: 'report') . '.pdf';
+        $filename = Str::slug($workspaceReport->title ?: 'report').'.pdf';
 
         return response($pdf, 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -217,11 +221,11 @@ class WorkspaceReportController extends Controller
         abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
 
         $png = $this->exportPngAction->handle($workspaceReport);
-        $filename = Str::slug($workspaceReport->title ?: 'report') . '.png';
+        $filename = Str::slug($workspaceReport->title ?: 'report').'.png';
 
         return response($png, 200, [
-            'Content-Type'        => 'image/png',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -235,11 +239,11 @@ class WorkspaceReportController extends Controller
             ->firstOrFail();
 
         $pdf = $this->exportPdfAction->handle($report);
-        $filename = Str::slug($report->title ?: 'report') . '.pdf';
+        $filename = Str::slug($report->title ?: 'report').'.pdf';
 
         return response($pdf, 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -253,11 +257,11 @@ class WorkspaceReportController extends Controller
             ->firstOrFail();
 
         $png = $this->exportPngAction->handle($report);
-        $filename = Str::slug($report->title ?: 'report') . '.png';
+        $filename = Str::slug($report->title ?: 'report').'.png';
 
         return response($png, 200, [
-            'Content-Type'        => 'image/png',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'image/png',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 

@@ -37,12 +37,12 @@ class WorkItemStatusChangedMail extends Mailable
         return new Content(
             view: 'emails.work_item_status_changed',
             with: [
-                'workItem'     => $this->workItem,
+                'workItem' => $this->workItem,
                 'oldStateName' => $this->oldStateName,
                 'newStateName' => $this->newStateName,
-                'actor'        => $this->actor,
-                'projectName'  => $this->workItem->project?->name ?? 'Proyecto',
-                'workItemUrl'  => $this->workItemUrl,
+                'actor' => $this->actor,
+                'projectName' => $this->workItem->project?->name ?? 'Proyecto',
+                'workItemUrl' => $this->workItemUrl,
             ],
         );
     }

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Project;
-use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemType;
@@ -31,7 +30,7 @@ class WorkItemImportService
         }
 
         // Auto-detectar delimitador si no se especificó
-        if (!$delimiter) {
+        if (! $delimiter) {
             $firstLine = $lines[0];
             $commas = substr_count($firstLine, ',');
             $semicolons = substr_count($firstLine, ';');
@@ -54,7 +53,9 @@ class WorkItemImportService
 
         for ($i = 1; $i < count($lines); $i++) {
             $line = trim($lines[$i]);
-            if ($line === '') continue;
+            if ($line === '') {
+                continue;
+            }
 
             $totalRows++;
             if (count($sampleRows) < 5) {
@@ -120,7 +121,8 @@ class WorkItemImportService
                 $title = trim($row[$titleCol] ?? '');
 
                 if ($title === '') {
-                    $errors[] = "Fila " . ($index + 1) . ": Título vacío, omitida.";
+                    $errors[] = 'Fila '.($index + 1).': Título vacío, omitida.';
+
                     continue;
                 }
 
@@ -230,22 +232,23 @@ class WorkItemImportService
         foreach ($headers as $header) {
             $norm = mb_strtolower(trim($header));
 
-            if (!isset($mapping['title']) && in_array($norm, ['título', 'titulo', 'title', 'nombre', 'name', 'resumen', 'summary'])) {
+            if (! isset($mapping['title']) && in_array($norm, ['título', 'titulo', 'title', 'nombre', 'name', 'resumen', 'summary'])) {
                 $mapping['title'] = $header;
-            } elseif (!isset($mapping['description']) && in_array($norm, ['descripción', 'descripcion', 'description', 'desc', 'detalle'])) {
+            } elseif (! isset($mapping['description']) && in_array($norm, ['descripción', 'descripcion', 'description', 'desc', 'detalle'])) {
                 $mapping['description'] = $header;
-            } elseif (!isset($mapping['priority']) && in_array($norm, ['prioridad', 'priority'])) {
+            } elseif (! isset($mapping['priority']) && in_array($norm, ['prioridad', 'priority'])) {
                 $mapping['priority'] = $header;
-            } elseif (!isset($mapping['state']) && in_array($norm, ['estado', 'state', 'status'])) {
+            } elseif (! isset($mapping['state']) && in_array($norm, ['estado', 'state', 'status'])) {
                 $mapping['state'] = $header;
-            } elseif (!isset($mapping['type']) && in_array($norm, ['tipo', 'type', 'issue_type'])) {
+            } elseif (! isset($mapping['type']) && in_array($norm, ['tipo', 'type', 'issue_type'])) {
                 $mapping['type'] = $header;
-            } elseif (!isset($mapping['estimate_points']) && in_array($norm, ['estimación', 'estimacion', 'estimate', 'points', 'puntos'])) {
+            } elseif (! isset($mapping['estimate_points']) && in_array($norm, ['estimación', 'estimacion', 'estimate', 'points', 'puntos'])) {
                 $mapping['estimate_points'] = $header;
-            } elseif (!isset($mapping['assignee']) && in_array($norm, ['asignado', 'assignee', 'responsable', 'email', 'owner'])) {
+            } elseif (! isset($mapping['assignee']) && in_array($norm, ['asignado', 'assignee', 'responsable', 'email', 'owner'])) {
                 $mapping['assignee'] = $header;
             }
         }
+
         return $mapping;
     }
 }

@@ -7,9 +7,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkItem;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class ProjectKpiService
 {
@@ -18,7 +16,7 @@ class ProjectKpiService
      */
     public function getProjectOverview(Project $project, array $filters = []): array
     {
-        $cacheKey = "project_{$project->id}_kpi_overview_" . md5(serialize($filters));
+        $cacheKey = "project_{$project->id}_kpi_overview_".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($project, $filters) {
             $period = $filters['period'] ?? '30d'; // 14d, 30d, 90d, all
@@ -45,8 +43,11 @@ class ProjectKpiService
             // Filtrar completados por ventana de tiempo para métricas de throughput/velocity
             $startDatePeriod = $this->calculatePeriodStartDate($period);
             $recentCompleted = $completedItems->filter(function ($item) use ($startDatePeriod) {
-                if (!$startDatePeriod) return true;
+                if (! $startDatePeriod) {
+                    return true;
+                }
                 $date = $item->completed_at ?? $item->updated_at;
+
                 return $date && Carbon::parse($date)->gte($startDatePeriod);
             });
 
@@ -54,6 +55,7 @@ class ProjectKpiService
             $twoWeeksAgo = Carbon::now()->subDays(14);
             $completed14d = $completedItems->filter(function ($item) use ($twoWeeksAgo) {
                 $date = $item->completed_at ?? $item->updated_at;
+
                 return $date && Carbon::parse($date)->gte($twoWeeksAgo);
             });
             $velocityPoints14d = (float) $completed14d->sum('estimate_points');
@@ -75,16 +77,19 @@ class ProjectKpiService
                 }
             }
 
-            $avgCycleTime = !empty($cycleTimes) ? round(array_sum($cycleTimes) / count($cycleTimes), 1) : 0;
-            $p85CycleTime = !empty($cycleTimes) ? $this->calculatePercentile($cycleTimes, 85) : 0;
-            $avgLeadTime = !empty($leadTimes) ? round(array_sum($leadTimes) / count($leadTimes), 1) : 0;
+            $avgCycleTime = ! empty($cycleTimes) ? round(array_sum($cycleTimes) / count($cycleTimes), 1) : 0;
+            $p85CycleTime = ! empty($cycleTimes) ? $this->calculatePercentile($cycleTimes, 85) : 0;
+            $avgLeadTime = ! empty($leadTimes) ? round(array_sum($leadTimes) / count($leadTimes), 1) : 0;
 
             // On-Time Delivery Rate (OTD)
-            $itemsWithTargetDate = $recentCompleted->filter(fn ($item) => !empty($item->target_date));
+            $itemsWithTargetDate = $recentCompleted->filter(fn ($item) => ! empty($item->target_date));
             $onTimeCount = $itemsWithTargetDate->filter(function ($item) {
-                if (!$item->completed_at || !$item->target_date) return false;
+                if (! $item->completed_at || ! $item->target_date) {
+                    return false;
+                }
                 $completed = Carbon::parse($item->completed_at)->startOfDay();
                 $target = Carbon::parse($item->target_date)->startOfDay();
+
                 return $completed->lte($target);
             })->count();
 
@@ -95,14 +100,20 @@ class ProjectKpiService
             // Items activos vencidos (Overdue)
             $now = Carbon::now()->startOfDay();
             $overdueActive = $items->filter(function ($item) use ($now) {
-                if (in_array($item->state?->group, ['COMPLETED', 'CANCELLED'])) return false;
-                if (!$item->target_date) return false;
+                if (in_array($item->state?->group, ['COMPLETED', 'CANCELLED'])) {
+                    return false;
+                }
+                if (! $item->target_date) {
+                    return false;
+                }
+
                 return Carbon::parse($item->target_date)->startOfDay()->lt($now);
             })->count();
 
             // Calidad: Defect Density / Tasa de Bugs
             $bugItems = $items->filter(function ($item) {
                 $typeName = strtolower($item->type?->name ?? '');
+
                 return str_contains($typeName, 'bug') || str_contains($typeName, 'defect') || str_contains($typeName, 'error');
             });
             $defectDensityRate = $total > 0 ? round(($bugItems->count() / $total) * 100, 1) : 0;
@@ -204,7 +215,7 @@ class ProjectKpiService
      */
     public function getCycleTimeStats(Project $project, array $filters = []): array
     {
-        $cacheKey = "project_{$project->id}_cycle_time_stats_" . md5(serialize($filters));
+        $cacheKey = "project_{$project->id}_cycle_time_stats_".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($project, $filters) {
             $period = $filters['period'] ?? '90d';
@@ -269,7 +280,7 @@ class ProjectKpiService
                     'p50' => $this->calculatePercentile($durations, 50),
                     'p85' => $this->calculatePercentile($durations, 85),
                     'p95' => $this->calculatePercentile($durations, 95),
-                    'average' => !empty($durations) ? round(array_sum($durations) / count($durations), 1) : 0,
+                    'average' => ! empty($durations) ? round(array_sum($durations) / count($durations), 1) : 0,
                     'total_completed_analyzed' => count($durations),
                 ],
                 'histogram_buckets' => [
@@ -289,7 +300,7 @@ class ProjectKpiService
      */
     public function getTeamPerformanceMatrix(Project $project, array $filters = []): array
     {
-        $cacheKey = "project_{$project->id}_team_perf_matrix_" . md5(serialize($filters));
+        $cacheKey = "project_{$project->id}_team_perf_matrix_".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($project, $filters) {
             $period = $filters['period'] ?? '30d';
@@ -316,13 +327,18 @@ class ProjectKpiService
 
                 $totalAssigned = $assignedItems->count();
                 $wipActive = $assignedItems->filter(fn ($i) => $i->state?->group === 'STARTED')->count();
-                $openCount = $assignedItems->filter(fn ($i) => !in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->count();
+                $openCount = $assignedItems->filter(fn ($i) => ! in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->count();
 
                 // Completados en el periodo
                 $completedInPeriod = $assignedItems->filter(function ($item) use ($startDate) {
-                    if ($item->state?->group !== 'COMPLETED') return false;
-                    if (!$startDate) return true;
+                    if ($item->state?->group !== 'COMPLETED') {
+                        return false;
+                    }
+                    if (! $startDate) {
+                        return true;
+                    }
                     $date = $item->completed_at ?? $item->updated_at;
+
                     return $date && Carbon::parse($date)->gte($startDate);
                 });
 
@@ -335,12 +351,15 @@ class ProjectKpiService
                         $cycleTimes[] = max(0.1, round(abs($end->diffInHours($start)) / 24, 1));
                     }
                 }
-                $avgCycleTime = !empty($cycleTimes) ? round(array_sum($cycleTimes) / count($cycleTimes), 1) : 0;
+                $avgCycleTime = ! empty($cycleTimes) ? round(array_sum($cycleTimes) / count($cycleTimes), 1) : 0;
 
                 // Tasa a tiempo individual (OTD)
-                $itemsWithTarget = $completedInPeriod->filter(fn ($i) => !empty($i->target_date));
+                $itemsWithTarget = $completedInPeriod->filter(fn ($i) => ! empty($i->target_date));
                 $onTimeCount = $itemsWithTarget->filter(function ($i) {
-                    if (!$i->completed_at || !$i->target_date) return false;
+                    if (! $i->completed_at || ! $i->target_date) {
+                        return false;
+                    }
+
                     return Carbon::parse($i->completed_at)->startOfDay()->lte(Carbon::parse($i->target_date)->startOfDay());
                 })->count();
 
@@ -350,14 +369,20 @@ class ProjectKpiService
 
                 // Tareas vencidas activas asignadas
                 $overdueAssigned = $assignedItems->filter(function ($item) use ($now) {
-                    if (in_array($item->state?->group, ['COMPLETED', 'CANCELLED'])) return false;
-                    if (!$item->target_date) return false;
+                    if (in_array($item->state?->group, ['COMPLETED', 'CANCELLED'])) {
+                        return false;
+                    }
+                    if (! $item->target_date) {
+                        return false;
+                    }
+
                     return Carbon::parse($item->target_date)->startOfDay()->lt($now);
                 })->count();
 
                 // Bugs resueltos por este miembro
                 $bugsResolved = $completedInPeriod->filter(function ($item) {
                     $name = strtolower($item->type?->name ?? '');
+
                     return str_contains($name, 'bug') || str_contains($name, 'defect');
                 })->count();
 
@@ -365,7 +390,7 @@ class ProjectKpiService
                 $loadStatus = match (true) {
                     $wipActive >= 7 => 'overloaded',
                     $wipActive >= 4 => 'heavy',
-                    default         => 'optimal',
+                    default => 'optimal',
                 };
 
                 $results[] = [
@@ -400,7 +425,7 @@ class ProjectKpiService
      */
     public function getMemberDetail(Project $project, User $member, array $filters = []): array
     {
-        $cacheKey = "project_{$project->id}_member_detail_{$member->id}_" . md5(serialize($filters));
+        $cacheKey = "project_{$project->id}_member_detail_{$member->id}_".md5(serialize($filters));
 
         return Cache::remember($cacheKey, 300, function () use ($project, $member, $filters) {
             $period = $filters['period'] ?? '90d';
@@ -414,9 +439,14 @@ class ProjectKpiService
                 ->get();
 
             $completedItems = $assignedItems->filter(function ($item) use ($startDate) {
-                if ($item->state?->group !== 'COMPLETED') return false;
-                if (!$startDate) return true;
+                if ($item->state?->group !== 'COMPLETED') {
+                    return false;
+                }
+                if (! $startDate) {
+                    return true;
+                }
                 $date = $item->completed_at ?? $item->updated_at;
+
                 return $date && Carbon::parse($date)->gte($startDate);
             });
 
@@ -444,6 +474,7 @@ class ProjectKpiService
 
                 $weekItems = $completedItems->filter(function ($item) use ($weekStart, $weekEnd) {
                     $date = $item->completed_at ? Carbon::parse($item->completed_at) : null;
+
                     return $date && $date->between($weekStart, $weekEnd);
                 });
 
@@ -456,7 +487,7 @@ class ProjectKpiService
 
             // Lista de tareas activas
             $activeItems = $assignedItems
-                ->filter(fn ($i) => !in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))
+                ->filter(fn ($i) => ! in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))
                 ->map(fn ($i) => [
                     'id' => $i->id,
                     'sequence_id' => $i->sequence_id,
@@ -495,7 +526,7 @@ class ProjectKpiService
     private function calculatePeriodStartDate(string $period): ?Carbon
     {
         return match ($period) {
-            '7d'  => Carbon::now()->subDays(7),
+            '7d' => Carbon::now()->subDays(7),
             '14d' => Carbon::now()->subDays(14),
             '30d' => Carbon::now()->subDays(30),
             '90d' => Carbon::now()->subDays(90),
@@ -508,10 +539,14 @@ class ProjectKpiService
      */
     private function calculatePercentile(array $data, int $percentile): float
     {
-        if (empty($data)) return 0.0;
+        if (empty($data)) {
+            return 0.0;
+        }
         sort($data);
         $count = count($data);
-        if ($count === 1) return (float) $data[0];
+        if ($count === 1) {
+            return (float) $data[0];
+        }
 
         $index = ($percentile / 100) * ($count - 1);
         $fraction = $index - floor($index);

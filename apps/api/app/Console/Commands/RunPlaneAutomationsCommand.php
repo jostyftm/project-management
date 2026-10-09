@@ -9,13 +9,14 @@ use Illuminate\Console\Command;
 class RunPlaneAutomationsCommand extends Command
 {
     protected $signature = 'plane:run-automations {--project= : ID del proyecto específico}';
+
     protected $description = 'Ejecuta tareas recurrentes vencidas y evalúa reglas de automatización programadas';
 
     public function handle(
         RecurringWorkItemService $recurringService,
         AutomationRuleService $ruleService
     ): int {
-        $this->info("Iniciando procesamiento de automatizaciones de Plane...");
+        $this->info('Iniciando procesamiento de automatizaciones de Plane...');
 
         // 1. Tareas recurrentes vencidas
         $recurringCount = $recurringService->runDueRecurringItems();
@@ -26,7 +27,8 @@ class RunPlaneAutomationsCommand extends Command
         $rulesCount = $ruleService->runScheduledRules($projectId);
         $this->line("  ✓ Reglas de automatización programadas ejecutadas: {$rulesCount}");
 
-        $this->info("Automatizaciones finalizadas con éxito.");
+        $this->info('Automatizaciones finalizadas con éxito.');
+
         return Command::SUCCESS;
     }
 }

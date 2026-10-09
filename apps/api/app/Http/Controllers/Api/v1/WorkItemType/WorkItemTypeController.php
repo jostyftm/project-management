@@ -20,12 +20,14 @@ class WorkItemTypeController extends Controller
     public function index(Request $request, ?Project $project = null): AnonymousResourceCollection
     {
         $types = $this->typeService->list($request, $project);
+
         return WorkItemTypeResource::collection($types);
     }
 
     public function store(WorkItemTypeCreateRequest $request, ?Project $project = null): JsonResponse
     {
         $type = $this->typeService->save($request, $project);
+
         return (new WorkItemTypeResource($type))
             ->response()
             ->setStatusCode(201);

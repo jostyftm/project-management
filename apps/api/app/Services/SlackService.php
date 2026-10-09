@@ -19,6 +19,7 @@ class SlackService
         // Si es una URL de prueba simulada o entorno local de test
         if (str_contains($webhookUrl, 'example.com') || app()->environment('testing')) {
             Log::info("Slack Notification (Simulated): [{$title}] {$message}");
+
             return true;
         }
 
@@ -41,9 +42,11 @@ class SlackService
 
         try {
             $response = Http::timeout(5)->post($webhookUrl, $payload);
+
             return $response->successful();
         } catch (\Throwable $e) {
-            Log::warning("Error sending Slack notification: " . $e->getMessage());
+            Log::warning('Error sending Slack notification: '.$e->getMessage());
+
             return false;
         }
     }

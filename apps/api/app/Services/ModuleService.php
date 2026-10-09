@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Module;
 use App\Models\Project;
-use App\Models\WorkItem;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -63,6 +62,7 @@ class ModuleService
     {
         $data = $request->validated();
         $module->update($data);
+
         return $module->load(['lead', 'workItems']);
     }
 
@@ -72,6 +72,7 @@ class ModuleService
     public function syncWorkItems(Module $module, array $workItemIds): Module
     {
         $module->workItems()->sync($workItemIds);
+
         return $module->load('workItems');
     }
 

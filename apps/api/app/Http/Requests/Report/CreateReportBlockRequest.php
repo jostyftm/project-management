@@ -16,11 +16,11 @@ class CreateReportBlockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type'       => ['required', Rule::in(BlockType::values())],
-            'title'      => ['nullable', 'string', 'max:255'],
-            'position'   => ['nullable', 'integer', 'min:0'],
-            'width'      => ['nullable', 'integer', 'min:1', 'max:12'],
-            'config'     => ['nullable', 'array'],
+            'type' => ['required', Rule::in(BlockType::values())],
+            'title' => ['nullable', 'string', 'max:255'],
+            'position' => ['nullable', 'integer', 'min:0'],
+            'width' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'config' => ['nullable', 'array'],
             'is_visible' => ['nullable', 'boolean'],
         ];
     }

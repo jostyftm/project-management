@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\Project;
 
+use App\Models\ProjectMember;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,8 +24,8 @@ class ProjectResource extends JsonResource
                 'estimate_system' => $this->estimate_system ?? 'FIBONACCI',
                 'start_date' => $this->start_date?->format('Y-m-d'),
                 'target_date' => $this->target_date?->format('Y-m-d'),
-                'completed_work_items_count' => $this->workItems()->whereHas('state', fn($q) => $q->where('group', 'COMPLETED'))->count(),
-                'overdue_items_count' => $this->workItems()->whereHas('state', fn($q) => $q->whereNotIn('group', ['COMPLETED', 'CANCELLED']))->whereNotNull('target_date')->where('target_date', '<', now()->toDateString())->count(),
+                'completed_work_items_count' => $this->workItems()->whereHas('state', fn ($q) => $q->where('group', 'COMPLETED'))->count(),
+                'overdue_items_count' => $this->workItems()->whereHas('state', fn ($q) => $q->whereNotIn('group', ['COMPLETED', 'CANCELLED']))->whereNotNull('target_date')->where('target_date', '<', now()->toDateString())->count(),
                 'current_user_role' => $this->resolveCurrentUserRole($request->user()),
                 'created_at' => $this->created_at?->toISOString(),
                 'updated_at' => $this->updated_at?->toISOString(),
@@ -44,7 +46,7 @@ class ProjectResource extends JsonResource
         ];
     }
 
-    protected function resolveCurrentUserRole(?\App\Models\User $user): ?string
+    protected function resolveCurrentUserRole(?User $user): ?string
     {
         if (! $user) {
             return null;
@@ -65,7 +67,7 @@ class ProjectResource extends JsonResource
             }
         }
 
-        $projectMember = \App\Models\ProjectMember::where('project_id', $this->id)
+        $projectMember = ProjectMember::where('project_id', $this->id)
             ->where('user_id', $user->id)
             ->first();
 

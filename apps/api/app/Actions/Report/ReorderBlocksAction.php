@@ -9,7 +9,8 @@ class ReorderBlocksAction
 {
     /**
      * Reordenar los bloques de un reporte.
-     * @param array $order Array de [{ id: int, position: int }]
+     *
+     * @param  array  $order  Array de [{ id: int, position: int }]
      */
     public function handle(WorkspaceReport $report, array $order): void
     {

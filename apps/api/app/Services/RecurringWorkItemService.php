@@ -7,7 +7,6 @@ use App\Models\RecurringWorkItem;
 use App\Models\WorkItem;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class RecurringWorkItemService
 {
@@ -65,13 +64,13 @@ class RecurringWorkItemService
         $nextSeq = $lastSeq + 1;
 
         $stateId = $template['state_id'] ?? null;
-        if (!$stateId && $project) {
+        if (! $stateId && $project) {
             $stateId = $project->states()->where('is_default', true)->value('id')
                 ?? $project->states()->value('id');
         }
 
         $typeId = $template['type_id'] ?? null;
-        if (!$typeId && $project) {
+        if (! $typeId && $project) {
             $typeId = $project->workItemTypes()->value('id');
         }
 
@@ -80,7 +79,7 @@ class RecurringWorkItemService
             'project_id' => $recurring->project_id,
             'sequence_id' => $nextSeq,
             'title' => $template['title'] ?? 'Tarea Periódica',
-            'description_json' => !empty($template['description']) ? [
+            'description_json' => ! empty($template['description']) ? [
                 'type' => 'doc',
                 'content' => [
                     [
@@ -114,7 +113,7 @@ class RecurringWorkItemService
         $dueItems = RecurringWorkItem::where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('next_run_at')
-                  ->orWhere('next_run_at', '<=', now());
+                    ->orWhere('next_run_at', '<=', now());
             })
             ->with('project')
             ->get();

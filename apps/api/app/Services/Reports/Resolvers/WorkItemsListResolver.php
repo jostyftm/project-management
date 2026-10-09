@@ -13,16 +13,16 @@ class WorkItemsListResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
-        $filter     = $config['filter'] ?? 'urgent';
+        $config = $block->config ?? [];
+        $filter = $config['filter'] ?? 'urgent';
         $projectIds = $config['project_ids'] ?? [];
-        $limit      = min(max((int)($config['limit'] ?? 5), 1), 20);
+        $limit = min(max((int) ($config['limit'] ?? 5), 1), 20);
 
         $query = WorkItem::query()->with(['project', 'state', 'lead']);
 
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
         }
 
@@ -52,16 +52,16 @@ class WorkItemsListResolver
 
         $list = $items->map(function ($item) {
             return [
-                'id'          => $item->id,
-                'identifier'  => ($item->project?->identifier ?? 'ITEM') . '-' . $item->sequence_id,
-                'title'       => $item->title,
-                'priority'    => $item->priority,
-                'state'       => [
-                    'name'  => $item->state?->name ?? 'Sin estado',
+                'id' => $item->id,
+                'identifier' => ($item->project?->identifier ?? 'ITEM').'-'.$item->sequence_id,
+                'title' => $item->title,
+                'priority' => $item->priority,
+                'state' => [
+                    'name' => $item->state?->name ?? 'Sin estado',
                     'group' => $item->state?->group ?? 'UNSTARTED',
                 ],
-                'lead'        => $item->lead ? [
-                    'name'   => $item->lead->name,
+                'lead' => $item->lead ? [
+                    'name' => $item->lead->name,
                     'avatar' => $item->lead->avatar ?? null,
                 ] : null,
                 'target_date' => $item->target_date?->toDateString(),
@@ -70,8 +70,8 @@ class WorkItemsListResolver
 
         return [
             'filter' => $filter,
-            'items'  => $list,
-            'count'  => count($list),
+            'items' => $list,
+            'count' => count($list),
         ];
     }
 }

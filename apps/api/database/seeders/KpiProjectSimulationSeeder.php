@@ -288,17 +288,17 @@ class KpiProjectSimulationSeeder extends Seeder
             );
 
             // Asignar miembros
-            if (!empty($item['assignees'])) {
+            if (! empty($item['assignees'])) {
                 $wi->assignees()->syncWithoutDetaching($item['assignees']);
             }
 
             // Asignar labels
-            if (!empty($item['labels'])) {
+            if (! empty($item['labels'])) {
                 $wi->labels()->syncWithoutDetaching($item['labels']);
             }
 
             // Asignar ciclo
-            if (!empty($item['cycle_id'])) {
+            if (! empty($item['cycle_id'])) {
                 $wi->cycles()->syncWithoutDetaching([$item['cycle_id']]);
             }
 

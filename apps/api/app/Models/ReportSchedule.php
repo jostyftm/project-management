@@ -22,11 +22,11 @@ class ReportSchedule extends Model
     ];
 
     protected $casts = [
-        'frequency'   => ScheduleFrequency::class,
-        'recipients'  => 'array',
+        'frequency' => ScheduleFrequency::class,
+        'recipients' => 'array',
         'next_run_at' => 'datetime',
         'last_run_at' => 'datetime',
-        'is_active'   => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     public function report(): BelongsTo

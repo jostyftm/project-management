@@ -22,12 +22,14 @@ class ModuleController extends Controller
     public function index(Request $request, Project $project): AnonymousResourceCollection
     {
         $modules = $this->moduleService->list($request, $project);
+
         return ModuleResource::collection($modules);
     }
 
     public function store(ModuleCreateRequest $request, Project $project): JsonResponse
     {
         $module = $this->moduleService->save($request, $project);
+
         return (new ModuleResource($module))
             ->response()
             ->setStatusCode(201);
@@ -36,12 +38,14 @@ class ModuleController extends Controller
     public function show(Module $module): ModuleResource
     {
         $module = $this->moduleService->get($module);
+
         return new ModuleResource($module);
     }
 
     public function update(ModuleUpdateRequest $request, Module $module): ModuleResource
     {
         $module = $this->moduleService->update($request, $module);
+
         return new ModuleResource($module);
     }
 
@@ -63,6 +67,7 @@ class ModuleController extends Controller
     public function progress(Module $module): JsonResponse
     {
         $progress = $this->moduleService->getProgress($module);
+
         return response()->json([
             'data' => $progress,
         ]);

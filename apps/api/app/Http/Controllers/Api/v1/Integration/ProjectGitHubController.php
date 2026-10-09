@@ -13,6 +13,8 @@ use App\Models\WorkItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ProjectGitHubController extends Controller
@@ -62,7 +64,7 @@ class ProjectGitHubController extends Controller
             $linkedNames = $repositories->pluck('repo_full_name')->all();
 
             $unlinkedRepos = collect($workspaceRepos)->filter(function ($r) use ($linkedNames) {
-                return !in_array($r['full_name'], $linkedNames);
+                return ! in_array($r['full_name'], $linkedNames);
             })->values()->all();
 
             $workspaceGitHub = [
@@ -78,7 +80,7 @@ class ProjectGitHubController extends Controller
             ];
         }
 
-        $webhookBaseUrl = url("/api/v1/integrations/github/webhook");
+        $webhookBaseUrl = url('/api/v1/integrations/github/webhook');
 
         return response()->json([
             'repositories' => $repositories->map(function ($repo) use ($webhookBaseUrl) {
@@ -157,10 +159,12 @@ class ProjectGitHubController extends Controller
                         'webhook_secret' => $repo->webhook_secret,
                     ];
                 }
+
                 return $saved;
             });
 
             $count = count($savedRepos);
+
             return response()->json([
                 'message' => "{$count} repositorio(s) vinculados exitosamente al proyecto",
                 'repositories' => $savedRepos,
@@ -224,7 +228,7 @@ class ProjectGitHubController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
-        $repo->update(array_filter($validated, fn($val) => !is_null($val)));
+        $repo->update(array_filter($validated, fn ($val) => ! is_null($val)));
 
         return response()->json([
             'message' => "Repositorio '{$repo->repo_full_name}' actualizado",
@@ -298,7 +302,7 @@ class ProjectGitHubController extends Controller
             'work_item_id' => $work_item->id,
             'identifier' => $work_item->identifier,
             'title' => $work_item->title,
-            'available_repositories' => $repositories->map(fn($r) => [
+            'available_repositories' => $repositories->map(fn ($r) => [
                 'id' => $r->id,
                 'repo_full_name' => $r->repo_full_name,
                 'label' => $r->label,
@@ -348,12 +352,12 @@ class ProjectGitHubController extends Controller
             'User-Agent' => 'Plane-SelfHosted-App',
             'Accept' => 'application/vnd.github.v3+json',
         ];
-        if (!empty($token)) {
+        if (! empty($token)) {
             $headers['Authorization'] = "Bearer {$token}";
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
+            $response = Http::withHeaders($headers)
                 ->timeout(8)
                 ->get("https://api.github.com/repos/{$repoFullName}/branches?per_page=100");
 
@@ -364,12 +368,12 @@ class ProjectGitHubController extends Controller
                     ->values()
                     ->all();
 
-                if (!empty($branches)) {
+                if (! empty($branches)) {
                     return response()->json(['branches' => $branches]);
                 }
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("Error al consultar ramas para {$repoFullName}: " . $e->getMessage());
+            Log::warning("Error al consultar ramas para {$repoFullName}: ".$e->getMessage());
         }
 
         return response()->json(['branches' => ['main', 'master', 'dev']]);
@@ -393,13 +397,13 @@ class ProjectGitHubController extends Controller
 
         // Verificar que el repositorio esté vinculado a este proyecto
         $repo = $project->githubRepositories()->where('repo_full_name', $repoFullName)->first();
-        if (!$repo) {
+        if (! $repo) {
             return response()->json([
-                'message' => "El repositorio '{$repoFullName}' no está vinculado a este proyecto."
+                'message' => "El repositorio '{$repoFullName}' no está vinculado a este proyecto.",
             ], 404);
         }
 
-        $baseBranch = !empty($validated['base_branch']) ? $validated['base_branch'] : ($repo->default_branch ?: 'main');
+        $baseBranch = ! empty($validated['base_branch']) ? $validated['base_branch'] : ($repo->default_branch ?: 'main');
 
         // Token de GitHub del workspace
         $workspace = $project->workspace;
@@ -411,7 +415,7 @@ class ProjectGitHubController extends Controller
         $token = $workspaceIntegration?->config['access_token'] ?? null;
         if (empty($token)) {
             return response()->json([
-                'message' => 'No hay credenciales de GitHub configuradas en el Workspace para crear ramas.'
+                'message' => 'No hay credenciales de GitHub configuradas en el Workspace para crear ramas.',
             ], 422);
         }
 
@@ -423,7 +427,7 @@ class ProjectGitHubController extends Controller
 
         try {
             // 1. Obtener SHA del commit base en GitHub
-            $refResponse = \Illuminate\Support\Facades\Http::withHeaders($headers)
+            $refResponse = Http::withHeaders($headers)
                 ->timeout(10)
                 ->get("https://api.github.com/repos/{$repoFullName}/git/ref/heads/{$baseBranch}");
 
@@ -431,7 +435,7 @@ class ProjectGitHubController extends Controller
             if ($refResponse->successful()) {
                 $sha = $refResponse->json('object.sha');
             } else {
-                $branchResponse = \Illuminate\Support\Facades\Http::withHeaders($headers)
+                $branchResponse = Http::withHeaders($headers)
                     ->timeout(10)
                     ->get("https://api.github.com/repos/{$repoFullName}/branches/{$baseBranch}");
 
@@ -442,12 +446,12 @@ class ProjectGitHubController extends Controller
 
             if (empty($sha)) {
                 return response()->json([
-                    'message' => "No se pudo obtener el commit base de la rama '{$baseBranch}' en {$repoFullName}."
+                    'message' => "No se pudo obtener el commit base de la rama '{$baseBranch}' en {$repoFullName}.",
                 ], 400);
             }
 
             // 2. Crear la nueva referencia en GitHub (POST /git/refs)
-            $createResponse = \Illuminate\Support\Facades\Http::withHeaders($headers)
+            $createResponse = Http::withHeaders($headers)
                 ->timeout(10)
                 ->post("https://api.github.com/repos/{$repoFullName}/git/refs", [
                     'ref' => "refs/heads/{$branchName}",
@@ -456,12 +460,13 @@ class ProjectGitHubController extends Controller
 
             if ($createResponse->status() === 422) {
                 return response()->json([
-                    'message' => "La rama '{$branchName}' ya existe en el repositorio {$repoFullName}."
+                    'message' => "La rama '{$branchName}' ya existe en el repositorio {$repoFullName}.",
                 ], 422);
             }
 
-            if (!$createResponse->successful()) {
+            if (! $createResponse->successful()) {
                 $errorMsg = $createResponse->json('message') ?: 'Error al crear la rama en GitHub.';
+
                 return response()->json(['message' => $errorMsg], $createResponse->status());
             }
 
@@ -470,7 +475,7 @@ class ProjectGitHubController extends Controller
             // 3. Si se asoció a un Work Item, auto-transicionar su estado a 'STARTED' si estaba en 'UNSTARTED' o 'BACKLOG'
             $workItemUpdated = false;
             $newState = null;
-            if (!empty($validated['work_item_id'])) {
+            if (! empty($validated['work_item_id'])) {
                 $workItem = WorkItem::where('project_id', $project->id)
                     ->where('id', $validated['work_item_id'])
                     ->first();
@@ -523,11 +528,11 @@ class ProjectGitHubController extends Controller
             ], 201);
 
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error("Error al crear rama en GitHub: " . $e->getMessage());
+            Log::error('Error al crear rama en GitHub: '.$e->getMessage());
+
             return response()->json([
-                'message' => 'Error al comunicar con GitHub: ' . $e->getMessage(),
+                'message' => 'Error al comunicar con GitHub: '.$e->getMessage(),
             ], 500);
         }
     }
 }
-

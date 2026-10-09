@@ -34,13 +34,13 @@ class AuthService
                 'password' => Hash::make($data['password']),
             ]);
 
-            $workspaceName = $data['workspace_name'] ?? ($user->name . "'s Workspace");
+            $workspaceName = $data['workspace_name'] ?? ($user->name."'s Workspace");
             $baseSlug = Str::slug($workspaceName);
             $slug = $baseSlug;
             $counter = 1;
 
             while (Workspace::where('slug', $slug)->exists()) {
-                $slug = $baseSlug . '-' . $counter++;
+                $slug = $baseSlug.'-'.$counter++;
             }
 
             $workspace = Workspace::create([
@@ -134,7 +134,7 @@ class AuthService
             );
 
             $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3010')), '/');
-            $resetUrl = "{$frontendUrl}/reset-password?token={$plainToken}&email=" . urlencode($email);
+            $resetUrl = "{$frontendUrl}/reset-password?token={$plainToken}&email=".urlencode($email);
 
             try {
                 SendNotificationEmailJob::dispatch(
@@ -142,11 +142,11 @@ class AuthService
                     new ResetPasswordMail($resetUrl, $user->name, 10)
                 );
             } catch (\Throwable $e) {
-                Log::warning("No se pudo encolar correo de recuperación de contraseña para {$user->email}: " . $e->getMessage());
+                Log::warning("No se pudo encolar correo de recuperación de contraseña para {$user->email}: ".$e->getMessage());
                 try {
                     Mail::to($user->email)->send(new ResetPasswordMail($resetUrl, $user->name, 10));
                 } catch (\Throwable $inner) {
-                    Log::error("Fallo al enviar correo directo de recuperación a {$user->email}: " . $inner->getMessage());
+                    Log::error("Fallo al enviar correo directo de recuperación a {$user->email}: ".$inner->getMessage());
                 }
             }
         }
@@ -211,4 +211,3 @@ class AuthService
         ];
     }
 }
-

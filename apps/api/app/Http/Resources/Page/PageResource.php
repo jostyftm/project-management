@@ -2,6 +2,9 @@
 
 namespace App\Http\Resources\Page;
 
+use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -56,7 +59,7 @@ class PageResource extends JsonResource
         ];
     }
 
-    protected function resolveCurrentUserRole(?\App\Models\Project $project, ?\App\Models\User $user): ?string
+    protected function resolveCurrentUserRole(?Project $project, ?User $user): ?string
     {
         if (! $project || ! $user) {
             return null;
@@ -70,7 +73,7 @@ class PageResource extends JsonResource
             return 'ADMIN';
         }
 
-        $projectMember = \App\Models\ProjectMember::where('project_id', $project->id)
+        $projectMember = ProjectMember::where('project_id', $project->id)
             ->where('user_id', $user->id)
             ->first();
 

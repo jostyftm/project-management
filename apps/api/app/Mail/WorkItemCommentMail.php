@@ -36,9 +36,9 @@ class WorkItemCommentMail extends Mailable
         return new Content(
             view: 'emails.work_item_comment',
             with: [
-                'workItem'    => $this->workItem,
-                'comment'     => $this->comment,
-                'author'      => $this->author,
+                'workItem' => $this->workItem,
+                'comment' => $this->comment,
+                'author' => $this->author,
                 'projectName' => $this->workItem->project?->name ?? 'Proyecto',
                 'workItemUrl' => $this->workItemUrl,
             ],

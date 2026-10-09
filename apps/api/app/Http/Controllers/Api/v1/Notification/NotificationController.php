@@ -24,6 +24,7 @@ class NotificationController extends Controller
             ?? (app()->bound('current_workspace_id') ? app('current_workspace_id') : null);
 
         $notifications = $this->notificationService->listForUser($userId, $workspaceId, $request->validated());
+
         return NotificationResource::collection($notifications);
     }
 
@@ -35,6 +36,7 @@ class NotificationController extends Controller
             ?? (app()->bound('current_workspace_id') ? app('current_workspace_id') : null);
 
         $count = $this->notificationService->getUnreadCount($userId, $workspaceId);
+
         return response()->json(['unread_count' => $count]);
     }
 
@@ -54,6 +56,7 @@ class NotificationController extends Controller
             ?? (app()->bound('current_workspace_id') ? app('current_workspace_id') : null);
 
         $updated = $this->notificationService->markAllAsRead($userId, $workspaceId);
+
         return response()->json(['marked_count' => $updated]);
     }
 }

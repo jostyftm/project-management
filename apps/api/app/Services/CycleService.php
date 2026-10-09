@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -70,6 +71,7 @@ class CycleService
     {
         $data = $request->validated();
         $cycle->update($data);
+
         return $cycle->load(['owner', 'workItems']);
     }
 
@@ -79,6 +81,7 @@ class CycleService
     public function addWorkItems(Cycle $cycle, array $workItemIds): Cycle
     {
         $cycle->workItems()->syncWithoutDetaching($workItemIds);
+
         return $cycle->load('workItems');
     }
 
@@ -155,7 +158,7 @@ class CycleService
 
             // Notificar a los miembros del proyecto sobre la finalización del ciclo
             try {
-                $completedCount = $cycle->workItems->filter(fn($i) => in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->count();
+                $completedCount = $cycle->workItems->filter(fn ($i) => in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->count();
                 $transferredCount = $cycle->workItems->count() - $completedCount;
                 $user = auth()->user() ?? $project->creator ?? User::first();
                 $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
@@ -188,7 +191,7 @@ class CycleService
                     }
                 }
             } catch (Throwable $e) {
-                Log::warning("Error notificando finalización de ciclo: " . $e->getMessage());
+                Log::warning('Error notificando finalización de ciclo: '.$e->getMessage());
             }
 
             return $cycle->fresh(['workItems.state']);
@@ -243,8 +246,8 @@ class CycleService
         $completionRate = $scope > 0 ? round(($done / $scope) * 100, 1) : 0.0;
 
         // Date range and current day index
-        $startDate = $cycle->start_date ? \Carbon\Carbon::parse($cycle->start_date)->startOfDay() : ($cycle->created_at ? $cycle->created_at->copy()->startOfDay() : now()->startOfDay());
-        $endDate = $cycle->end_date ? \Carbon\Carbon::parse($cycle->end_date)->endOfDay() : (clone $startDate)->addDays(13)->endOfDay();
+        $startDate = $cycle->start_date ? Carbon::parse($cycle->start_date)->startOfDay() : ($cycle->created_at ? $cycle->created_at->copy()->startOfDay() : now()->startOfDay());
+        $endDate = $cycle->end_date ? Carbon::parse($cycle->end_date)->endOfDay() : (clone $startDate)->addDays(13)->endOfDay();
         if ($endDate->lessThanOrEqualTo($startDate)) {
             $endDate = (clone $startDate)->addDays(13)->endOfDay();
         }
@@ -290,7 +293,8 @@ class CycleService
                     if ($item->state?->group !== 'COMPLETED') {
                         return false;
                     }
-                    $compDate = $item->completed_at ? \Carbon\Carbon::parse($item->completed_at) : \Carbon\Carbon::parse($item->updated_at);
+                    $compDate = $item->completed_at ? Carbon::parse($item->completed_at) : Carbon::parse($item->updated_at);
+
                     return $compDate->lessThanOrEqualTo($currentDay);
                 });
 
@@ -302,7 +306,8 @@ class CycleService
                     if ($item->state?->group !== 'STARTED') {
                         return false;
                     }
-                    $startDate = \Carbon\Carbon::parse($item->updated_at ?? $item->created_at);
+                    $startDate = Carbon::parse($item->updated_at ?? $item->created_at);
+
                     return $startDate->lessThanOrEqualTo($currentDay);
                 });
 
@@ -316,7 +321,7 @@ class CycleService
                 $dayCompleted = $done;
                 $dayCompletedPoints = $completedPoints;
                 $dayStarted = $started;
-                $dayStartedPoints = (float) $workItems->filter(fn($i) => $i->state?->group === 'STARTED')->sum('estimate_points');
+                $dayStartedPoints = (float) $workItems->filter(fn ($i) => $i->state?->group === 'STARTED')->sum('estimate_points');
                 $dayPending = $pending;
                 $dayPendingPoints = max(0, $totalPoints - $completedPoints);
             }

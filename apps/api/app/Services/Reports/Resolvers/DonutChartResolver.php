@@ -14,14 +14,14 @@ class DonutChartResolver
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
-        $config     = $block->config ?? [];
-        $dimension  = $config['dimension'] ?? 'state';
+        $config = $block->config ?? [];
+        $dimension = $config['dimension'] ?? 'state';
         $projectIds = $config['project_ids'] ?? [];
 
         $query = WorkItem::query();
-        if (!empty($projectIds)) {
+        if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
-        } elseif (!empty($scope['workspace_id'])) {
+        } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
         }
 
@@ -30,10 +30,10 @@ class DonutChartResolver
         if ($dimension === 'priority') {
             $priorityColors = [
                 'URGENT' => '#ef4444',
-                'HIGH'   => '#f97316',
+                'HIGH' => '#f97316',
                 'MEDIUM' => '#eab308',
-                'LOW'    => '#3b82f6',
-                'NONE'   => '#9ca3af',
+                'LOW' => '#3b82f6',
+                'NONE' => '#9ca3af',
             ];
 
             $results = (clone $query)
@@ -45,22 +45,22 @@ class DonutChartResolver
 
             foreach ($priorityColors as $priority => $color) {
                 $item = $results->firstWhere('priority', $priority);
-                $count = $item ? (int)$item->count : 0;
+                $count = $item ? (int) $item->count : 0;
                 if ($count > 0 || $total === 0) {
                     $segments[] = [
-                        'name'       => $this->priorityLabel($priority),
-                        'value'      => $count,
+                        'name' => $this->priorityLabel($priority),
+                        'value' => $count,
                         'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
-                        'color'      => $color,
+                        'color' => $color,
                     ];
                 }
             }
         } else {
             // Dimension: state
             $stateColors = [
-                'BACKLOG'   => '#94a3b8',
+                'BACKLOG' => '#94a3b8',
                 'UNSTARTED' => '#64748b',
-                'STARTED'   => '#3b82f6',
+                'STARTED' => '#3b82f6',
                 'COMPLETED' => '#10b981',
                 'CANCELLED' => '#ef4444',
             ];
@@ -74,12 +74,12 @@ class DonutChartResolver
             $total = $results->sum('count');
 
             foreach ($results as $item) {
-                $count = (int)$item->count;
+                $count = (int) $item->count;
                 $segments[] = [
-                    'name'       => $item->name,
-                    'value'      => $count,
+                    'name' => $item->name,
+                    'value' => $count,
                     'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
-                    'color'      => $stateColors[$item->group] ?? '#6366f1',
+                    'color' => $stateColors[$item->group] ?? '#6366f1',
                 ];
             }
 
@@ -95,8 +95,8 @@ class DonutChartResolver
 
         return [
             'dimension' => $dimension,
-            'segments'  => $segments,
-            'total'     => $total,
+            'segments' => $segments,
+            'total' => $total,
         ];
     }
 
@@ -104,11 +104,11 @@ class DonutChartResolver
     {
         return match ($priority) {
             'URGENT' => 'Urgente',
-            'HIGH'   => 'Alta',
+            'HIGH' => 'Alta',
             'MEDIUM' => 'Media',
-            'LOW'    => 'Baja',
-            'NONE'   => 'Sin Prioridad',
-            default  => $priority,
+            'LOW' => 'Baja',
+            'NONE' => 'Sin Prioridad',
+            default => $priority,
         };
     }
 }

@@ -17,6 +17,7 @@ class YourWorkController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $items = $this->yourWorkService->getItems($request);
+
         return WorkItemResource::collection($items);
     }
 }

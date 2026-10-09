@@ -40,3 +40,8 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 - **Pruebas Automatizadas:** `docker compose exec project_managment php artisan test`
 - **Formateo de Código:** `docker compose exec project_managment ./vendor/bin/pint`
 - **Inspector MCP:** `docker compose exec project_managment php artisan mcp:inspector project-management`
+
+---
+
+## 3. Documentación Técnica de Integración y Work Items
+- **Guía de Integración Completa:** Para detalles sobre el almacenamiento en HTML puro (`description_html`), el catálogo de editores frontend (`RichTextEditor` vs `NotionBlockEditor`) y contratos de MCP/REST API, consulta [docs/WORK_ITEM_INTEGRATION_AND_MCP.md](docs/WORK_ITEM_INTEGRATION_AND_MCP.md).

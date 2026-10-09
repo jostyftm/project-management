@@ -11,8 +11,6 @@ use App\Models\ProjectGithubSetting;
 use App\Models\State;
 use App\Models\WorkItem;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class GitHubSyncService
 {
@@ -68,7 +66,7 @@ class GitHubSyncService
             $prState = 'draft';
         }
 
-        $mergedAt = !empty($prData['merged_at']) ? Carbon::parse($prData['merged_at']) : null;
+        $mergedAt = ! empty($prData['merged_at']) ? Carbon::parse($prData['merged_at']) : null;
 
         // Intentar extraer preview_url del cuerpo o comentario inicial si viene formateado
         $previewUrl = $this->extractPreviewUrl($body);
@@ -211,7 +209,7 @@ class GitHubSyncService
             $message = $commitData['message'] ?? '';
             $authorName = $commitData['author']['name'] ?? ($commitData['author']['username'] ?? 'Developer');
             $htmlUrl = $commitData['url'] ?? '';
-            $committedAt = !empty($commitData['timestamp']) ? Carbon::parse($commitData['timestamp']) : now();
+            $committedAt = ! empty($commitData['timestamp']) ? Carbon::parse($commitData['timestamp']) : now();
 
             $matchedSequenceIds = $this->extractSequenceIds($project->identifier, $message);
             if (empty($matchedSequenceIds)) {
@@ -247,7 +245,7 @@ class GitHubSyncService
                         ? State::find($setting->completed_state_id)
                         : $project->states()->where('group', 'COMPLETED')->first();
 
-                    if ($completedState && (!$setting || !$setting->require_all_prs_merged || $item->githubPullRequests()->whereIn('state', ['open', 'draft'])->count() === 0)) {
+                    if ($completedState && (! $setting || ! $setting->require_all_prs_merged || $item->githubPullRequests()->whereIn('state', ['open', 'draft'])->count() === 0)) {
                         $item->update(['state_id' => $completedState->id]);
                         $this->logActivity($item, "Commit {$sha} cerró la tarea mediante palabra clave de cierre.");
                     }
@@ -272,7 +270,7 @@ class GitHubSyncService
         $envUrl = $payload['deployment_status']['environment_url'] ?? '';
         $ref = $payload['deployment']['ref'] ?? '';
 
-        if ($statusState === 'success' && !empty($envUrl) && !empty($ref)) {
+        if ($statusState === 'success' && ! empty($envUrl) && ! empty($ref)) {
             // Actualizar preview_url en las PRs correspondientes a esa rama
             $updated = GithubPullRequest::where('project_github_repo_id', $repo->id)
                 ->where('head_branch', $ref)
@@ -294,7 +292,7 @@ class GitHubSyncService
     public function simulateWebhook(int $projectId, array $data): array
     {
         $repo = ProjectGithubRepository::where('project_id', $projectId)->first();
-        if (!$repo) {
+        if (! $repo) {
             $repo = ProjectGithubRepository::create([
                 'project_id' => $projectId,
                 'repo_full_name' => 'simulated/repo',
@@ -319,7 +317,7 @@ class GitHubSyncService
         // Soporta formatos como PROJ-15, PROJ_15 o menciones de cierre
         preg_match_all("/{$prefix}[-_](\\d+)/i", $text, $matches);
 
-        if (!empty($matches[1])) {
+        if (! empty($matches[1])) {
             return array_unique(array_map('intval', $matches[1]));
         }
 
@@ -337,6 +335,7 @@ class GitHubSyncService
         if (preg_match('/https:\/\/[a-zA-Z0-9\-_.]+\.preview\.[a-zA-Z0-9\-_.]+/i', $text, $matches)) {
             return $matches[0];
         }
+
         return null;
     }
 

@@ -22,7 +22,17 @@ class WorkItemCreateRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
 
             /**
-             * Descripción estructurada en JSON o texto
+             * Descripción en formato HTML puro
+             */
+            'description_html' => ['nullable', 'string'],
+
+            /**
+             * Alias de descripción (HTML o texto)
+             */
+            'description' => ['nullable', 'string'],
+
+            /**
+             * Descripción estructurada en JSON o texto (legacy)
              */
             'description_json' => ['nullable'],
 

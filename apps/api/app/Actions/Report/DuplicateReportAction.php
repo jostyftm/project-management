@@ -13,9 +13,9 @@ class DuplicateReportAction
         return DB::transaction(function () use ($report, $newOwnerId) {
             // Duplicar el reporte
             $newReport = $report->replicate();
-            $newReport->title        = $report->title . ' (copia)';
-            $newReport->owner_id     = $newOwnerId;
-            $newReport->visibility   = ReportVisibility::DRAFT->value;
+            $newReport->title = $report->title.' (copia)';
+            $newReport->owner_id = $newOwnerId;
+            $newReport->visibility = ReportVisibility::DRAFT->value;
             $newReport->public_token = null;
             $newReport->published_at = null;
             $newReport->save();

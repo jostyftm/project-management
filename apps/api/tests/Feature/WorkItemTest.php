@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Activity;
 use App\Models\Project;
 use App\Models\State;
 use App\Models\User;
@@ -164,7 +165,7 @@ it('does not create activity log when only work item description is updated', fu
         'created_by' => $this->user->id,
     ]);
 
-    $initialActivitiesCount = \App\Models\Activity::where('entity_id', $workItem->id)->count();
+    $initialActivitiesCount = Activity::where('entity_id', $workItem->id)->count();
 
     $response = $this->withHeaders([
         'Authorization' => "Bearer {$this->token}",
@@ -180,7 +181,82 @@ it('does not create activity log when only work item description is updated', fu
 
     $response->assertStatus(200);
 
-    $newActivitiesCount = \App\Models\Activity::where('entity_id', $workItem->id)->count();
+    $newActivitiesCount = Activity::where('entity_id', $workItem->id)->count();
     expect($newActivitiesCount)->toBe($initialActivitiesCount);
 });
 
+it('creates and updates work item with pure html description and exposes it in resource', function () {
+    $htmlContent = '<h2>Objetivo del Sprint</h2><p>Implementar autenticación con <strong>OAuth2</strong> y <em>JWT</em>.</p><ul><li>Requisito 1</li><li>Requisito 2</li></ul>';
+
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->postJson("/api/v1/projects/{$this->project->id}/work-items", [
+        'title' => 'Tarea con HTML puro',
+        'description_html' => $htmlContent,
+        'priority' => 'HIGH',
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonPath('data.attributes.title', 'Tarea con HTML puro')
+        ->assertJsonPath('data.attributes.description_html', $htmlContent)
+        ->assertJsonPath('data.attributes.description', $htmlContent);
+
+    $itemId = $response->json('data.id');
+
+    // Verificar persistencia en base de datos
+    $this->assertDatabaseHas('work_items', [
+        'id' => $itemId,
+        'title' => 'Tarea con HTML puro',
+        'description_html' => $htmlContent,
+    ]);
+
+    // Actualizar descripción usando el alias 'description'
+    $updatedHtml = '<p>Descripción actualizada con nuevo alcance.</p>';
+    $updateResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->putJson("/api/v1/work-items/{$itemId}", [
+        'description' => $updatedHtml,
+    ]);
+
+    $updateResponse->assertStatus(200)
+        ->assertJsonPath('data.attributes.description_html', $updatedHtml)
+        ->assertJsonPath('data.attributes.description', $updatedHtml);
+
+    $this->assertDatabaseHas('work_items', [
+        'id' => $itemId,
+        'description_html' => $updatedHtml,
+    ]);
+});
+
+it('resolves legacy description_json to description_html attribute dynamically', function () {
+    $legacyItem = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 99,
+        'title' => 'Tarea Legacy con JSON',
+        'description_html' => null,
+        'description_json' => [
+            ['type' => 'heading_2', 'content' => 'Título Legacy'],
+            ['type' => 'paragraph', 'content' => 'Párrafo de bloque antiguo'],
+        ],
+        'state_id' => $this->stateTodo->id,
+        'priority' => 'MEDIUM',
+        'created_by' => $this->user->id,
+    ]);
+
+    // El accesor dinámico en el modelo debe resolverlo a HTML
+    expect($legacyItem->description_html)->toBe('<h2>Título Legacy</h2><p>Párrafo de bloque antiguo</p>');
+    expect($legacyItem->description)->toBe('<h2>Título Legacy</h2><p>Párrafo de bloque antiguo</p>');
+
+    // La API REST debe exponerlo en el Resource
+    $response = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'X-Workspace-Id' => $this->workspace->id,
+    ])->getJson("/api/v1/work-items/{$legacyItem->id}");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('data.attributes.description_html', '<h2>Título Legacy</h2><p>Párrafo de bloque antiguo</p>')
+        ->assertJsonPath('data.attributes.description', '<h2>Título Legacy</h2><p>Párrafo de bloque antiguo</p>');
+});

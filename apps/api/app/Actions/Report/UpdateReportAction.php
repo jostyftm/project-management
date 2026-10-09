@@ -11,10 +11,10 @@ class UpdateReportAction
     {
         return DB::transaction(function () use ($report, $data) {
             $report->update(array_filter([
-                'title'         => $data['title'] ?? null,
-                'description'   => array_key_exists('description', $data) ? $data['description'] : null,
-                'visibility'    => $data['visibility'] ?? null,
-                'theme'         => $data['theme'] ?? null,
+                'title' => $data['title'] ?? null,
+                'description' => array_key_exists('description', $data) ? $data['description'] : null,
+                'visibility' => $data['visibility'] ?? null,
+                'theme' => $data['theme'] ?? null,
                 'layout_config' => $data['layout_config'] ?? null,
             ], fn ($v) => $v !== null));
 

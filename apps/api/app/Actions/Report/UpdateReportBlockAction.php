@@ -20,7 +20,7 @@ class UpdateReportBlockAction
                 $updateData['config'] = array_merge($block->config ?? [], $data['config']);
                 // Invalidar caché al cambiar config
                 $updateData['data_cache'] = null;
-                $updateData['cached_at']  = null;
+                $updateData['cached_at'] = null;
             }
             if (isset($data['width'])) {
                 $updateData['width'] = $data['width'];
@@ -30,6 +30,7 @@ class UpdateReportBlockAction
             }
 
             $block->update($updateData);
+
             return $block->fresh();
         });
     }

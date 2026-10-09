@@ -53,6 +53,8 @@ export const workItemService = {
 
   create: async (projectId: string | number, payload: {
     title: string;
+    description_html?: string | null;
+    description?: string | null;
     description_json?: any;
     priority?: string;
     state_id?: string | number;

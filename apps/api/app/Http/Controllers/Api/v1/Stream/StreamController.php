@@ -19,11 +19,11 @@ class StreamController extends Controller
 
         return response()->stream(function () use ($userId, $workspaceId) {
             echo "event: connected\n";
-            echo 'data: ' . json_encode([
+            echo 'data: '.json_encode([
                 'status' => 'connected',
                 'workspace_id' => $workspaceId,
                 'timestamp' => now()->toIso8601String(),
-            ]) . "\n\n";
+            ])."\n\n";
 
             if (ob_get_level() > 0) {
                 ob_flush();
@@ -45,10 +45,10 @@ class StreamController extends Controller
                 $lastNotificationId = $lastNotification?->id ?? 0;
 
                 echo "event: notification_count\n";
-                echo 'data: ' . json_encode([
+                echo 'data: '.json_encode([
                     'count' => $unreadCount,
                     'unread_count' => $unreadCount,
-                ]) . "\n\n";
+                ])."\n\n";
 
                 if (ob_get_level() > 0) {
                     ob_flush();
@@ -78,7 +78,7 @@ class StreamController extends Controller
                     foreach ($newNotifications as $notif) {
                         $lastNotificationId = $notif->id;
                         echo "event: notification\n";
-                        echo 'data: ' . json_encode($notif) . "\n\n";
+                        echo 'data: '.json_encode($notif)."\n\n";
 
                         if (ob_get_level() > 0) {
                             ob_flush();
@@ -93,10 +93,10 @@ class StreamController extends Controller
                             ->count();
 
                         echo "event: notification_count\n";
-                        echo 'data: ' . json_encode([
+                        echo 'data: '.json_encode([
                             'count' => $unreadCount,
                             'unread_count' => $unreadCount,
-                        ]) . "\n\n";
+                        ])."\n\n";
 
                         if (ob_get_level() > 0) {
                             ob_flush();
@@ -108,7 +108,7 @@ class StreamController extends Controller
                 // Heartbeat ping cada 10 segundos
                 if ($iterations % 5 === 0) {
                     echo "event: ping\n";
-                    echo 'data: ' . json_encode(['time' => now()->toIso8601String()]) . "\n\n";
+                    echo 'data: '.json_encode(['time' => now()->toIso8601String()])."\n\n";
 
                     if (ob_get_level() > 0) {
                         ob_flush();

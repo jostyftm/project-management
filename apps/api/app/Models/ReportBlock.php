@@ -24,10 +24,10 @@ class ReportBlock extends Model
     ];
 
     protected $casts = [
-        'type'       => BlockType::class,
-        'config'     => 'array',
+        'type' => BlockType::class,
+        'config' => 'array',
         'data_cache' => 'array',
-        'cached_at'  => 'datetime',
+        'cached_at' => 'datetime',
         'is_visible' => 'boolean',
     ];
 
@@ -50,9 +50,10 @@ class ReportBlock extends Model
     /** Verifica si el caché sigue siendo válido (TTL 5 minutos) */
     public function isCacheValid(): bool
     {
-        if (!$this->cached_at) {
+        if (! $this->cached_at) {
             return false;
         }
+
         return $this->cached_at->diffInMinutes(now()) < 5;
     }
 }

@@ -21,12 +21,14 @@ class ReleaseController extends Controller
     public function index(Project $project): AnonymousResourceCollection
     {
         $releases = $this->releaseService->list($project->id);
+
         return ReleaseResource::collection($releases);
     }
 
     public function store(ReleaseCreateRequest $request, Project $project): JsonResponse
     {
         $release = $this->releaseService->create($project->id, $request->validated());
+
         return (new ReleaseResource($release))
             ->response()
             ->setStatusCode(201);
@@ -40,18 +42,21 @@ class ReleaseController extends Controller
     public function update(Request $request, Release $release): ReleaseResource
     {
         $updated = $this->releaseService->update($release, $request->all());
+
         return new ReleaseResource($updated);
     }
 
     public function publish(Release $release): ReleaseResource
     {
         $updated = $this->releaseService->publish($release);
+
         return new ReleaseResource($updated);
     }
 
     public function generateChangelog(Release $release): JsonResponse
     {
         $changelog = $this->releaseService->generateChangelog($release);
+
         return response()->json([
             'message' => 'Changelog generado exitosamente',
             'changelog' => $changelog,
@@ -61,6 +66,7 @@ class ReleaseController extends Controller
     public function destroy(Release $release): JsonResponse
     {
         $this->releaseService->delete($release);
+
         return response()->json(['message' => 'Release eliminado exitosamente']);
     }
 }

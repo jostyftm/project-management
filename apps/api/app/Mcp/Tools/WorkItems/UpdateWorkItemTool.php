@@ -6,6 +6,7 @@ use App\Mcp\Tools\Concerns\ResolvesWorkspaceContext;
 use App\Models\State;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -31,7 +32,7 @@ class UpdateWorkItemTool extends Tool
             'title' => $schema->string()
                 ->description('Nuevo título de la tarea'),
             'description' => $schema->string()
-                ->description('Nueva descripción o actualización de requerimientos'),
+                ->description('Nueva descripción o actualización de requerimientos en HTML puro o Markdown'),
             'state_id' => $schema->integer()
                 ->description('Nuevo ID de estado del flujo de trabajo'),
             'priority' => $schema->string()
@@ -77,13 +78,17 @@ class UpdateWorkItemTool extends Tool
 
             if ($request->has('description')) {
                 $descRaw = $request->get('description');
-                $updates['description_json'] = $descRaw ? [
-                    [
-                        'id' => 'b1',
-                        'type' => 'paragraph',
-                        'content' => $descRaw,
-                    ],
-                ] : null;
+                if ($descRaw !== null) {
+                    $trimmed = trim($descRaw);
+                    $descHtml = preg_match('/<[a-z][\s\S]*>/i', $trimmed)
+                        ? $trimmed
+                        : Str::markdown($trimmed);
+                    $updates['description_html'] = $descHtml;
+                    $updates['description_json'] = ['html' => $descHtml];
+                } else {
+                    $updates['description_html'] = null;
+                    $updates['description_json'] = null;
+                }
             }
 
             if ($stateId = $request->get('state_id')) {

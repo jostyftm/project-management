@@ -14,13 +14,13 @@ class ReportHtmlRenderer
     public function render(WorkspaceReport $report, array $resolvedData = []): string
     {
         $theme = $report->theme ?? [];
-        $primaryColor   = $theme['primaryColor'] ?? '#6366f1';
-        $accentColor    = $theme['accentColor'] ?? '#8b5cf6';
-        $bgColor        = $theme['backgroundColor'] ?? '#ffffff';
-        $surfaceColor   = $theme['surfaceColor'] ?? '#f8fafc';
-        $textColor      = $theme['textColor'] ?? '#0f172a';
-        $fontFamily     = $theme['fontFamily'] ?? 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        $borderRadius   = $theme['borderRadius'] ?? '12px';
+        $primaryColor = $theme['primaryColor'] ?? '#6366f1';
+        $accentColor = $theme['accentColor'] ?? '#8b5cf6';
+        $bgColor = $theme['backgroundColor'] ?? '#ffffff';
+        $surfaceColor = $theme['surfaceColor'] ?? '#f8fafc';
+        $textColor = $theme['textColor'] ?? '#0f172a';
+        $fontFamily = $theme['fontFamily'] ?? 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        $borderRadius = $theme['borderRadius'] ?? '12px';
 
         $blocks = $report->blocks()->where('is_visible', true)->orderBy('position')->get();
 
@@ -275,22 +275,25 @@ HTML;
 
     private function renderOptionalDesc(string $desc): string
     {
-        if (empty($desc)) return '';
-        return '<p style="margin: 6px 0 0 0; color: #475569; font-size: 12px; max-width: 700px;">' . $desc . '</p>';
+        if (empty($desc)) {
+            return '';
+        }
+
+        return '<p style="margin: 6px 0 0 0; color: #475569; font-size: 12px; max-width: 700px;">'.$desc.'</p>';
     }
 
     private function renderBlock(ReportBlock $block, array $data, string $primaryColor = '#6366f1'): string
     {
         // Si es separador, no necesita tarjeta contenedora
         if ($block->type === BlockType::DIVIDER) {
-            return '<div class="col-12">' . $this->renderDivider($block, $data) . '</div>';
+            return '<div class="col-12">'.$this->renderDivider($block, $data).'</div>';
         }
 
         $widthClass = match ($block->width) {
             12 => 'col-12',
-            8  => 'col-8',
-            6  => 'col-6',
-            4  => 'col-4',
+            8 => 'col-8',
+            6 => 'col-6',
+            4 => 'col-4',
             default => 'col-12',
         };
 
@@ -314,25 +317,25 @@ HTML;
     private function renderBlockBody(ReportBlock $block, array $data, string $primaryColor = '#6366f1'): string
     {
         return match ($block->type) {
-            BlockType::KPI_ROW             => $this->renderKpiRow($data, $primaryColor),
-            BlockType::NARRATIVE           => $this->renderNarrative($block, $data),
-            BlockType::PROJECT_SUMMARY     => $this->renderProjectSummary($data),
-            BlockType::TABLE               => $this->renderTable($data),
-            BlockType::WORK_ITEMS_LIST     => $this->renderWorkItemsList($data),
-            BlockType::CYCLES_OVERVIEW     => $this->renderCyclesOverview($data),
-            BlockType::CALLOUT             => $this->renderCallout($block, $data),
-            BlockType::LINE_CHART          => $this->renderLineChart($block, $data, $primaryColor),
-            BlockType::BAR_CHART           => $this->renderBarChart($block, $data),
-            BlockType::AREA_CHART          => $this->renderAreaChart($block, $data, $primaryColor),
-            BlockType::DONUT_CHART         => $this->renderDonutChart($block, $data),
-            BlockType::TEAM_WORKLOAD       => $this->renderTeamWorkload($data),
-            BlockType::HEATMAP             => $this->renderHeatmap($data),
+            BlockType::KPI_ROW => $this->renderKpiRow($data, $primaryColor),
+            BlockType::NARRATIVE => $this->renderNarrative($block, $data),
+            BlockType::PROJECT_SUMMARY => $this->renderProjectSummary($data),
+            BlockType::TABLE => $this->renderTable($data),
+            BlockType::WORK_ITEMS_LIST => $this->renderWorkItemsList($data),
+            BlockType::CYCLES_OVERVIEW => $this->renderCyclesOverview($data),
+            BlockType::CALLOUT => $this->renderCallout($block, $data),
+            BlockType::LINE_CHART => $this->renderLineChart($block, $data, $primaryColor),
+            BlockType::BAR_CHART => $this->renderBarChart($block, $data),
+            BlockType::AREA_CHART => $this->renderAreaChart($block, $data, $primaryColor),
+            BlockType::DONUT_CHART => $this->renderDonutChart($block, $data),
+            BlockType::TEAM_WORKLOAD => $this->renderTeamWorkload($data),
+            BlockType::HEATMAP => $this->renderHeatmap($data),
             BlockType::MILESTONES_PROGRESS => $this->renderMilestonesProgress($data),
-            BlockType::RELEASES_TIMELINE   => $this->renderReleasesTimeline($data),
-            BlockType::RECENT_ACTIVITY     => $this->renderRecentActivity($data),
-            BlockType::RISKS_BLOCKERS      => $this->renderRisksBlockers($data),
-            BlockType::IMAGE               => $this->renderImage($block, $data),
-            default                        => '<div style="font-size:11px;color:#64748b;">Visualización de bloque generada correctamente.</div>',
+            BlockType::RELEASES_TIMELINE => $this->renderReleasesTimeline($data),
+            BlockType::RECENT_ACTIVITY => $this->renderRecentActivity($data),
+            BlockType::RISKS_BLOCKERS => $this->renderRisksBlockers($data),
+            BlockType::IMAGE => $this->renderImage($block, $data),
+            default => '<div style="font-size:11px;color:#64748b;">Visualización de bloque generada correctamente.</div>',
         };
     }
 
@@ -342,14 +345,16 @@ HTML;
     private function renderKpiRow(array $data, string $primaryColor): string
     {
         $kpis = $data['kpis'] ?? [];
-        if (empty($kpis)) return '<p style="font-size:11px;color:#94a3b8;">Sin datos de KPIs</p>';
+        if (empty($kpis)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin datos de KPIs</p>';
+        }
 
         $sparklinePoints = $data['sparkline'] ?? [];
 
         $html = '<div class="kpi-grid">';
         foreach ($kpis as $k) {
-            $val = htmlspecialchars((string)($k['value'] ?? '0'));
-            $label = htmlspecialchars((string)($k['label'] ?? 'Métrica'));
+            $val = htmlspecialchars((string) ($k['value'] ?? '0'));
+            $label = htmlspecialchars((string) ($k['label'] ?? 'Métrica'));
             $icon = $k['icon'] ?? '📊';
             $delta = $k['delta_percent'] ?? null;
             $deltaHtml = '';
@@ -361,8 +366,8 @@ HTML;
 
             // Minigráfico Sparkline SVG (últimos 7 días)
             $sparklineHtml = '';
-            if (!empty($sparklinePoints) && count($sparklinePoints) >= 2) {
-                $values = array_map(fn ($p) => (int)($p['value'] ?? 0), $sparklinePoints);
+            if (! empty($sparklinePoints) && count($sparklinePoints) >= 2) {
+                $values = array_map(fn ($p) => (int) ($p['value'] ?? 0), $sparklinePoints);
                 $maxV = max($values) ?: 1;
                 $w = 120;
                 $h = 24;
@@ -391,6 +396,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -400,6 +406,7 @@ HTML;
     private function renderNarrative(ReportBlock $block, array $data): string
     {
         $content = $data['content'] ?? ($block->config['content'] ?? '');
+
         return "<div style=\"font-size:12px;line-height:1.6;\">{$content}</div>";
     }
 
@@ -409,20 +416,22 @@ HTML;
     private function renderProjectSummary(array $data): string
     {
         $projects = $data['projects'] ?? [];
-        if (empty($projects)) return '<p style="font-size:11px;color:#94a3b8;">Sin proyectos seleccionados</p>';
+        if (empty($projects)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin proyectos seleccionados</p>';
+        }
 
         $html = '<div style="display:flex;flex-direction:column;gap:10px;">';
         foreach ($projects as $p) {
             $pName = htmlspecialchars($p['name'] ?? 'Proyecto');
-            $prog = (int)($p['progress'] ?? 0);
+            $prog = (int) ($p['progress'] ?? 0);
             $health = $p['health'] ?? 'on_track';
             $healthBadge = match ($health) {
                 'on_track' => '<span class="status-pill status-green">En Tiempo</span>',
-                'at_risk'  => '<span class="status-pill status-yellow">En Riesgo</span>',
-                default    => '<span class="status-pill status-red">Retrasado</span>',
+                'at_risk' => '<span class="status-pill status-yellow">En Riesgo</span>',
+                default => '<span class="status-pill status-red">Retrasado</span>',
             };
-            $completed = (int)($p['completed_items'] ?? 0);
-            $total = (int)($p['total_items'] ?? 0);
+            $completed = (int) ($p['completed_items'] ?? 0);
+            $total = (int) ($p['total_items'] ?? 0);
 
             $html .= "
             <div style=\"background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;\">
@@ -440,6 +449,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -449,17 +459,19 @@ HTML;
     private function renderCyclesOverview(array $data): string
     {
         $cycles = $data['cycles'] ?? [];
-        if (empty($cycles)) return '<p style="font-size:11px;color:#94a3b8;">Sin ciclos configurados</p>';
+        if (empty($cycles)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin ciclos configurados</p>';
+        }
 
         $html = '<div style="display:flex;flex-direction:column;gap:8px;">';
         foreach ($cycles as $c) {
             $name = htmlspecialchars($c['name'] ?? 'Ciclo');
-            $prog = (int)($c['progress'] ?? 0);
+            $prog = (int) ($c['progress'] ?? 0);
             $start = $c['start_date'] ?? '';
             $end = $c['end_date'] ?? '';
             $dateRange = ($start && $end) ? "{$start} &rarr; {$end}" : '';
-            $total = (int)($c['total_items'] ?? 0);
-            $completed = (int)($c['completed_items'] ?? 0);
+            $total = (int) ($c['total_items'] ?? 0);
+            $completed = (int) ($c['completed_items'] ?? 0);
 
             $html .= "
             <div style=\"background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;\">
@@ -475,6 +487,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -484,14 +497,16 @@ HTML;
     private function renderTable(array $data): string
     {
         $items = $data['rows'] ?? ($data['items'] ?? []);
-        if (empty($items)) return '<p style="font-size:11px;color:#94a3b8;">Sin registros disponibles</p>';
+        if (empty($items)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin registros disponibles</p>';
+        }
 
         $html = '<table class="table-custom"><thead><tr>';
         $html .= '<th style="width:75px;">ID</th><th>Título</th><th>Estado</th><th>Prioridad</th><th>Responsable</th>';
         $html .= '</tr></thead><tbody>';
 
         foreach (array_slice($items, 0, 10) as $item) {
-            $identifier = htmlspecialchars($item['identifier'] ?? ('#' . ($item['id'] ?? '')));
+            $identifier = htmlspecialchars($item['identifier'] ?? ('#'.($item['id'] ?? '')));
             $title = htmlspecialchars($item['title'] ?? ($item['name'] ?? 'Ítem'));
             $stateName = htmlspecialchars($item['state']['name'] ?? ($item['state'] ?? 'Abierto'));
             $priority = $item['priority'] ?? 'NONE';
@@ -513,6 +528,7 @@ HTML;
             </tr>";
         }
         $html .= '</tbody></table>';
+
         return $html;
     }
 
@@ -527,6 +543,7 @@ HTML;
     private function renderCallout(ReportBlock $block, array $data): string
     {
         $text = htmlspecialchars($data['text'] ?? ($block->config['text'] ?? 'Nota importante'));
+
         return "<div style=\"background:#eff6ff;border-left:4px solid #3b82f6;padding:12px 14px;border-radius:6px;font-size:12px;color:#1e3a8a;line-height:1.5;\">{$text}</div>";
     }
 
@@ -543,7 +560,7 @@ HTML;
         }
 
         $slicePoints = array_slice($points, -14); // últimos 14 puntos para claridad
-        $values = array_map(fn ($p) => (int)($p['value'] ?? 0), $slicePoints);
+        $values = array_map(fn ($p) => (int) ($p['value'] ?? 0), $slicePoints);
         $maxVal = max($values) ?: 1;
 
         $w = 540;
@@ -568,7 +585,7 @@ HTML;
         $firstX = $coordPoints[0]['x'];
         $lastX = $coordPoints[count($coordPoints) - 1]['x'];
         $bottomY = $padTop + $plotH;
-        $areaPoints = "{$firstX},{$bottomY} " . $polyLinePoints . " {$lastX},{$bottomY}";
+        $areaPoints = "{$firstX},{$bottomY} ".$polyLinePoints." {$lastX},{$bottomY}";
 
         $circlesHtml = '';
         $xLabelsHtml = '';
@@ -611,11 +628,11 @@ HTML;
             return '<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">Sin datos para el gráfico de barras</div>';
         }
 
-        $maxVal = max(array_map(fn ($it) => (float)($it['value'] ?? 0), $items)) ?: 1;
+        $maxVal = max(array_map(fn ($it) => (float) ($it['value'] ?? 0), $items)) ?: 1;
 
         $html = '<div style="display:flex;align-items:flex-end;gap:12px;height:140px;padding:12px 10px 0 10px;border-bottom:1.5px solid #e2e8f0;">';
         foreach ($items as $it) {
-            $val = (float)($it['value'] ?? 0);
+            $val = (float) ($it['value'] ?? 0);
             $name = htmlspecialchars($it['name'] ?? '');
             $color = $it['color'] ?? '#6366f1';
             $hPct = max(6, round(($val / $maxVal) * 100));
@@ -628,6 +645,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -643,8 +661,8 @@ HTML;
 
         // Muestrear últimos 14 puntos
         $points = array_slice($series, -14);
-        $createdVals = array_map(fn ($p) => (int)($p['created'] ?? 0), $points);
-        $completedVals = array_map(fn ($p) => (int)($p['completed'] ?? 0), $points);
+        $createdVals = array_map(fn ($p) => (int) ($p['created'] ?? 0), $points);
+        $completedVals = array_map(fn ($p) => (int) ($p['completed'] ?? 0), $points);
         $maxVal = max(max($createdVals ?: [1]), max($completedVals ?: [1])) ?: 1;
 
         $w = 540;
@@ -714,7 +732,7 @@ HTML;
             return '<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">Sin datos para el gráfico circular</div>';
         }
 
-        $total = array_sum(array_map(fn ($s) => (float)($s['value'] ?? 0), $segments));
+        $total = array_sum(array_map(fn ($s) => (float) ($s['value'] ?? 0), $segments));
 
         $html = '<div style="display:flex;align-items:center;justify-content:space-around;gap:20px;padding:8px 0;">';
         $html .= '<div style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;">';
@@ -722,9 +740,9 @@ HTML;
 
         $offset = 0;
         foreach ($segments as $s) {
-            $pct = (float)($s['percentage'] ?? 0);
+            $pct = (float) ($s['percentage'] ?? 0);
             $color = $s['color'] ?? '#6366f1';
-            $dash = "{$pct} " . (100 - $pct);
+            $dash = "{$pct} ".(100 - $pct);
             $html .= "<circle cx=\"18\" cy=\"18\" r=\"15.9\" fill=\"transparent\" stroke=\"{$color}\" stroke-width=\"4\" stroke-dasharray=\"{$dash}\" stroke-dashoffset=\"-{$offset}\"></circle>";
             $offset += $pct;
         }
@@ -750,6 +768,7 @@ HTML;
             </div>";
         }
         $html .= '</div></div>';
+
         return $html;
     }
 
@@ -763,22 +782,22 @@ HTML;
             return '<p style="font-size:11px;color:#94a3b8;">Sin datos de carga de trabajo asignada</p>';
         }
 
-        $maxAssigned = max(array_map(fn ($m) => (int)($m['total_assigned'] ?? 0), $members)) ?: 1;
+        $maxAssigned = max(array_map(fn ($m) => (int) ($m['total_assigned'] ?? 0), $members)) ?: 1;
 
         $html = '<div style="display:flex;flex-direction:column;gap:10px;">';
         foreach (array_slice($members, 0, 8) as $m) {
             $name = htmlspecialchars($m['name'] ?? 'Miembro');
             $initials = strtoupper(substr($name, 0, 2));
-            $active = (int)($m['active_items'] ?? 0);
-            $completed = (int)($m['completed_items'] ?? 0);
-            $total = (int)($m['total_assigned'] ?? 0);
+            $active = (int) ($m['active_items'] ?? 0);
+            $completed = (int) ($m['completed_items'] ?? 0);
+            $total = (int) ($m['total_assigned'] ?? 0);
             $loadStatus = $m['load_status'] ?? 'balanced';
 
             $statusPill = match ($loadStatus) {
                 'overloaded' => '<span class="status-pill status-red">Sobrecargado</span>',
-                'heavy'      => '<span class="status-pill status-yellow">Carga Alta</span>',
-                'balanced'   => '<span class="status-pill status-blue">Equilibrado</span>',
-                default      => '<span class="status-pill status-green">Ligero</span>',
+                'heavy' => '<span class="status-pill status-yellow">Carga Alta</span>',
+                'balanced' => '<span class="status-pill status-blue">Equilibrado</span>',
+                default => '<span class="status-pill status-green">Ligero</span>',
             };
 
             $barPct = round(($total / $maxAssigned) * 100);
@@ -799,6 +818,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -853,6 +873,7 @@ HTML;
         }
 
         $html .= '</div></div>';
+
         return $html;
     }
 
@@ -869,7 +890,7 @@ HTML;
         $html = '<div style="display:flex;flex-direction:column;gap:8px;">';
         foreach ($milestones as $m) {
             $title = htmlspecialchars($m['title'] ?? 'Hito');
-            $progress = (int)($m['progress'] ?? 0);
+            $progress = (int) ($m['progress'] ?? 0);
             $target = $m['target_date'] ?? 'Sin fecha';
             $isOverdue = $m['is_overdue'] ?? false;
             $overdueBadge = $isOverdue ? '<span class="status-pill status-red">Vencido</span>' : '';
@@ -894,6 +915,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -915,7 +937,7 @@ HTML;
             $statusBadge = $status === 'PUBLISHED'
                 ? '<span class="status-pill status-green">Publicada</span>'
                 : '<span class="status-pill status-gray">Borrador</span>';
-            $itemsCount = (int)($r['items_count'] ?? 0);
+            $itemsCount = (int) ($r['items_count'] ?? 0);
             $date = $r['published_at'] ? date('d/m/Y', strtotime($r['published_at'])) : ($r['created_at'] ? date('d/m/Y', strtotime($r['created_at'])) : '');
 
             $html .= "
@@ -925,7 +947,7 @@ HTML;
                     <div style=\"display:flex;justify-content:space-between;align-items:center;\">
                         <div style=\"display:flex;align-items:center;gap:6px;\">
                             <span style=\"font-size:11px;font-weight:700;\">{$name}</span>
-                            " . ($ver ? "<span class=\"status-pill status-blue\">{$ver}</span>" : '') . "
+                            ".($ver ? "<span class=\"status-pill status-blue\">{$ver}</span>" : '')."
                         </div>
                         <div style=\"display:flex;align-items:center;gap:6px;\">
                             <span style=\"font-size:10px;color:#94a3b8;\">{$date} &bull; {$itemsCount} tareas</span>
@@ -936,6 +958,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -967,7 +990,7 @@ HTML;
             </div>
         </div>";
 
-        if (!empty($risks)) {
+        if (! empty($risks)) {
             $html .= '<div style="display:flex;flex-direction:column;gap:6px;">';
             foreach (array_slice($risks, 0, 5) as $item) {
                 $title = htmlspecialchars($item['title'] ?? 'Tarea');
@@ -980,7 +1003,7 @@ HTML;
                 <div style=\"background:#fff;border:1px solid #f1f5f9;border-radius:6px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:11px;\">
                     <span style=\"font-weight:600;color:#1e293b;\">{$title}</span>
                     <div style=\"display:flex;align-items:center;gap:6px;\">
-                        " . ($target ? "<span style=\"color:#ef4444;font-size:10px;\">Vence: {$target}</span>" : '') . "
+                        ".($target ? "<span style=\"color:#ef4444;font-size:10px;\">Vence: {$target}</span>" : '')."
                         <span class=\"priority-pill {$prioClass}\">{$prioLabel}</span>
                     </div>
                 </div>";
@@ -1018,6 +1041,7 @@ HTML;
             </div>";
         }
         $html .= '</div>';
+
         return $html;
     }
 
@@ -1028,7 +1052,7 @@ HTML;
     {
         $style = $data['style'] ?? ($block->config['style'] ?? 'solid');
         $color = $data['color'] ?? ($block->config['color'] ?? '#e2e8f0');
-        $h = (int)($data['height'] ?? ($block->config['height'] ?? 24));
+        $h = (int) ($data['height'] ?? ($block->config['height'] ?? 24));
 
         if ($style === 'space') {
             return "<div style=\"height:{$h}px;\"></div>";
@@ -1073,11 +1097,11 @@ HTML;
     {
         return match ($priority) {
             'URGENT' => 'Urgente',
-            'HIGH'   => 'Alta',
+            'HIGH' => 'Alta',
             'MEDIUM' => 'Media',
-            'LOW'    => 'Baja',
-            'NONE'   => 'Sin Prioridad',
-            default  => $priority,
+            'LOW' => 'Baja',
+            'NONE' => 'Sin Prioridad',
+            default => $priority,
         };
     }
 
@@ -1085,10 +1109,10 @@ HTML;
     {
         return match ($priority) {
             'URGENT' => 'priority-urgent',
-            'HIGH'   => 'priority-high',
+            'HIGH' => 'priority-high',
             'MEDIUM' => 'priority-medium',
-            'LOW'    => 'priority-low',
-            default  => 'priority-none',
+            'LOW' => 'priority-low',
+            default => 'priority-none',
         };
     }
 }

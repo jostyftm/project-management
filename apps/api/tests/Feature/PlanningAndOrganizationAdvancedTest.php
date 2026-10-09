@@ -1,12 +1,9 @@
 <?php
 
-use App\Models\Initiative;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Release;
 use App\Models\State;
 use App\Models\Sticky;
-use App\Models\Teamspace;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemType;

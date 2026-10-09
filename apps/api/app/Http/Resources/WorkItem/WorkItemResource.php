@@ -22,6 +22,8 @@ class WorkItemResource extends JsonResource
                 'sequence_id' => $this->sequence_id,
                 'identifier' => $identifier,
                 'title' => $this->title,
+                'description_html' => $this->description_html,
+                'description' => $this->description_html,
                 'description_json' => $this->description_json,
                 'priority' => $this->priority,
                 'estimate_points' => $this->estimate_points,
