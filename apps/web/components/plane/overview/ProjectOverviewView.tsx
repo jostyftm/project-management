@@ -14,6 +14,7 @@ import { calculateProjectHealth } from "@/lib/project-health";
 import { WorkItemCreateModal } from "@/components/plane/work-items/WorkItemCreateModal";
 import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useWorkspaceStore } from "@/hooks/use-workspace-store";
 import { ProjectOverviewHeader } from "./ProjectOverviewHeader";
 import { ProjectKpiRow } from "./ProjectKpiRow";
 import { ProjectBurnupChart } from "./ProjectBurnupChart";
@@ -31,8 +32,14 @@ import { toast } from "sonner";
 export function ProjectOverviewView() {
   const params = useParams();
   const projectId = String(params.projectId);
+  const { currentProject } = useWorkspaceStore();
 
-  const [project, setProject] = useState<Project | null>(null);
+  const [project, setProject] = useState<Project | null>(() => {
+    if (currentProject && String(currentProject.id) === String(projectId)) {
+      return currentProject;
+    }
+    return null;
+  });
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -52,6 +59,10 @@ export function ProjectOverviewView() {
     if (!silent) setIsLoading(true);
 
     try {
+      const projPromise = currentProject && String(currentProject.id) === String(projectId)
+        ? Promise.resolve(currentProject)
+        : projectService.get(projectId);
+
       const [
         projData,
         itemsData,
@@ -62,7 +73,7 @@ export function ProjectOverviewView() {
         statesData,
         typesData,
       ] = await Promise.all([
-        projectService.get(projectId),
+        projPromise,
         workItemService.list(projectId),
         activityService.listByProject(projectId).catch(() => []),
         milestoneService.list(projectId).catch(() => []),

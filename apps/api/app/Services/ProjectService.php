@@ -29,7 +29,7 @@ class ProjectService
 
         return (new Project)->search(
             request: $request,
-            relationships: ['lead', 'states', 'labels', 'members'],
+            relationships: ['workspace', 'lead', 'states', 'labels', 'members'],
             callback: function ($builder) use ($user, $workspace) {
                 if (! $user) {
                     $builder->whereRaw('1 = 0');
@@ -57,7 +57,7 @@ class ProjectService
      */
     public function get(Project $project): Project
     {
-        return $project->load(['lead', 'states', 'labels', 'members']);
+        return $project->load(['workspace', 'lead', 'states', 'labels', 'members']);
     }
 
     /**

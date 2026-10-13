@@ -84,10 +84,11 @@ RUN mkdir -p storage/framework/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Copiar configuraciones de Nginx, Supervisor y PHP
+# Copiar configuraciones de Nginx, Supervisor, PHP y Pool PHP-FPM
 COPY ./deploy/prod/nginx.conf /etc/nginx/nginx.conf
 COPY ./deploy/prod/supervisord.conf /etc/supervisord.conf
 COPY ./deploy/prod/php.ini /usr/local/etc/php/conf.d/99-custom-limits.ini
+COPY ./deploy/prod/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zz-docker.conf
 
 # Limpiar herramientas de compilación en producción para aligerar la imagen
 RUN rm /usr/local/bin/install-php-extensions

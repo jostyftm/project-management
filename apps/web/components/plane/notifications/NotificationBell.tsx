@@ -46,57 +46,13 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Initial fetch and real-time SSE stream
+  // Sondeo liviano periódico de notificaciones cada 30 segundos (sin retener conexiones SSE persistentes en PHP-FPM)
   useEffect(() => {
     fetchCount();
-    const interval = setInterval(fetchCount, 30000); // 30s polling fallback
-
-    // Attempt Server-Sent Events (SSE) live stream connection with auth in query string
-    let eventSource: EventSource | null = null;
-    try {
-      const token = storage.get(ACCESS_TOKEN);
-      const currentWs = storage.get("current_workspace") as { id?: number | string } | null;
-      if (typeof token === "string" && token && typeof window !== "undefined") {
-        const streamUrl = new URL(`${API_BASE_URL}/live-stream`, window.location.origin);
-        streamUrl.searchParams.set("token", token);
-        if (currentWs?.id) {
-          streamUrl.searchParams.set("workspace_id", String(currentWs.id));
-        }
-
-        eventSource = new EventSource(streamUrl.toString());
-
-        eventSource.addEventListener("connected", () => {
-          // Live stream connected successfully
-        });
-
-        eventSource.addEventListener("notification_count", (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            const count = data.unread_count ?? data.count;
-            if (typeof count === "number") {
-              setUnreadCount(count);
-            }
-          } catch {}
-        });
-
-        eventSource.addEventListener("notification", (e) => {
-          try {
-            const notif: Notification = JSON.parse(e.data);
-            setNotifications((prev) => [notif, ...prev.filter((n) => String(n.id) !== String(notif.id))].slice(0, 6));
-            setUnreadCount((prev) => prev + 1);
-            toast.info(notif.title || "Nueva notificación", {
-              description: notif.message,
-            });
-          } catch {}
-        });
-      }
-    } catch {}
+    const interval = setInterval(fetchCount, 30000);
 
     return () => {
       clearInterval(interval);
-      if (eventSource) {
-        eventSource.close();
-      }
     };
   }, [fetchCount]);
 
