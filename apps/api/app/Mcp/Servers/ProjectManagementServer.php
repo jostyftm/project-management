@@ -38,6 +38,15 @@ use App\Mcp\Tools\WorkItems\DeleteWorkItemTool;
 use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
+use App\Mcp\Tools\Workspaces\AddWorkspaceMemberTool;
+use App\Mcp\Tools\Workspaces\CreateWorkspaceTool;
+use App\Mcp\Tools\Workspaces\DeleteWorkspaceTool;
+use App\Mcp\Tools\Workspaces\GetWorkspaceTool;
+use App\Mcp\Tools\Workspaces\ListWorkspaceMembersTool;
+use App\Mcp\Tools\Workspaces\ListWorkspacesTool;
+use App\Mcp\Tools\Workspaces\RemoveWorkspaceMemberTool;
+use App\Mcp\Tools\Workspaces\UpdateWorkspaceMemberRoleTool;
+use App\Mcp\Tools\Workspaces\UpdateWorkspaceTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -45,13 +54,24 @@ use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('Project Management MCP Server')]
 #[Version('1.0.0')]
-#[Instructions('Servidor MCP para la gestión integral de desarrollo ágil de software en Plane. Permite listar, consultar, crear, modificar y auditar proyectos, historias de usuario, tareas, bugs, ciclos/sprints, módulos funcionales, hitos estratégicos, versiones (releases) y flujos de trabajo.')]
+#[Instructions('Servidor MCP para la gestión integral de desarrollo ágil de software en Plane. Permite listar, consultar, crear, modificar y auditar espacios de trabajo (workspaces), miembros, proyectos, historias de usuario, tareas, bugs, ciclos/sprints, módulos funcionales, hitos estratégicos, versiones (releases) y flujos de trabajo.')]
 class ProjectManagementServer extends Server
 {
     /**
      * Catálogo completo de herramientas expuestas al modelo de IA.
      */
     protected array $tools = [
+        // Workspaces & Workspace Members
+        ListWorkspacesTool::class,
+        GetWorkspaceTool::class,
+        CreateWorkspaceTool::class,
+        UpdateWorkspaceTool::class,
+        DeleteWorkspaceTool::class,
+        ListWorkspaceMembersTool::class,
+        AddWorkspaceMemberTool::class,
+        RemoveWorkspaceMemberTool::class,
+        UpdateWorkspaceMemberRoleTool::class,
+
         // Projects
         ListProjectsTool::class,
         GetProjectTool::class,

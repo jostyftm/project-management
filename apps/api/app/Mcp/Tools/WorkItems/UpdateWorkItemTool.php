@@ -50,6 +50,8 @@ class UpdateWorkItemTool extends Tool
                 ->description('Asignar a un hito (milestone) específico'),
             'target_date' => $schema->string()
                 ->description('Nueva fecha objetivo (formato YYYY-MM-DD)'),
+            'parent' => $schema->string()
+                ->description('Nueva clave (ej: "JSVRC-12") o ID de la tarea/épica padre (o vacío para desvincular)'),
         ];
     }
 
@@ -122,6 +124,20 @@ class UpdateWorkItemTool extends Tool
 
             if ($request->has('target_date')) {
                 $updates['target_date'] = $request->get('target_date');
+            }
+
+            if ($request->has('parent')) {
+                $parentKey = $request->get('parent');
+                if (empty($parentKey)) {
+                    $updates['parent_id'] = null;
+                } elseif (is_numeric($parentKey)) {
+                    $updates['parent_id'] = (int) $parentKey;
+                } else {
+                    $parts = explode('-', (string) $parentKey);
+                    $seq = (int) end($parts);
+                    $parentItem = WorkItem::where('project_id', $workItem->project_id)->where('sequence_id', $seq)->first();
+                    $updates['parent_id'] = $parentItem?->id;
+                }
             }
 
             if (! empty($updates)) {

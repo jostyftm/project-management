@@ -11,7 +11,8 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 ./scripts/mcp-server.sh
 ```
 
-### Herramientas Disponibles (25 Tools):
+### Herramientas Disponibles (34 Tools):
+- **Espacios de Trabajo (Workspaces):** `list_workspaces`, `get_workspace`, `create_workspace`, `update_workspace`, `delete_workspace`, `list_workspace_members`, `add_workspace_member`, `update_workspace_member_role`, `remove_workspace_member`.
 - **Proyectos:** `list_projects`, `get_project`, `create_project`, `update_project`, `delete_project`.
 - **Work Items (Tareas, Historias, Bugs):** `list_work_items`, `get_work_item`, `create_work_item`, `update_work_item`, `delete_work_item`.
 - **Ciclos / Sprints:** `list_cycles`, `get_cycle`, `create_cycle`, `update_cycle`.
@@ -29,7 +30,7 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 - `plan_sprint`: Asiste en la planificación de sprints a partir del backlog del proyecto y la capacidad estimada.
 - `project_health_review`: Audita tareas vencidas, sobrecarga de WIP y riesgos de entrega.
 
-> **Instrucción para el Agente:** Cuando el usuario solicite crear, consultar, modificar o auditar tareas, proyectos, sprints, módulos o releases, prioriza siempre el uso de estas herramientas MCP.
+> **Instrucción para el Agente:** Cuando el usuario solicite crear, consultar, modificar o auditar espacios de trabajo, tareas, proyectos, sprints, módulos o releases, prioriza siempre el uso de estas herramientas MCP.
 
 ---
 

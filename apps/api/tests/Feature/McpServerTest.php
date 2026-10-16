@@ -29,6 +29,15 @@ use App\Mcp\Tools\WorkItems\DeleteWorkItemTool;
 use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
+use App\Mcp\Tools\Workspaces\AddWorkspaceMemberTool;
+use App\Mcp\Tools\Workspaces\CreateWorkspaceTool;
+use App\Mcp\Tools\Workspaces\DeleteWorkspaceTool;
+use App\Mcp\Tools\Workspaces\GetWorkspaceTool;
+use App\Mcp\Tools\Workspaces\ListWorkspaceMembersTool;
+use App\Mcp\Tools\Workspaces\ListWorkspacesTool;
+use App\Mcp\Tools\Workspaces\RemoveWorkspaceMemberTool;
+use App\Mcp\Tools\Workspaces\UpdateWorkspaceMemberRoleTool;
+use App\Mcp\Tools\Workspaces\UpdateWorkspaceTool;
 use App\Models\Project;
 use App\Models\ProjectInvitation;
 use App\Models\ProjectMember;
@@ -113,6 +122,15 @@ it('discovers all registered tools, resources, and prompts on the MCP server', f
         AddProjectMemberTool::class,
         UpdateProjectMemberRoleTool::class,
         RemoveProjectMemberTool::class,
+        ListWorkspacesTool::class,
+        GetWorkspaceTool::class,
+        CreateWorkspaceTool::class,
+        UpdateWorkspaceTool::class,
+        DeleteWorkspaceTool::class,
+        ListWorkspaceMembersTool::class,
+        AddWorkspaceMemberTool::class,
+        RemoveWorkspaceMemberTool::class,
+        UpdateWorkspaceMemberRoleTool::class,
     ]);
 
     $resources = ProjectManagementServer::resources();
@@ -226,7 +244,41 @@ it('manages work items lifecycle via MCP tools', function () {
     $listResponse->assertOk()
         ->assertSee('ENG-1');
 
-    // 5. Eliminar WorkItem
+    // 5. Crear ítem padre (Épica) con sequence_id explícito y tipo textual
+    $createParentResponse = ProjectManagementServer::tool(CreateWorkItemTool::class, [
+        'project' => 'ENG',
+        'sequence_id' => 18,
+        'title' => 'Épica 1: Gestión de Identidad',
+        'type' => 'Epic',
+    ]);
+    $createParentResponse->assertOk()
+        ->assertSee('ENG-18')
+        ->assertSee('Épica 1: Gestión de Identidad');
+
+    $this->assertDatabaseHas('work_items', [
+        'project_id' => $this->project->id,
+        'sequence_id' => 18,
+    ]);
+
+    // 6. Crear ítem hijo vinculado a la épica con completed_at histórico
+    $createChildResponse = ProjectManagementServer::tool(CreateWorkItemTool::class, [
+        'project' => 'ENG',
+        'sequence_id' => 128,
+        'title' => 'HU-1.11 - Desactivación de usuarios',
+        'parent' => 'ENG-18',
+        'type' => 'Story',
+        'completed_at' => '2026-04-08T03:24:38Z',
+    ]);
+    $createChildResponse->assertOk()
+        ->assertSee('ENG-128');
+
+    $parentItem = WorkItem::where('project_id', $this->project->id)->where('sequence_id', 18)->first();
+    $childItem = WorkItem::where('project_id', $this->project->id)->where('sequence_id', 128)->first();
+
+    expect($childItem->parent_id)->toBe($parentItem->id);
+    expect($childItem->completed_at?->format('Y-m-d H:i:s'))->toBe('2026-04-08 03:24:38');
+
+    // 7. Eliminar WorkItem
     $deleteResponse = ProjectManagementServer::tool(DeleteWorkItemTool::class, [
         'item' => 'ENG-1',
     ]);
@@ -714,4 +766,366 @@ it('enforces RBAC for member management in MCP', function () {
     $addResponse->assertStatus(200);
     expect($addResponse->json('result.isError'))->toBeTrue();
     expect($addResponse->json('result.content.0.text'))->toContain('Requiere rol de Administrador');
+});
+
+it('manages workspaces lifecycle via MCP tools for admin and regular users', function () {
+    $regularUser = User::factory()->create([
+        'name' => 'John Regular',
+        'email' => 'john.regular@example.com',
+        'is_instance_admin' => false,
+    ]);
+
+    $otherUser = User::factory()->create([
+        'name' => 'Jane Other',
+        'email' => 'jane.other@example.com',
+        'is_instance_admin' => false,
+    ]);
+
+    $regularWorkspace = Workspace::create([
+        'name' => 'John Team Workspace',
+        'slug' => 'john-team-workspace',
+        'owner_id' => $regularUser->id,
+    ]);
+    WorkspaceMember::create([
+        'workspace_id' => $regularWorkspace->id,
+        'user_id' => $regularUser->id,
+        'role' => 'OWNER',
+    ]);
+
+    // 1. Admin lista todos los workspaces
+    $adminListResponse = ProjectManagementServer::tool(ListWorkspacesTool::class, [
+        'acting_user' => (string) $this->user->id,
+    ]);
+    $adminListResponse->assertOk()
+        ->assertSee('MCP Workspace')
+        ->assertSee('John Team Workspace');
+
+    // 2. Admin filtra workspaces de un usuario específico
+    $adminFilterResponse = ProjectManagementServer::tool(ListWorkspacesTool::class, [
+        'acting_user' => (string) $this->user->id,
+        'user' => (string) $regularUser->id,
+    ]);
+    $adminFilterResponse->assertOk()
+        ->assertSee('John Team Workspace')
+        ->assertDontSee('MCP Workspace');
+
+    // 3. Usuario regular lista sus propios workspaces (no debe ver el workspace del admin)
+    $regularListResponse = ProjectManagementServer::tool(ListWorkspacesTool::class, [
+        'acting_user' => (string) $regularUser->id,
+    ]);
+    $regularListResponse->assertOk()
+        ->assertSee('John Team Workspace')
+        ->assertDontSee('MCP Workspace');
+
+    // 4. Usuario regular intenta consultar workspaces de otro usuario -> Denegado
+    $unauthListResponse = ProjectManagementServer::tool(ListWorkspacesTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'user' => (string) $this->user->id,
+    ]);
+    $unauthListResponse->assertHasErrors();
+    $unauthListResponse->assertSee('Acceso denegado');
+
+    // 5. Usuario regular crea workspace para sí mismo
+    $createRegResponse = ProjectManagementServer::tool(CreateWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'name' => 'Startup Project',
+        'slug' => 'startup-project',
+    ]);
+    $createRegResponse->assertOk()
+        ->assertSee('creado exitosamente')
+        ->assertSee('Startup Project');
+
+    $this->assertDatabaseHas('workspaces', [
+        'name' => 'Startup Project',
+        'owner_id' => $regularUser->id,
+    ]);
+
+    // 6. Usuario regular intenta crear workspace asignando a otro dueño -> Denegado
+    $unauthCreateResponse = ProjectManagementServer::tool(CreateWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'name' => 'Spoofed Workspace',
+        'owner' => (string) $this->user->id,
+    ]);
+    $unauthCreateResponse->assertHasErrors();
+    $unauthCreateResponse->assertSee('Acceso denegado: Solo los administradores pueden crear espacios de trabajo para otros usuarios.');
+
+    // 7. Admin crea un workspace asignando a otro usuario como propietario
+    $adminCreateForOtherResponse = ProjectManagementServer::tool(CreateWorkspaceTool::class, [
+        'acting_user' => (string) $this->user->id,
+        'name' => 'Jane Workspace',
+        'slug' => 'jane-workspace',
+        'owner' => $otherUser->email,
+    ]);
+    $adminCreateForOtherResponse->assertOk()
+        ->assertSee('creado exitosamente')
+        ->assertSee('Jane Workspace');
+
+    $this->assertDatabaseHas('workspaces', [
+        'slug' => 'jane-workspace',
+        'owner_id' => $otherUser->id,
+    ]);
+
+    // 8. Get Workspace: Usuario regular consulta el suyo
+    $getSelfResponse = ProjectManagementServer::tool(GetWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'workspace' => 'startup-project',
+    ]);
+    $getSelfResponse->assertOk()
+        ->assertSee('Startup Project')
+        ->assertSee('john.regular@example.com');
+
+    // 9. Get Workspace: Usuario regular intenta consultar workspace donde no es miembro -> Denegado
+    $unauthGetResponse = ProjectManagementServer::tool(GetWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'workspace' => 'mcp-workspace',
+    ]);
+    $unauthGetResponse->assertHasErrors();
+    $unauthGetResponse->assertSee('Acceso denegado: No perteneces al espacio de trabajo');
+
+    // 10. Update Workspace: Regular actualiza su workspace
+    $updateResponse = ProjectManagementServer::tool(UpdateWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'workspace' => 'startup-project',
+        'name' => 'Startup Project Renamed',
+    ]);
+    $updateResponse->assertOk()
+        ->assertSee('actualizado correctamente')
+        ->assertSee('Startup Project Renamed');
+
+    // 11. Update Workspace: Transferencia de propiedad por el owner o admin
+    $transferResponse = ProjectManagementServer::tool(UpdateWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'workspace' => 'startup-project',
+        'owner' => (string) $otherUser->id,
+    ]);
+    $transferResponse->assertOk()
+        ->assertSee('actualizado correctamente');
+
+    $this->assertDatabaseHas('workspaces', [
+        'slug' => 'startup-project',
+        'owner_id' => $otherUser->id,
+    ]);
+
+    // 12. Delete Workspace: No-owner regular intenta eliminar -> Denegado
+    $unauthDeleteResponse = ProjectManagementServer::tool(DeleteWorkspaceTool::class, [
+        'acting_user' => (string) $regularUser->id,
+        'workspace' => 'mcp-workspace',
+    ]);
+    $unauthDeleteResponse->assertHasErrors();
+    $unauthDeleteResponse->assertSee('Acceso denegado');
+
+    // 13. Delete Workspace: Admin elimina el workspace
+    $deleteResponse = ProjectManagementServer::tool(DeleteWorkspaceTool::class, [
+        'acting_user' => (string) $this->user->id,
+        'workspace' => 'startup-project',
+    ]);
+    $deleteResponse->assertOk()
+        ->assertSee('eliminado exitosamente');
+
+    $this->assertDatabaseMissing('workspaces', [
+        'slug' => 'startup-project',
+    ]);
+});
+
+it('manages workspace members and enforces RBAC via MCP tools', function () {
+    $owner = User::factory()->create(['name' => 'Owner WS', 'email' => 'owner@example.com', 'is_instance_admin' => false]);
+    $adminMember = User::factory()->create(['name' => 'Admin Member', 'email' => 'admin.member@example.com', 'is_instance_admin' => false]);
+    $regularMember = User::factory()->create(['name' => 'Regular Member', 'email' => 'regular.member@example.com', 'is_instance_admin' => false]);
+    $outsider = User::factory()->create(['name' => 'Outsider', 'email' => 'outsider@example.com', 'is_instance_admin' => false]);
+    $candidate = User::factory()->create(['name' => 'Candidate', 'email' => 'candidate.ws@example.com', 'is_instance_admin' => false]);
+
+    $testWs = Workspace::create([
+        'name' => 'RBAC Team Workspace',
+        'slug' => 'rbac-team-workspace',
+        'owner_id' => $owner->id,
+    ]);
+
+    WorkspaceMember::create(['workspace_id' => $testWs->id, 'user_id' => $owner->id, 'role' => 'OWNER']);
+    WorkspaceMember::create(['workspace_id' => $testWs->id, 'user_id' => $adminMember->id, 'role' => 'ADMIN']);
+    WorkspaceMember::create(['workspace_id' => $testWs->id, 'user_id' => $regularMember->id, 'role' => 'MEMBER']);
+
+    // 1. Listar miembros: Miembro regular puede listar
+    $listResponse = ProjectManagementServer::tool(ListWorkspaceMembersTool::class, [
+        'acting_user' => (string) $regularMember->id,
+        'workspace' => 'rbac-team-workspace',
+    ]);
+    $listResponse->assertOk()
+        ->assertSee('Owner WS')
+        ->assertSee('Admin Member')
+        ->assertSee('Regular Member');
+
+    // 2. Listar miembros con filtro por rol
+    $listAdminsResponse = ProjectManagementServer::tool(ListWorkspaceMembersTool::class, [
+        'acting_user' => (string) $regularMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'role' => 'ADMIN',
+    ]);
+    $listAdminsResponse->assertOk()
+        ->assertSee('Admin Member')
+        ->assertDontSee('Regular Member');
+
+    // 3. Usuario ajeno (outsider) no puede listar miembros
+    $outsiderListResponse = ProjectManagementServer::tool(ListWorkspaceMembersTool::class, [
+        'acting_user' => (string) $outsider->id,
+        'workspace' => 'rbac-team-workspace',
+    ]);
+    $outsiderListResponse->assertHasErrors();
+    $outsiderListResponse->assertSee('Acceso denegado: No perteneces al espacio de trabajo');
+
+    // 4. Miembro regular intenta agregar a un nuevo miembro -> Denegado (requiere ADMIN/OWNER)
+    $unauthAddResponse = ProjectManagementServer::tool(AddWorkspaceMemberTool::class, [
+        'acting_user' => (string) $regularMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => $candidate->email,
+        'role' => 'MEMBER',
+    ]);
+    $unauthAddResponse->assertHasErrors();
+    $unauthAddResponse->assertSee('Acción denegada: Requiere rol de Administrador o Propietario');
+
+    // 5. Miembro ADMIN agrega al candidato con éxito
+    $addResponse = ProjectManagementServer::tool(AddWorkspaceMemberTool::class, [
+        'acting_user' => (string) $adminMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => $candidate->email,
+        'role' => 'MEMBER',
+    ]);
+    $addResponse->assertOk()
+        ->assertSee('agregado exitosamente')
+        ->assertSee('candidate.ws@example.com');
+
+    $this->assertDatabaseHas('workspace_members', [
+        'workspace_id' => $testWs->id,
+        'user_id' => $candidate->id,
+        'role' => 'MEMBER',
+    ]);
+
+    // 6. Admin intenta actualizar rol de un miembro -> Denegado (solo el OWNER o instance admin puede cambiar roles)
+    $unauthUpdateRoleResponse = ProjectManagementServer::tool(UpdateWorkspaceMemberRoleTool::class, [
+        'acting_user' => (string) $adminMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $candidate->id,
+        'role' => 'ADMIN',
+    ]);
+    $unauthUpdateRoleResponse->assertHasErrors();
+    $unauthUpdateRoleResponse->assertSee('Acceso denegado: Solo el propietario del espacio de trabajo');
+
+    // 7. Owner actualiza rol del candidato a ADMIN
+    $updateRoleResponse = ProjectManagementServer::tool(UpdateWorkspaceMemberRoleTool::class, [
+        'acting_user' => (string) $owner->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $candidate->id,
+        'role' => 'ADMIN',
+    ]);
+    $updateRoleResponse->assertOk()
+        ->assertSee('actualizado de')
+        ->assertSee('ADMIN');
+
+    $this->assertDatabaseHas('workspace_members', [
+        'workspace_id' => $testWs->id,
+        'user_id' => $candidate->id,
+        'role' => 'ADMIN',
+    ]);
+
+    // 8. Intentar modificar el rol del propio OWNER -> Denegado
+    $changeOwnerRoleResponse = ProjectManagementServer::tool(UpdateWorkspaceMemberRoleTool::class, [
+        'acting_user' => (string) $owner->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $owner->id,
+        'role' => 'MEMBER',
+    ]);
+    $changeOwnerRoleResponse->assertHasErrors();
+    $changeOwnerRoleResponse->assertSee('siempre mantiene el rol OWNER');
+
+    // 9. Intentar remover al OWNER -> Denegado
+    $removeOwnerResponse = ProjectManagementServer::tool(RemoveWorkspaceMemberTool::class, [
+        'acting_user' => (string) $owner->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $owner->id,
+    ]);
+    $removeOwnerResponse->assertHasErrors();
+    $removeOwnerResponse->assertSee('No se puede remover al propietario del espacio de trabajo');
+
+    // 10. Miembro regular intenta remover a otro miembro -> Denegado
+    $unauthRemoveResponse = ProjectManagementServer::tool(RemoveWorkspaceMemberTool::class, [
+        'acting_user' => (string) $regularMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $candidate->id,
+    ]);
+    $unauthRemoveResponse->assertHasErrors();
+    $unauthRemoveResponse->assertSee('Requiere rol de Administrador o Propietario');
+
+    // 11. Admin remueve al candidato con éxito
+    $removeResponse = ProjectManagementServer::tool(RemoveWorkspaceMemberTool::class, [
+        'acting_user' => (string) $adminMember->id,
+        'workspace' => 'rbac-team-workspace',
+        'user' => (string) $candidate->id,
+    ]);
+    $removeResponse->assertOk()
+        ->assertSee('ha sido removido');
+
+    $this->assertDatabaseMissing('workspace_members', [
+        'workspace_id' => $testWs->id,
+        'user_id' => $candidate->id,
+    ]);
+});
+
+it('manages workspaces and members via HTTP JSON-RPC MCP requests', function () {
+    // 1. Listar workspaces por HTTP
+    $listResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 201,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'list_workspaces',
+            'arguments' => [],
+        ],
+    ]);
+
+    $listResponse->assertStatus(200);
+    expect($listResponse->json('result.isError'))->toBeFalsy();
+    expect($listResponse->json('result.content.0.text'))->toContain('MCP Workspace');
+
+    // 2. Crear workspace por HTTP
+    $createResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 202,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'create_workspace',
+            'arguments' => [
+                'name' => 'HTTP Workspace API',
+                'slug' => 'http-workspace-api',
+            ],
+        ],
+    ]);
+
+    $createResponse->assertStatus(200);
+    expect($createResponse->json('result.isError'))->toBeFalsy();
+    expect($createResponse->json('result.content.0.text'))->toContain('creado exitosamente');
+
+    // 3. Listar miembros por HTTP
+    $membersResponse = $this->withHeaders([
+        'Authorization' => "Bearer {$this->token}",
+        'Accept' => 'application/json',
+    ])->postJson('/api/mcp/project-management', [
+        'jsonrpc' => '2.0',
+        'id' => 203,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'list_workspace_members',
+            'arguments' => [
+                'workspace' => 'http-workspace-api',
+            ],
+        ],
+    ]);
+
+    $membersResponse->assertStatus(200);
+    expect($membersResponse->json('result.isError'))->toBeFalsy();
+    expect($membersResponse->json('result.content.0.text'))->toContain('OWNER');
 });

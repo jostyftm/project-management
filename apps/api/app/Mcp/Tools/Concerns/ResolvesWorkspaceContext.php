@@ -7,6 +7,7 @@ use App\Models\ProjectMember;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -226,6 +227,91 @@ trait ResolvesWorkspaceContext
         return $query->whereHas('members', function ($q) use ($user) {
             $q->where('users.id', $user->id);
         });
+    }
+
+    /**
+     * Resuelve el usuario en nombre de quien se ejecuta la acción (acting_user).
+     */
+    protected function resolveActingUser(Request $request, int|string|null $explicitUserKey = null): ?User
+    {
+        $authenticatedUser = $request->user();
+
+        if ($authenticatedUser) {
+            if ($authenticatedUser->is_instance_admin && $explicitUserKey) {
+                return $this->resolveTargetUser($explicitUserKey) ?? $authenticatedUser;
+            }
+
+            return $authenticatedUser;
+        }
+
+        if ($explicitUserKey) {
+            $explicit = $this->resolveTargetUser($explicitUserKey);
+            if ($explicit) {
+                return $explicit;
+            }
+        }
+
+        return $this->resolveUser($request);
+    }
+
+    /**
+     * Resuelve un espacio de trabajo a partir de su ID numérico o slug.
+     */
+    protected function resolveWorkspaceByKey(int|string|null $workspaceKey): ?Workspace
+    {
+        if (empty($workspaceKey)) {
+            return null;
+        }
+
+        $key = trim((string) $workspaceKey);
+
+        return is_numeric($key)
+            ? Workspace::find((int) $key)
+            : Workspace::where('slug', $key)->first();
+    }
+
+    /**
+     * Resuelve el rol del usuario en el espacio de trabajo (OWNER, ADMIN, MEMBER, GUEST) o null si no pertenece.
+     */
+    protected function getWorkspaceRole(User $user, Workspace $workspace): ?string
+    {
+        if ($user->is_instance_admin || (int) $workspace->owner_id === (int) $user->id) {
+            return 'OWNER';
+        }
+
+        $membership = WorkspaceMember::where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        return $membership?->role;
+    }
+
+    /**
+     * Valida permisos del usuario sobre el espacio de trabajo.
+     *
+     * @param  string|null  $requiredRole  'OWNER', 'ADMIN', 'MEMBER' o null para cualquier membresía
+     */
+    protected function authorizeWorkspaceAccess(User $user, Workspace $workspace, ?string $requiredRole = null): ?Response
+    {
+        if ($user->is_instance_admin) {
+            return null;
+        }
+
+        $role = $this->getWorkspaceRole($user, $workspace);
+
+        if ($role === null) {
+            return Response::error("Acceso denegado: No perteneces al espacio de trabajo '{$workspace->name}'.");
+        }
+
+        if ($requiredRole === 'OWNER' && $role !== 'OWNER') {
+            return Response::error("Acción denegada: Requiere ser propietario del espacio de trabajo '{$workspace->name}'.");
+        }
+
+        if ($requiredRole === 'ADMIN' && ! in_array($role, ['OWNER', 'ADMIN'], true)) {
+            return Response::error("Acción denegada: Requiere rol de Administrador o Propietario en el espacio de trabajo '{$workspace->name}'.");
+        }
+
+        return null;
     }
 
     /**

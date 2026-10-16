@@ -5,6 +5,8 @@ namespace App\Mcp\Tools\WorkItems;
 use App\Mcp\Tools\Concerns\ResolvesWorkspaceContext;
 use App\Models\State;
 use App\Models\WorkItem;
+use App\Models\WorkItemType;
+use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -53,6 +55,14 @@ class CreateWorkItemTool extends Tool
                 ->description('ID del usuario responsable / líder'),
             'target_date' => $schema->string()
                 ->description('Fecha objetivo de culminación (formato YYYY-MM-DD)'),
+            'parent' => $schema->string()
+                ->description('Clave (ej: "JSVRC-12") o ID de la tarea/épica padre'),
+            'sequence_id' => $schema->integer()
+                ->description('Número correlativo explícito del proyecto (opcional; si se omite, se autoincrementa)'),
+            'type' => $schema->string()
+                ->description('Nombre del tipo de ítem (ej: "Épica", "Historia", "Tarea", "Bug" o "Epic", "Task") como alternativa a type_id'),
+            'completed_at' => $schema->string()
+                ->description('Fecha/hora histórica de finalización en formato ISO 8601 (opcional)'),
         ];
     }
 
@@ -72,10 +82,15 @@ class CreateWorkItemTool extends Tool
         $user = $this->resolveUser($request);
 
         $createdItem = DB::transaction(function () use ($request, $project, $user) {
-            $maxSeq = WorkItem::withoutGlobalScopes()
-                ->where('project_id', $project->id)
-                ->max('sequence_id') ?? 0;
-            $sequenceId = $maxSeq + 1;
+            $explicitSeq = $request->get('sequence_id');
+            if ($explicitSeq && is_numeric($explicitSeq)) {
+                $sequenceId = (int) $explicitSeq;
+            } else {
+                $maxSeq = WorkItem::withoutGlobalScopes()
+                    ->where('project_id', $project->id)
+                    ->max('sequence_id') ?? 0;
+                $sequenceId = $maxSeq + 1;
+            }
 
             $stateId = $request->get('state_id');
             if (! $stateId) {
@@ -87,7 +102,46 @@ class CreateWorkItemTool extends Tool
             }
 
             $state = $stateId ? State::find($stateId) : null;
-            $completedAt = ($state && in_array(strtoupper($state->group), ['COMPLETED', 'CANCELLED'])) ? now() : null;
+            if ($explicitCompleted = $request->get('completed_at')) {
+                try {
+                    $completedAt = Carbon::parse($explicitCompleted);
+                } catch (\Throwable) {
+                    $completedAt = now();
+                }
+            } else {
+                $completedAt = ($state && in_array(strtoupper($state->group), ['COMPLETED', 'CANCELLED'])) ? now() : null;
+            }
+
+            $typeId = $request->get('type_id');
+            if (! $typeId && ($typeName = $request->get('type'))) {
+                $normalizedName = match (strtolower(trim((string) $typeName))) {
+                    'epic', 'épica', 'epica' => 'Épica',
+                    'story', 'historia' => 'Historia',
+                    'task', 'tarea' => 'Tarea',
+                    'bug' => 'Bug',
+                    default => trim((string) $typeName),
+                };
+
+                $typeModel = WorkItemType::where('workspace_id', $project->workspace_id)
+                    ->where(function ($q) use ($project) {
+                        $q->whereNull('project_id')->orWhere('project_id', $project->id);
+                    })
+                    ->where('name', 'like', "%{$normalizedName}%")
+                    ->first();
+                $typeId = $typeModel?->id;
+            }
+
+            $parentId = null;
+            if ($parentKey = $request->get('parent')) {
+                if (is_numeric($parentKey)) {
+                    $parentItem = WorkItem::where('project_id', $project->id)->find((int) $parentKey);
+                } else {
+                    $parts = explode('-', (string) $parentKey);
+                    $seq = (int) end($parts);
+                    $parentItem = WorkItem::where('project_id', $project->id)->where('sequence_id', $seq)->first();
+                }
+                $parentId = $parentItem?->id;
+            }
 
             $descriptionRaw = $request->get('description');
             $descriptionHtml = null;
@@ -108,8 +162,9 @@ class CreateWorkItemTool extends Tool
                 'description_html' => $descriptionHtml,
                 'description_json' => $descriptionHtml ? ['html' => $descriptionHtml] : null,
                 'state_id' => $stateId,
-                'type_id' => $request->get('type_id'),
+                'type_id' => $typeId,
                 'priority' => strtoupper($request->get('priority', 'NONE')),
+                'parent_id' => $parentId,
                 'lead_id' => $request->get('lead_id'),
                 'milestone_id' => $request->get('milestone_id'),
                 'estimate_points' => $request->get('estimate_points'),
