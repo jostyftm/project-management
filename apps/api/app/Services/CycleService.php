@@ -252,14 +252,14 @@ class CycleService
             $endDate = (clone $startDate)->addDays(13)->endOfDay();
         }
 
-        $totalDays = max(1, $startDate->diffInDays($endDate));
+        $totalDays = max(1, (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()));
         $today = now()->startOfDay();
         if ($today->lessThan($startDate)) {
             $todayIndex = 0;
         } elseif ($today->greaterThan($endDate)) {
             $todayIndex = $totalDays;
         } else {
-            $todayIndex = min($totalDays, max(0, $startDate->diffInDays($today)));
+            $todayIndex = min($totalDays, max(0, (int) $startDate->copy()->startOfDay()->diffInDays($today)));
         }
 
         $todayIdeal = $scope > 0 ? round(max(0, $scope - (($todayIndex / $totalDays) * $scope)), 1) : 0;

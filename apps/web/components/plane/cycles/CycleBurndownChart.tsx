@@ -99,17 +99,18 @@ export function CycleBurndownChart({
 
   // Calculate dynamic today index
   const todayIndex = (() => {
-    if (typeof propTodayIndex === "number" && propTodayIndex >= 0 && propTodayIndex < dates.length) {
-      return propTodayIndex;
+    const maxIdx = Math.max(0, Math.min(dates.length - 1, rawSeries.length - 1));
+    if (typeof propTodayIndex === "number" && !isNaN(propTodayIndex) && propTodayIndex >= 0) {
+      return Math.min(maxIdx, Math.round(propTodayIndex));
     }
     const todayStr = propTodayDate || new Date().toISOString().split("T")[0];
-    const matchIdx = rawSeries.findIndex((pt) => pt.full_date === todayStr);
+    const matchIdx = rawSeries.findIndex((pt) => pt?.full_date === todayStr);
     if (matchIdx !== -1) return matchIdx;
 
     if (rawSeries[0]?.full_date && todayStr < rawSeries[0].full_date) return 0;
-    if (rawSeries.length > 0 && todayStr > rawSeries[rawSeries.length - 1]?.full_date) return dates.length - 1;
+    if (rawSeries.length > 0 && todayStr > (rawSeries[rawSeries.length - 1]?.full_date ?? "")) return maxIdx;
 
-    return Math.min(dates.length - 1, Math.max(0, Math.floor(dates.length / 2)));
+    return Math.min(maxIdx, Math.max(0, Math.floor(dates.length / 2)));
   })();
 
   const unit = isEstimates ? "pts" : "";
@@ -129,12 +130,12 @@ export function CycleBurndownChart({
   const rawMax = Math.max(
     1,
     ...rawSeries.map((d) => Math.max(
-      d.scope || 0,
-      d.pending || 0,
-      d.completed || 0,
-      d.started || 0,
-      d.ideal_pending || 0,
-      d.ideal_completed || 0
+      d?.scope || 0,
+      d?.pending || 0,
+      d?.completed || 0,
+      d?.started || 0,
+      d?.ideal_pending || 0,
+      d?.ideal_completed || 0
     ))
   );
   const maxVal = rawMax <= 5 ? 5 : rawMax <= 10 ? 10 : Math.ceil(rawMax / 5) * 5;
@@ -147,7 +148,7 @@ export function CycleBurndownChart({
   };
 
   const getY = (val: number) => {
-    const ratio = Math.max(0, Math.min(1, val / maxVal));
+    const ratio = Math.max(0, Math.min(1, (val || 0) / maxVal));
     return padTop + chartHeight - ratio * chartHeight;
   };
 
@@ -170,7 +171,7 @@ export function CycleBurndownChart({
 
   const primaryPath = activePoints
     .map((pt, i) => {
-      const val = chartType === "burndown" ? pt.pending : pt.completed;
+      const val = chartType === "burndown" ? (pt?.pending ?? 0) : (pt?.completed ?? 0);
       const cmd = i === 0 ? "M" : "L";
       return `${cmd} ${getX(i)} ${getY(val)}`;
     })
@@ -180,7 +181,7 @@ export function CycleBurndownChart({
   const startedPath = activePoints
     .map((pt, i) => {
       const cmd = i === 0 ? "M" : "L";
-      return `${cmd} ${getX(i)} ${getY(pt.started)}`;
+      return `${cmd} ${getX(i)} ${getY(pt?.started ?? 0)}`;
     })
     .join(" ");
 
@@ -193,7 +194,7 @@ export function CycleBurndownChart({
 
     const linePoints = activePoints
       .map((pt, i) => {
-        const val = chartType === "burndown" ? pt.pending : pt.completed;
+        const val = chartType === "burndown" ? (pt?.pending ?? 0) : (pt?.completed ?? 0);
         return `L ${getX(i)} ${getY(val)}`;
       })
       .join(" ");
@@ -205,20 +206,28 @@ export function CycleBurndownChart({
   const redLagAreaPath = (() => {
     if (chartType !== "burndown" || activePoints.length === 0) return "";
     // Find the first index in activePoints where pending > ideal_pending
-    const lagStartIndex = activePoints.findIndex((pt) => pt.pending > pt.ideal_pending);
+    const lagStartIndex = activePoints.findIndex((pt) => (pt?.pending ?? 0) > (pt?.ideal_pending ?? 0));
     if (lagStartIndex === -1 || lagStartIndex > todayIndex) return "";
 
     const startX = getX(lagStartIndex);
     const endX = getX(todayIndex);
 
+    const startIdeal = rawSeries[lagStartIndex]?.ideal_pending ?? 0;
+
     // Forward along pending
-    let path = `M ${startX} ${getY(rawSeries[lagStartIndex].ideal_pending)}`;
+    let path = `M ${startX} ${getY(startIdeal)}`;
     for (let i = lagStartIndex; i <= todayIndex; i++) {
-      path += ` L ${getX(i)} ${getY(rawSeries[i].pending)}`;
+      const pt = rawSeries[i];
+      if (pt) {
+        path += ` L ${getX(i)} ${getY(pt.pending ?? 0)}`;
+      }
     }
     // Backward along ideal
     for (let i = todayIndex; i >= lagStartIndex; i--) {
-      path += ` L ${getX(i)} ${getY(rawSeries[i].ideal_pending)}`;
+      const pt = rawSeries[i];
+      if (pt) {
+        path += ` L ${getX(i)} ${getY(pt.ideal_pending ?? 0)}`;
+      }
     }
     path += " Z";
     return path;
@@ -558,7 +567,7 @@ export function CycleBurndownChart({
 
           {/* Data Points on Primary Line up to Today */}
           {activePoints.map((pt, i) => {
-            const val = chartType === "burndown" ? pt.pending : pt.completed;
+            const val = chartType === "burndown" ? (pt?.pending ?? 0) : (pt?.completed ?? 0);
             const cx = getX(i);
             const cy = getY(val);
             const isHovered = hoveredIndex === i;
@@ -579,7 +588,7 @@ export function CycleBurndownChart({
           {/* Data Points on Started Line up to Today */}
           {activePoints.map((pt, i) => {
             const cx = getX(i);
-            const cy = getY(pt.started);
+            const cy = getY(pt?.started ?? 0);
             const isHovered = hoveredIndex === i;
 
             return (
@@ -611,7 +620,7 @@ export function CycleBurndownChart({
               {hoveredData && (
                 <circle
                   cx={getX(hoveredIndex)}
-                  cy={getY(chartType === "burndown" ? hoveredData.ideal_pending : hoveredData.ideal_completed)}
+                  cy={getY(chartType === "burndown" ? (hoveredData.ideal_pending ?? 0) : (hoveredData.ideal_completed ?? 0))}
                   r={4}
                   fill="#3b82f6"
                   stroke="white"
@@ -650,34 +659,34 @@ export function CycleBurndownChart({
               <div className="space-y-1 text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Scope:</span>
-                  <span className="font-semibold">{hoveredData.scope} {unit}</span>
+                  <span className="font-semibold">{hoveredData.scope ?? 0} {unit}</span>
                 </div>
                 {chartType === "burndown" ? (
                   <div className="flex items-center justify-between text-emerald-400 font-medium">
                     <span>Pending:</span>
-                    <span className="font-bold">{hoveredData.pending} {unit}</span>
+                    <span className="font-bold">{hoveredData.pending ?? 0} {unit}</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between text-emerald-400 font-medium">
                     <span>Completed:</span>
-                    <span className="font-bold">{hoveredData.completed} {unit}</span>
+                    <span className="font-bold">{hoveredData.completed ?? 0} {unit}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-orange-400 font-medium">
                   <span>Started:</span>
-                  <span className="font-bold">{hoveredData.started} {unit}</span>
+                  <span className="font-bold">{hoveredData.started ?? 0} {unit}</span>
                 </div>
                 <div className="flex items-center justify-between text-blue-400 font-medium">
                   <span>Ideal {chartType === "burndown" ? "Pending" : "Completed"}:</span>
                   <span className="font-bold">
-                    {chartType === "burndown" ? hoveredData.ideal_pending : hoveredData.ideal_completed} {unit}
+                    {chartType === "burndown" ? (hoveredData.ideal_pending ?? 0) : (hoveredData.ideal_completed ?? 0)} {unit}
                   </span>
                 </div>
               </div>
 
-              {chartType === "burndown" && hoveredData.pending > hoveredData.ideal_pending && (
+              {chartType === "burndown" && (hoveredData.pending ?? 0) > (hoveredData.ideal_pending ?? 0) && (
                 <div className="pt-1 border-t border-slate-700/50 text-[10px] text-red-400 font-medium">
-                  Trailing by {Math.round((hoveredData.pending - hoveredData.ideal_pending) * 10) / 10} {isEstimates ? "estimate pts" : "work items"}
+                  Trailing by {Math.round(((hoveredData.pending ?? 0) - (hoveredData.ideal_pending ?? 0)) * 10) / 10} {isEstimates ? "estimate pts" : "work items"}
                 </div>
               )}
             </div>
