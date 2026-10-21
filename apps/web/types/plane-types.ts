@@ -1,3 +1,5 @@
+import { WorkItemDeliverable } from "./deliverable-types";
+
 export interface User {
   id: number | string;
   name: string;
@@ -75,6 +77,62 @@ export interface CycleDayData {
   completed: number;
   ideal_pending: number;
   ideal_completed: number;
+  added_today?: number;
+  modified_today?: number;
+}
+
+export interface CycleScopeBreakdown {
+  initial_planned_count: number;
+  added_mid_cycle_count: number;
+  modified_count: number;
+  unresolved_count: number;
+  transferred_count: number;
+  completed_count: number;
+  added_points?: number;
+}
+
+export interface CycleImpactAnalysis {
+  scope_impact: string;
+  ideal_impact: string;
+  burndown_impact: string;
+  burnup_impact: string;
+}
+
+export interface CycleClassifiedItem {
+  id: string | number;
+  sequence_id: number;
+  identifier: string;
+  title: string;
+  priority: string;
+  estimate_points?: number | null;
+  estimate_value?: string | null;
+  state?: {
+    id: string | number;
+    name: string;
+    color: string;
+    group: string;
+  };
+  type?: {
+    id: string | number;
+    name: string;
+    color: string;
+  };
+  assignees?: {
+    id: string | number;
+    name: string;
+    email: string;
+  }[];
+  is_added_mid_cycle: boolean;
+  added_at?: string;
+  is_modified: boolean;
+  is_unresolved: boolean;
+  is_transferred: boolean;
+  status_at_completion?: string | null;
+  deliverables_count?: number;
+  approved_deliverables_count?: number;
+  deliverables?: any[];
+  dod_items_count?: number;
+  completed_dod_items_count?: number;
 }
 
 export interface CycleBreakdown {
@@ -92,6 +150,7 @@ export interface CycleBreakdown {
 export interface CycleAnalytics {
   cycle_id: string | number;
   name: string;
+  description?: string | null;
   status: string;
   start_date?: string | null;
   end_date?: string | null;
@@ -107,11 +166,14 @@ export interface CycleAnalytics {
     completed_points: number;
   };
   breakdown?: CycleBreakdown;
+  scope_breakdown?: CycleScopeBreakdown;
+  impact_analysis?: CycleImpactAnalysis;
   timeline?: {
     dates: string[];
     work_items: CycleDayData[];
     estimates: CycleDayData[];
   };
+  work_items?: CycleClassifiedItem[];
 }
 
 export interface Module {
@@ -268,6 +330,12 @@ export interface WorkItem {
   }[];
   outward_relations?: WorkItemRelation[];
   inward_relations?: WorkItemRelation[];
+  deliverables?: WorkItemDeliverable[];
+  deliverables_count?: number;
+  approved_deliverables_count?: number;
+  dod_items?: any[];
+  dod_items_count?: number;
+  completed_dod_items_count?: number;
 }
 
 export type DocBlockType =

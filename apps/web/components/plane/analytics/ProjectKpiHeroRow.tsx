@@ -26,8 +26,18 @@ export function ProjectKpiHeroRow({ overview, isLoading }: ProjectKpiHeroRowProp
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-32 rounded-xl bg-slate-100 dark:bg-neutral-800 animate-pulse border border-slate-200 dark:border-neutral-700"
-          />
+            className="p-5 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="h-3.5 w-24 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              <div className="size-8 rounded-lg bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+            </div>
+            <div className="space-y-1.5 pt-1">
+              <div className="h-7 w-20 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+              <div className="h-3 w-32 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+            </div>
+            <div className="h-4 w-28 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse mt-1" />
+          </div>
         ))}
       </div>
     );

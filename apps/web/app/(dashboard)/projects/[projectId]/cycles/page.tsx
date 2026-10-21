@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { cycleService } from "@/services/plane/cycleService";
 import { projectService } from "@/services/plane/projectService";
 import { Cycle, CycleAnalytics, Project, State } from "@/types/plane-types";
@@ -30,6 +31,7 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
+  Eye,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -458,6 +460,14 @@ export default function CyclesPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Link
+                        href={`/projects/${projectId}/cycles/${cycle.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Eye className="size-3.5 text-slate-500" />
+                        <span>Ver Detalle</span>
+                      </Link>
+
                       {isAdmin && (
                         <>
                           <Button
@@ -542,6 +552,14 @@ export default function CyclesPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Link
+                        href={`/projects/${projectId}/cycles/${cycle.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition-colors"
+                      >
+                        <Eye className="size-3.5 text-indigo-500" />
+                        <span>Página de Detalle</span>
+                      </Link>
+
                       <Button
                         size="sm"
                         variant="outline"

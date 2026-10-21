@@ -31,7 +31,19 @@ import {
   Save,
   Loader2,
   Lock,
+  KeyRound,
+  Copy,
+  Check,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { copyToClipboard } from "@/lib/clipboard";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -141,6 +153,78 @@ export default function InstanceAdminPage() {
       );
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Error al modificar permisos");
+    }
+  };
+
+  // Password reset link dialog state
+  const [resetModal, setResetModal] = useState<{
+    isOpen: boolean;
+    user: InstanceUser | null;
+    resetUrl: string;
+    isGenerating: boolean;
+    copied: boolean;
+    sendEmail: boolean;
+  }>({
+    isOpen: false,
+    user: null,
+    resetUrl: "",
+    isGenerating: false,
+    copied: false,
+    sendEmail: false,
+  });
+
+  const handleOpenResetDialog = (userToReset: InstanceUser) => {
+    setResetModal({
+      isOpen: true,
+      user: userToReset,
+      resetUrl: "",
+      isGenerating: false,
+      copied: false,
+      sendEmail: false,
+    });
+  };
+
+  const handleGenerateResetLink = async (sendEmailOption?: boolean) => {
+    if (!resetModal.user) return;
+    const shouldSendEmail = sendEmailOption !== undefined ? sendEmailOption : resetModal.sendEmail;
+
+    setResetModal((prev) => ({ ...prev, isGenerating: true, copied: false }));
+    try {
+      const res = await instanceAdminService.generatePasswordResetLink(
+        resetModal.user.id,
+        shouldSendEmail
+      );
+      setResetModal((prev) => ({
+        ...prev,
+        resetUrl: res.reset_url,
+        isGenerating: false,
+      }));
+
+      // Copy automatically
+      await copyToClipboard(res.reset_url);
+      setResetModal((prev) => ({ ...prev, copied: true }));
+      toast.success(
+        shouldSendEmail
+          ? "Enlace generado, copiado al portapapeles y enviado por correo"
+          : "Enlace generado y copiado al portapapeles"
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Error al generar enlace de restablecimiento");
+      setResetModal((prev) => ({ ...prev, isGenerating: false }));
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!resetModal.resetUrl) return;
+    const ok = await copyToClipboard(resetModal.resetUrl);
+    if (ok) {
+      setResetModal((prev) => ({ ...prev, copied: true }));
+      toast.success("Enlace copiado al portapapeles");
+      setTimeout(() => {
+        setResetModal((prev) => ({ ...prev, copied: false }));
+      }, 3000);
+    } else {
+      toast.error("No se pudo copiar el enlace");
     }
   };
 
@@ -658,6 +742,7 @@ export default function InstanceAdminPage() {
                       <th className="p-3">Workspaces</th>
                       <th className="p-3">SuperAdmin de Instancia</th>
                       <th className="p-3">Fecha de Registro</th>
+                      <th className="p-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -691,6 +776,18 @@ export default function InstanceAdminPage() {
                         <td className="p-3 text-slate-400">
                           {new Date(u.created_at).toLocaleDateString()}
                         </td>
+                        <td className="p-3 text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenResetDialog(u)}
+                            className="h-7 px-2.5 text-[11px] gap-1.5 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 hover:text-indigo-800 border-indigo-200 shadow-2xs"
+                            title="Resetear contraseña y copiar enlace"
+                          >
+                            <KeyRound className="size-3 text-indigo-600" />
+                            <span>Resetear Contraseña</span>
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -700,6 +797,141 @@ export default function InstanceAdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Password Reset Modal */}
+      <Dialog
+        open={resetModal.isOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetModal({
+              isOpen: false,
+              user: null,
+              resetUrl: "",
+              isGenerating: false,
+              copied: false,
+              sendEmail: false,
+            });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <KeyRound className="size-4 text-indigo-600" />
+              Resetear Contraseña de Usuario
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Genera un enlace temporal para restablecer la contraseña de{" "}
+              <strong className="text-slate-800">{resetModal.user?.name}</strong> ({resetModal.user?.email}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {!resetModal.resetUrl ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Al hacer clic en generar enlace, se creará un token con vigencia de <strong>60 minutos</strong> y se copiará automáticamente al portapapeles para que puedas compartirlo de inmediato con el usuario.
+                </p>
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  <Switch
+                    id="send-email-toggle"
+                    checked={resetModal.sendEmail}
+                    onCheckedChange={(checked) => setResetModal((prev) => ({ ...prev, sendEmail: checked }))}
+                  />
+                  <Label htmlFor="send-email-toggle" className="text-xs cursor-pointer text-slate-700">
+                    Enviar también enlace por correo electrónico (SMTP)
+                  </Label>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                  <p className="font-semibold flex items-center gap-1.5 text-emerald-800">
+                    <CheckCircle2 className="size-3.5 text-emerald-600" />
+                    ¡Enlace generado exitosamente!
+                  </p>
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    El enlace tiene una vigencia de <strong>60 minutos</strong> y se ha copiado automáticamente a tu portapapeles.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-700 font-medium">Enlace de Restablecimiento</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={resetModal.resetUrl}
+                      className="text-xs font-mono bg-slate-50 border-slate-200 select-all"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCopyLink}
+                      className="shrink-0 h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5"
+                    >
+                      {resetModal.copied ? <Check className="size-3.5 text-emerald-300" /> : <Copy className="size-3.5" />}
+                      {resetModal.copied ? "Copiado" : "Copiar"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setResetModal({
+                  isOpen: false,
+                  user: null,
+                  resetUrl: "",
+                  isGenerating: false,
+                  copied: false,
+                  sendEmail: false,
+                })
+              }
+              className="text-xs"
+            >
+              Cerrar
+            </Button>
+            {!resetModal.resetUrl ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={resetModal.isGenerating}
+                onClick={() => handleGenerateResetLink()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              >
+                {resetModal.isGenerating ? (
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <KeyRound className="size-3.5 mr-1.5" />
+                )}
+                Generar y Copiar Link
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={resetModal.isGenerating}
+                onClick={() => handleGenerateResetLink()}
+                className="text-xs text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+              >
+                {resetModal.isGenerating ? (
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <RefreshCw className="size-3.5 mr-1.5" />
+                )}
+                Generar Nuevo Enlace
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

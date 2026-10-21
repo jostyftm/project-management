@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 interface ProjectTeamWorkloadProps {
   members: ProjectMemberUser[];
   workItems: WorkItem[];
+  isLoading?: boolean;
 }
 
 export function ProjectTeamWorkload({
-  members,
-  workItems,
+  members = [],
+  workItems = [],
+  isLoading,
 }: ProjectTeamWorkloadProps) {
   // Capacidad de referencia por miembro para el cálculo de saturación
   const CAPACITY = 10;
@@ -51,6 +53,30 @@ export function ProjectTeamWorkload({
       })
       .sort((a, b) => b.assignedCount - a.assignedCount);
   }, [members, workItems]);
+
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Balance de Carga del Equipo"
+        description="Tareas abiertas asignadas vs. capacidad estimada"
+      >
+        <div className="space-y-4 py-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="size-6 rounded-full bg-slate-200 dark:bg-neutral-700 animate-pulse" />
+                  <div className="h-3.5 w-24 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                </div>
+                <div className="h-4 w-16 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse" />
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </WidgetCard>
+    );
+  }
 
   return (
     <WidgetCard

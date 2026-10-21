@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { Cycle, CycleAnalytics, Project, State } from "@/types/plane-types";
 import { cycleService } from "@/services/plane/cycleService";
 import { CycleProgressRing } from "./CycleProgressRing";
@@ -19,7 +20,11 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
+  TrendingDown,
   Repeat,
+  Eye,
+  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -233,8 +238,18 @@ export function CycleDetailView({
               </div>
             </div>
 
-            {/* Right: Info, Notification Bell with red badge, More Options */}
+            {/* Right: Info, Full Page Button, Notification Bell with red badge, More Options */}
             <div className="flex items-center gap-1.5 self-end sm:self-center">
+              {cycle && projectId && (
+                <Link
+                  href={`/projects/${projectId}/cycles/${cycle.id}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition-colors shadow-2xs mr-1"
+                >
+                  <Eye className="size-3.5" />
+                  <span>Ver Página de Detalle</span>
+                </Link>
+              )}
+
               {/* Info Popover */}
               <Popover>
                 <PopoverTrigger asChild>
@@ -353,6 +368,74 @@ export function CycleDetailView({
               </DropdownMenu>
             </div>
           </div>
+
+          {/* 2.5 Scope & Flow Dynamics Cards */}
+          {analytics?.scope_breakdown && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Alcance Inicial
+                </span>
+                <p className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                  {analytics.scope_breakdown.initial_planned_count}
+                </p>
+                <p className="text-[10px] text-slate-400">Planificadas al inicio</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/60 shadow-2xs space-y-1 bg-indigo-50/15">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">
+                    Agregadas
+                  </span>
+                  <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.2 rounded-full">
+                    +{analytics.scope_breakdown.added_mid_cycle_count}
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {analytics.scope_breakdown.added_mid_cycle_count}
+                </p>
+                <p className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80">
+                  {analytics.scope_breakdown.added_points
+                    ? `+${analytics.scope_breakdown.added_points} pts tras inicio`
+                    : "Sumadas durante el ciclo"}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 shadow-2xs space-y-1 bg-amber-50/15">
+                <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                  Modificadas
+                </span>
+                <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                  {analytics.scope_breakdown.modified_count}
+                </p>
+                <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Cambios de alcance/estimación</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 shadow-2xs space-y-1 bg-rose-50/15">
+                <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-400 uppercase tracking-wider">
+                  Sin Resolver
+                </span>
+                <p className="text-xl font-bold text-rose-600 dark:text-rose-400">
+                  {analytics.scope_breakdown.unresolved_count}
+                </p>
+                <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80">
+                  {analytics.scope_breakdown.transferred_count > 0
+                    ? `${analytics.scope_breakdown.transferred_count} transferidas`
+                    : "Pendientes"}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 shadow-2xs space-y-1 bg-emerald-50/15 col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                  Completadas
+                </span>
+                <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {analytics.scope_breakdown.completed_count}
+                </p>
+                <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80">Finalizadas</p>
+              </div>
+            </div>
+          )}
 
           {/* 3. Layout principal (Grid de 2 columnas) */}
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs overflow-hidden">

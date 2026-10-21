@@ -18,6 +18,7 @@ import {
   SignalLow,
   CircleSlash,
   ChevronDown,
+  Paperclip,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -245,6 +246,28 @@ export function WorkItemListRow({
             >
               <GitBranch className="size-3 text-slate-400" />
               <span>{item.sub_items?.length}</span>
+            </span>
+          )}
+
+          {/* Evidencias / Entregables badge */}
+          {((item.deliverables_count && item.deliverables_count > 0) || (item.deliverables && item.deliverables.length > 0)) && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(item);
+              }}
+              className={cn(
+                "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 transition-colors cursor-pointer",
+                item.approved_deliverables_count && item.approved_deliverables_count > 0
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800"
+              )}
+              title={`${item.deliverables_count || item.deliverables?.length} evidencias adjuntas (${item.approved_deliverables_count || 0} aprobadas)`}
+            >
+              <Paperclip className="size-3" />
+              <span>
+                {item.deliverables_count || item.deliverables?.length} {Number(item.deliverables_count || item.deliverables?.length) === 1 ? "evidencia" : "evidencias"}
+              </span>
             </span>
           )}
         </div>

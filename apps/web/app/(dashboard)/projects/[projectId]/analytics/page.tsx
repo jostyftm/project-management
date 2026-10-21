@@ -33,7 +33,10 @@ export default function ProjectAnalyticsPage() {
   const [cycleTimeStats, setCycleTimeStats] = useState<CycleTimeStats | null>(null);
   const [members, setMembers] = useState<TeamMemberKpi[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isOverviewLoading, setIsOverviewLoading] = useState(true);
+  const [isVelocityLoading, setIsVelocityLoading] = useState(true);
+  const [isCycleTimeLoading, setIsCycleTimeLoading] = useState(true);
+  const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useDocumentTitle(`Métricas & KPIs - ${project?.name || "Proyecto"}`);
@@ -45,28 +48,48 @@ export default function ProjectAnalyticsPage() {
   const loadAllAnalytics = useCallback(async (isSilent = false) => {
     if (!projectId || projectId === "new") return;
 
-    if (!isSilent) setIsLoading(true);
-    else setIsRefreshing(true);
-
-    try {
-      projectService.get(projectId).then(setProject).catch(() => {});
-      const [overviewData, velocityData, cycleData, membersData] = await Promise.all([
-        projectAnalyticsService.getOverview(projectId, { period }),
-        projectAnalyticsService.getVelocityTrend(projectId, 6),
-        projectAnalyticsService.getCycleTimeStats(projectId, { period }),
-        projectAnalyticsService.getTeamPerformanceMatrix(projectId, { period }),
-      ]);
-
-      setOverview(overviewData);
-      setVelocityTrend(velocityData);
-      setCycleTimeStats(cycleData);
-      setMembers(membersData);
-    } catch (err) {
-      console.error("Error loading project analytics:", err);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+    if (isSilent) {
+      setIsRefreshing(true);
+    } else {
+      setIsOverviewLoading(true);
+      setIsVelocityLoading(true);
+      setIsCycleTimeLoading(true);
+      setIsMembersLoading(true);
     }
+
+    // 0. Cargar proyecto
+    projectService.get(projectId).then(setProject).catch(() => {});
+
+    // 1. Overview KPIs (Carga individual)
+    projectAnalyticsService
+      .getOverview(projectId, { period })
+      .then(setOverview)
+      .catch((err) => console.error("Error loading overview KPI:", err))
+      .finally(() => setIsOverviewLoading(false));
+
+    // 2. Velocity Trend (Carga individual)
+    projectAnalyticsService
+      .getVelocityTrend(projectId, 6)
+      .then(setVelocityTrend)
+      .catch((err) => console.error("Error loading velocity trend:", err))
+      .finally(() => setIsVelocityLoading(false));
+
+    // 3. Cycle Time Stats (Carga individual)
+    projectAnalyticsService
+      .getCycleTimeStats(projectId, { period })
+      .then(setCycleTimeStats)
+      .catch((err) => console.error("Error loading cycle time stats:", err))
+      .finally(() => setIsCycleTimeLoading(false));
+
+    // 4. Team Performance Matrix (Carga individual)
+    projectAnalyticsService
+      .getTeamPerformanceMatrix(projectId, { period })
+      .then(setMembers)
+      .catch((err) => console.error("Error loading members performance:", err))
+      .finally(() => {
+        setIsMembersLoading(false);
+        setIsRefreshing(false);
+      });
   }, [projectId, period]);
 
   useEffect(() => {
@@ -79,7 +102,7 @@ export default function ProjectAnalyticsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6 max-w-7xl mx-auto w-full">
+    <div className="flex-1 space-y-6 mx-auto w-full">
       {/* Header de la vista */}
       <div className="space-y-4 pb-2 border-b border-slate-100 dark:border-neutral-800">
         <ProjectBreadcrumb
@@ -102,79 +125,75 @@ export default function ProjectAnalyticsPage() {
             </div>
           </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Selector de periodo */}
-          <div className="inline-flex rounded-lg border border-slate-200 dark:border-neutral-800 p-0.5 bg-slate-50 dark:bg-neutral-800/50 text-xs">
-            <button
-              onClick={() => setPeriod("14d")}
-              className={`px-3 py-1 font-medium rounded-md transition-colors ${
-                period === "14d"
-                  ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              14 días
-            </button>
-            <button
-              onClick={() => setPeriod("30d")}
-              className={`px-3 py-1 font-medium rounded-md transition-colors ${
-                period === "30d"
-                  ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              30 días
-            </button>
-            <button
-              onClick={() => setPeriod("90d")}
-              className={`px-3 py-1 font-medium rounded-md transition-colors ${
-                period === "90d"
-                  ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              90 días
-            </button>
-            <button
-              onClick={() => setPeriod("all")}
-              className={`px-3 py-1 font-medium rounded-md transition-colors ${
-                period === "all"
-                  ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Histórico
-            </button>
-          </div>
+          <div className="flex items-center gap-2.5">
+            {/* Selector de periodo */}
+            <div className="inline-flex rounded-lg border border-slate-200 dark:border-neutral-800 p-0.5 bg-slate-50 dark:bg-neutral-800/50 text-xs">
+              <button
+                onClick={() => setPeriod("14d")}
+                className={`px-3 py-1 font-medium rounded-md transition-colors ${period === "14d"
+                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                  }`}
+              >
+                14 días
+              </button>
+              <button
+                onClick={() => setPeriod("30d")}
+                className={`px-3 py-1 font-medium rounded-md transition-colors ${period === "30d"
+                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                  }`}
+              >
+                30 días
+              </button>
+              <button
+                onClick={() => setPeriod("90d")}
+                className={`px-3 py-1 font-medium rounded-md transition-colors ${period === "90d"
+                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                  }`}
+              >
+                90 días
+              </button>
+              <button
+                onClick={() => setPeriod("all")}
+                className={`px-3 py-1 font-medium rounded-md transition-colors ${period === "all"
+                    ? "bg-white dark:bg-neutral-900 text-slate-900 dark:text-slate-100 shadow-xs"
+                    : "text-slate-500 hover:text-slate-900"
+                  }`}
+              >
+                Histórico
+              </button>
+            </div>
 
-          {/* Botón de actualizar datos */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadAllAnalytics(true)}
-            disabled={isRefreshing}
-            className="text-xs gap-1.5 h-8 border-slate-200 dark:border-neutral-700"
-          >
-            <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-            <span>Actualizar</span>
-          </Button>
+            {/* Botón de actualizar datos */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadAllAnalytics(true)}
+              disabled={isRefreshing}
+              className="text-xs gap-1.5 h-8 border-slate-200 dark:border-neutral-700"
+            >
+              <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span>Actualizar</span>
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
 
-      {/* Fila 1: Resumen ejecutivo y 4 pilares de KPIs */}
-      <ProjectKpiHeroRow overview={overview} isLoading={isLoading} />
+      {/* Fila 1: Resumen ejecutivo y 4 pilares de KPIs (Carga independiente) */}
+      <ProjectKpiHeroRow overview={overview} isLoading={isOverviewLoading} />
 
-      {/* Fila 2: Gráficos de Flujo y Tiempos */}
+      {/* Fila 2: Gráficos de Flujo y Tiempos (Cargas independientes) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ProjectVelocityChart trend={velocityTrend} isLoading={isLoading} />
-        <CycleTimeDistributionChart stats={cycleTimeStats} isLoading={isLoading} />
+        <ProjectVelocityChart trend={velocityTrend} isLoading={isVelocityLoading} />
+        <CycleTimeDistributionChart stats={cycleTimeStats} isLoading={isCycleTimeLoading} />
       </div>
 
-      {/* Fila 3: Matriz de Rendimiento Individual y Balance de Carga */}
+      {/* Fila 3: Matriz de Rendimiento Individual y Balance de Carga (Carga independiente) */}
       <ProjectMembersMatrixTable
         members={members}
-        isLoading={isLoading}
+        isLoading={isMembersLoading}
         onSelectMember={handleSelectMember}
       />
 

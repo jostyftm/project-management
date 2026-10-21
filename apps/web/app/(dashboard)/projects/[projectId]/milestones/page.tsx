@@ -34,6 +34,7 @@ import {
   Maximize2,
   GitBranch,
   ListTodo,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ export default function ProjectMilestonesPage() {
 
   // Modal
   const [openModal, setOpenModal] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDate, setTargetDate] = useState("");
@@ -109,28 +111,78 @@ export default function ProjectMilestonesPage() {
     loadData();
   }, [projectId]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingMilestone(null);
+    setTitle("");
+    setDescription("");
+    setTargetDate("");
+    setSelectedItemIds([]);
+    setOpenModal(true);
+  };
+
+  const handleOpenEdit = async (m: Milestone) => {
+    setEditingMilestone(m);
+    setTitle(m.title);
+    setDescription(m.description || "");
+    setTargetDate(m.target_date || "");
+
+    const mId = String(m.id);
+    if (milestoneItemsMap[mId]) {
+      setSelectedItemIds(milestoneItemsMap[mId].map((i) => String(i.id)));
+    } else {
+      try {
+        const items = await workItemService.list(projectId, { milestone_id: m.id });
+        setMilestoneItemsMap((prev) => ({ ...prev, [mId]: items }));
+        setSelectedItemIds(items.map((i) => String(i.id)));
+      } catch {
+        setSelectedItemIds([]);
+      }
+    }
+    setOpenModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     setIsSubmitting(true);
     try {
-      const created = await milestoneService.create(projectId, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        target_date: targetDate || undefined,
-        work_item_ids: selectedItemIds,
-      });
+      if (editingMilestone) {
+        const updated = await milestoneService.update(editingMilestone.id, {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          target_date: targetDate || undefined,
+          work_item_ids: selectedItemIds,
+        });
 
-      toast.success("Hito (Milestone) creado exitosamente");
-      setMilestones((prev) => [...prev, created]);
+        toast.success("Hito actualizado exitosamente");
+        setMilestones((prev) =>
+          prev.map((m) => (String(m.id) === String(editingMilestone.id) ? { ...m, ...updated } : m))
+        );
+
+        // Refresh items for this milestone
+        const items = await workItemService.list(projectId, { milestone_id: editingMilestone.id }).catch(() => []);
+        setMilestoneItemsMap((prev) => ({ ...prev, [String(editingMilestone.id)]: items }));
+      } else {
+        const created = await milestoneService.create(projectId, {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          target_date: targetDate || undefined,
+          work_item_ids: selectedItemIds,
+        });
+
+        toast.success("Hito (Milestone) creado exitosamente");
+        setMilestones((prev) => [...prev, created]);
+      }
+
       setTitle("");
       setDescription("");
       setTargetDate("");
       setSelectedItemIds([]);
+      setEditingMilestone(null);
       setOpenModal(false);
     } catch (err) {
-      toast.error("Error al crear el hito");
+      toast.error(editingMilestone ? "Error al actualizar el hito" : "Error al crear el hito");
     } finally {
       setIsSubmitting(false);
     }
@@ -186,7 +238,7 @@ export default function ProjectMilestonesPage() {
 
         {isAdmin && (
           <Button
-            onClick={() => setOpenModal(true)}
+            onClick={handleOpenCreate}
             className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs font-semibold h-9 shadow-sm"
           >
             <Plus className="size-4" />
@@ -208,7 +260,7 @@ export default function ProjectMilestonesPage() {
             Crea hitos con fecha objetivo para rastrear fechas clave de entrega y progreso de tareas.
           </p>
           {isAdmin && (
-            <Button onClick={() => setOpenModal(true)} className="mt-4 bg-indigo-600 text-white text-xs">
+            <Button onClick={handleOpenCreate} className="mt-4 bg-indigo-600 text-white text-xs">
               <Plus className="size-4 mr-1.5" /> Crear Hito
             </Button>
           )}
@@ -328,6 +380,19 @@ export default function ProjectMilestonesPage() {
                     {isAdmin && (
                       <Button
                         variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenEdit(m)}
+                        className="text-xs text-slate-600 hover:text-indigo-600 font-medium gap-1 h-8 px-2"
+                        title="Editar hito"
+                      >
+                        <Pencil className="size-3.5" />
+                        <span>Editar</span>
+                      </Button>
+                    )}
+
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(m.id)}
                         className="size-8 text-slate-400 hover:text-red-600 cursor-pointer"
@@ -431,44 +496,54 @@ export default function ProjectMilestonesPage() {
         </div>
       )}
 
-      {/* Modal */}
-      <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+      {/* Modal Crear / Editar Hito */}
+      <Dialog
+        open={openModal}
+        onOpenChange={(isOpen) => {
+          setOpenModal(isOpen);
+          if (!isOpen) setEditingMilestone(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-6 overflow-hidden">
+          <DialogHeader className="shrink-0 pb-2 border-b border-slate-100">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
               <Flag className="size-5 text-indigo-600" />
-              Nuevo Hito (Milestone)
+              {editingMilestone ? "Editar Hito (Milestone)" : "Nuevo Hito (Milestone)"}
             </DialogTitle>
-            <DialogDescription>
-              Fija una fecha clave de entrega para {project?.name}.
+            <DialogDescription className="text-xs text-slate-500">
+              {editingMilestone
+                ? "Modifica los detalles, fecha objetivo y tareas vinculadas a este hito."
+                : `Fija una fecha clave de entrega para ${project?.name}.`}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="m-title">Título del Hito *</Label>
+          <form onSubmit={handleSave} className="flex-1 overflow-y-auto pr-1 space-y-4 py-3 min-w-0">
+            <div className="space-y-1.5 min-w-0">
+              <Label htmlFor="m-title" className="text-xs font-semibold">Título del Hito *</Label>
               <Input
                 id="m-title"
                 placeholder="Ej. Lanzamiento MVP en Producción"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+                className="w-full text-xs h-9"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="m-date">Fecha Objetivo</Label>
+            <div className="space-y-1.5 min-w-0">
+              <Label htmlFor="m-date" className="text-xs font-semibold">Fecha Objetivo</Label>
               <Input
                 id="m-date"
                 type="date"
                 value={targetDate}
                 onChange={(e) => setTargetDate(e.target.value)}
+                className="w-full text-xs h-9"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Vincular Work Items del Proyecto</Label>
-              <div className="flex flex-col gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg max-h-40 overflow-y-auto">
+            <div className="space-y-1.5 min-w-0">
+              <Label className="text-xs font-semibold">Vincular Work Items del Proyecto</Label>
+              <div className="flex flex-col gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg max-h-40 overflow-y-auto w-full">
                 {availableItems.length === 0 ? (
                   <p className="text-xs text-slate-400 p-2">No hay work items en este proyecto.</p>
                 ) : (
@@ -499,24 +574,25 @@ export default function ProjectMilestonesPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="m-desc">Descripción (Opcional)</Label>
+            <div className="space-y-1.5 min-w-0">
+              <Label htmlFor="m-desc" className="text-xs font-semibold">Descripción (Opcional)</Label>
               <Textarea
                 id="m-desc"
                 placeholder="Criterios y objetivos para alcanzar este hito..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
+                className="w-full text-xs resize-none"
               />
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenModal(false)}>
+            <DialogFooter className="shrink-0 pt-3 border-t border-slate-100">
+              <Button type="button" variant="outline" size="sm" onClick={() => setOpenModal(false)} className="text-xs">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                {isSubmitting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Guardar Hito
+              <Button type="submit" size="sm" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs">
+                {isSubmitting ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
+                {editingMilestone ? "Actualizar Hito" : "Guardar Hito"}
               </Button>
             </DialogFooter>
           </form>

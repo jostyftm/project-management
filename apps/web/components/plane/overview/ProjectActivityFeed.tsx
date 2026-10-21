@@ -19,12 +19,35 @@ import { es } from "date-fns/locale";
 interface ProjectActivityFeedProps {
   activities: Activity[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 export function ProjectActivityFeed({
   activities,
   projectId,
+  isLoading,
 }: ProjectActivityFeedProps) {
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Actividad Reciente"
+        description="Últimos cambios y actualizaciones en el proyecto"
+      >
+        <div className="space-y-4 py-1">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-start gap-3">
+              <div className="size-6 rounded-full bg-slate-200 dark:bg-neutral-700 animate-pulse shrink-0 mt-0.5" />
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="h-3 w-3/4 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+                <div className="h-2.5 w-24 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </WidgetCard>
+    );
+  }
+
   const recentActivities = activities.slice(0, 8);
 
   const getActionIcon = (action: string) => {

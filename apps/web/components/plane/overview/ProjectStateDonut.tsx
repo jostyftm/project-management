@@ -8,6 +8,7 @@ import { WidgetCard } from "./WidgetCard";
 interface ProjectStateDonutProps {
   workItems: WorkItem[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 const STATE_GROUPS = [
@@ -18,7 +19,7 @@ const STATE_GROUPS = [
   { group: "CANCELLED", label: "Cancelado", color: "#ef4444" },
 ];
 
-export function ProjectStateDonut({ workItems, projectId }: ProjectStateDonutProps) {
+export function ProjectStateDonut({ workItems = [], projectId, isLoading }: ProjectStateDonutProps) {
   const total = workItems.length;
 
   const distribution = useMemo(() => {
@@ -50,6 +51,32 @@ export function ProjectStateDonut({ workItems, projectId }: ProjectStateDonutPro
       strokeDashoffset,
     };
   });
+
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Distribución por Estado"
+        description="Tareas agrupadas según su fase actual"
+      >
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-4">
+          <div className="size-40 rounded-full border-[18px] border-slate-100 dark:border-neutral-800 animate-pulse flex items-center justify-center shrink-0">
+            <div className="h-6 w-10 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          </div>
+          <div className="space-y-2.5 w-full sm:w-44">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-slate-200 dark:bg-neutral-700 animate-pulse" />
+                  <div className="h-3 w-16 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                </div>
+                <div className="h-3 w-8 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </WidgetCard>
+    );
+  }
 
   return (
     <WidgetCard

@@ -8,11 +8,12 @@ import { CheckCircle2, TrendingUp, AlertTriangle, Clock, ArrowUpRight, ArrowDown
 import { cn } from "@/lib/utils";
 
 interface ProjectKpiRowProps {
-  project: Project;
+  project?: Project | null;
   workItems: WorkItem[];
+  isLoading?: boolean;
 }
 
-export function ProjectKpiRow({ project, workItems }: ProjectKpiRowProps) {
+export function ProjectKpiRow({ project, workItems = [], isLoading }: ProjectKpiRowProps) {
   const total = workItems.length;
 
   const completedItems = useMemo(
@@ -62,7 +63,7 @@ export function ProjectKpiRow({ project, workItems }: ProjectKpiRowProps) {
 
   // Días restantes hasta fecha objetivo del proyecto
   const remainingDaysData = useMemo(() => {
-    if (!project.target_date) {
+    if (!project?.target_date) {
       return { days: null, isOverdue: false, text: "Sin fecha objetivo" };
     }
     const now = new Date();
@@ -75,7 +76,32 @@ export function ProjectKpiRow({ project, workItems }: ProjectKpiRowProps) {
       return { days: Math.abs(diffDays), isOverdue: true, text: `Vencido hace ${Math.abs(diffDays)}d` };
     }
     return { days: diffDays, isOverdue: false, text: `${diffDays} días restantes` };
-  }, [project.target_date]);
+  }, [project?.target_date]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="p-4 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xs space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="h-3.5 w-24 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              <div className="size-7 rounded-lg bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div className="space-y-1.5">
+                <div className="h-7 w-16 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+                <div className="h-3 w-28 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+              <div className="size-12 rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse shrink-0" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -78,6 +78,7 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::get('health', [InstanceAdminController::class, 'getHealth']);
         Route::get('users', [InstanceAdminController::class, 'getUsers']);
         Route::put('users/{id}/admin-status', [InstanceAdminController::class, 'toggleUserAdmin']);
+        Route::post('users/{id}/reset-password-link', [InstanceAdminController::class, 'resetUserPasswordLink']);
         Route::post('test-email', [InstanceAdminController::class, 'testEmail']);
     });
 

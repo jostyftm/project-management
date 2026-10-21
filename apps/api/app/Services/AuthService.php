@@ -114,28 +114,26 @@ class AuthService
     }
 
     /**
-     * Genera un token firmado temporal de 10 minutos y envía el correo de restablecimiento.
+     * Genera un enlace de restablecimiento de contraseña para un usuario (uso de administración).
      */
-    public function forgotPassword(ForgotPasswordRequest $request): array
+    public function createPasswordResetLink(User $user, bool $sendEmail = false): array
     {
-        $email = strtolower(trim($request->validated('email')));
-        $user = User::where('email', $email)->first();
+        $email = strtolower(trim($user->email));
+        $plainToken = Str::random(64);
+        $hashedToken = hash('sha256', $plainToken);
 
-        if ($user) {
-            $plainToken = Str::random(64);
-            $hashedToken = hash('sha256', $plainToken);
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $email],
+            [
+                'token' => $hashedToken,
+                'created_at' => now(),
+            ]
+        );
 
-            DB::table('password_reset_tokens')->updateOrInsert(
-                ['email' => $email],
-                [
-                    'token' => $hashedToken,
-                    'created_at' => now(),
-                ]
-            );
+        $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3010')), '/');
+        $resetUrl = "{$frontendUrl}/reset-password?token={$plainToken}&email=".urlencode($email);
 
-            $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:3010')), '/');
-            $resetUrl = "{$frontendUrl}/reset-password?token={$plainToken}&email=".urlencode($email);
-
+        if ($sendEmail) {
             try {
                 SendNotificationEmailJob::dispatch(
                     $user->email,
@@ -149,6 +147,28 @@ class AuthService
                     Log::error("Fallo al enviar correo directo de recuperación a {$user->email}: ".$inner->getMessage());
                 }
             }
+        }
+
+        return [
+            'reset_url' => $resetUrl,
+            'token' => $plainToken,
+            'email' => $email,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'expires_in_minutes' => 10,
+        ];
+    }
+
+    /**
+     * Genera un token firmado temporal y envía el correo de restablecimiento.
+     */
+    public function forgotPassword(ForgotPasswordRequest $request): array
+    {
+        $email = strtolower(trim($request->validated('email')));
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            $this->createPasswordResetLink($user, true);
         }
 
         return [

@@ -11,11 +11,13 @@ import { cn } from "@/lib/utils";
 interface ProjectAttentionListProps {
   workItems: WorkItem[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 export function ProjectAttentionList({
-  workItems,
+  workItems = [],
   projectId,
+  isLoading,
 }: ProjectAttentionListProps) {
   const criticalItems = useMemo(() => {
     const now = Date.now();
@@ -45,6 +47,30 @@ export function ProjectAttentionList({
 
     return [...overdue, ...highUnassigned, ...otherUrgent].slice(0, 7);
   }, [workItems]);
+
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Requiere Atención Inmediata"
+        description="Tareas bloqueadas, vencidas o críticas sin asignar"
+      >
+        <div className="divide-y divide-slate-100 dark:divide-neutral-800">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="py-3 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="h-4 w-12 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse shrink-0" />
+                <div className="h-4 w-3/4 max-w-md bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="h-5 w-20 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse" />
+                <div className="size-6 rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </WidgetCard>
+    );
+  }
 
   return (
     <WidgetCard

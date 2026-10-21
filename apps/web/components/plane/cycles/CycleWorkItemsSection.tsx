@@ -21,6 +21,7 @@ import {
   Loader2,
   Check,
   Calendar,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -253,6 +254,22 @@ export function CycleWorkItemsSection({
                   <span className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     {item.title}
                   </span>
+
+                  {/* Evidencias / Entregables badge */}
+                  {((item.deliverables_count && item.deliverables_count > 0) || (item.deliverables && item.deliverables.length > 0)) && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0",
+                        item.approved_deliverables_count && item.approved_deliverables_count > 0
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                      )}
+                      title={`${item.deliverables_count || item.deliverables?.length} evidencias adjuntas`}
+                    >
+                      <Paperclip className="size-3" />
+                      <span>{item.deliverables_count || item.deliverables?.length}</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Derecha: Selector de Estado, Puntos, Prioridad y Acciones */}

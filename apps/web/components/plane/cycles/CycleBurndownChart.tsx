@@ -61,8 +61,8 @@ export function CycleBurndownChart({
   onChartTypeChange,
   className,
 }: CycleBurndownChartProps) {
-  // Dropdown states: filter dropdown is opened by default as specified in UI spec
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(true);
+  // Dropdown states: closed by default
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isChartTypeDropdownOpen, setIsChartTypeDropdownOpen] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -77,7 +77,7 @@ export function CycleBurndownChart({
         filterDropdownRef.current &&
         !filterDropdownRef.current.contains(event.target as Node)
       ) {
-        // Allow user to close it when clicking elsewhere
+        setIsFilterDropdownOpen(false);
       }
       if (
         chartTypeDropdownRef.current &&
@@ -153,18 +153,26 @@ export function CycleBurndownChart({
   };
 
   // Build SVG Paths
-  // 1. Scope line: straight horizontal line
+  // 1. Scope line: dynamic stepwise curve reflecting scope changes over the cycle
   const scopeVal = rawSeries[0]?.scope ?? 0;
-  const scopeY = getY(scopeVal);
-  const scopePath = `M ${getX(0)} ${scopeY} L ${getX(dates.length - 1)} ${scopeY}`;
+  const hasVaryingScope = rawSeries.some((pt) => pt?.scope !== rawSeries[0]?.scope);
+  const scopePath = hasVaryingScope
+    ? rawSeries
+        .map((pt, i) => {
+          const val = pt?.scope ?? 0;
+          const cmd = i === 0 ? "M" : "L";
+          return `${cmd} ${getX(i)} ${getY(val)}`;
+        })
+        .join(" ")
+    : `M ${getX(0)} ${getY(scopeVal)} L ${getX(dates.length - 1)} ${getY(scopeVal)}`;
 
   // 2. Ideal line: diagonal
   // In Burndown: from (0, scope) to (last, 0)
   // In Burnup: from (0, 0) to (last, scope)
   const idealPath =
     chartType === "burndown"
-      ? `M ${getX(0)} ${getY(scopeVal)} L ${getX(dates.length - 1)} ${getY(0)}`
-      : `M ${getX(0)} ${getY(0)} L ${getX(dates.length - 1)} ${getY(scopeVal)}`;
+      ? `M ${getX(0)} ${getY(rawSeries[0]?.scope ?? scopeVal)} L ${getX(dates.length - 1)} ${getY(0)}`
+      : `M ${getX(0)} ${getY(0)} L ${getX(dates.length - 1)} ${getY(rawSeries[rawSeries.length - 1]?.scope ?? scopeVal)}`;
 
   // 3. Primary line: Pending (Burndown) or Completed (Burnup) up to todayIndex
   const activePoints = rawSeries.slice(0, todayIndex + 1);
@@ -682,6 +690,18 @@ export function CycleBurndownChart({
                     {chartType === "burndown" ? (hoveredData.ideal_pending ?? 0) : (hoveredData.ideal_completed ?? 0)} {unit}
                   </span>
                 </div>
+                {Boolean(hoveredData.added_today && hoveredData.added_today > 0) && (
+                  <div className="flex items-center justify-between text-indigo-300 font-semibold pt-0.5 border-t border-slate-800">
+                    <span>Agregadas en este día:</span>
+                    <span>+{hoveredData.added_today}</span>
+                  </div>
+                )}
+                {Boolean(hoveredData.modified_today && hoveredData.modified_today > 0) && (
+                  <div className="flex items-center justify-between text-amber-300 font-semibold">
+                    <span>Modificadas en este día:</span>
+                    <span>~{hoveredData.modified_today}</span>
+                  </div>
+                )}
               </div>
 
               {chartType === "burndown" && (hoveredData.pending ?? 0) > (hoveredData.ideal_pending ?? 0) && (

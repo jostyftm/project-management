@@ -50,6 +50,7 @@ import {
   Layers,
   Loader2,
   Clock,
+  Paperclip,
 } from "lucide-react";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store";
 import { toast } from "sonner";
@@ -176,6 +177,22 @@ function KanbanCard({
               {item.sub_items.length}
             </span>
           )}
+
+          {/* Evidencias / Entregables */}
+          {((item.deliverables_count && item.deliverables_count > 0) || (item.deliverables && item.deliverables.length > 0)) && (
+            <span
+              className={cn(
+                "flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border",
+                item.approved_deliverables_count && item.approved_deliverables_count > 0
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-200"
+              )}
+              title={`${item.deliverables_count || item.deliverables?.length} evidencias`}
+            >
+              <Paperclip className="size-2.5" />
+              {item.deliverables_count || item.deliverables?.length}
+            </span>
+          )}
         </div>
 
         {item.target_date ? (
@@ -297,7 +314,7 @@ function KanbanColumn({
 
 export default function YourWorkPage() {
   const router = useRouter();
-  const { currentWorkspace } = useWorkspaceStore();
+  const { currentWorkspace, projects } = useWorkspaceStore();
 
   useDocumentTitle("Tu trabajo");
 
@@ -309,6 +326,7 @@ export default function YourWorkPage() {
   const [viewLayout, setViewLayout] = useState<"kanban" | "list" | "calendar" | "gantt">("kanban");
   const [groupBy, setGroupBy] = useState<"state" | "priority">("state");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [projectFilter, setProjectFilter] = useState<string>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [stateFilter, setStateFilter] = useState<string>("ALL");
@@ -398,6 +416,31 @@ export default function YourWorkPage() {
     }
   }, [currentWorkspace, activeTab]);
 
+  // Distinct projects available across the workspace and loaded items
+  const availableProjects = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; identifier?: string; emoji?: string }>();
+    if (projects && projects.length > 0) {
+      projects.forEach((p) => {
+        map.set(String(p.id), {
+          id: String(p.id),
+          name: p.name,
+          identifier: p.identifier,
+          emoji: (p as any).emoji,
+        });
+      });
+    }
+    items.forEach((item) => {
+      if (item.project && !map.has(String(item.project.id))) {
+        map.set(String(item.project.id), {
+          id: String(item.project.id),
+          name: item.project.name,
+          identifier: item.project.identifier,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [projects, items]);
+
   // Distinct types across items for filter
   const distinctTypes = useMemo(() => {
     const map = new Map<string, WorkItemType>();
@@ -434,6 +477,9 @@ export default function YourWorkPage() {
         item.identifier.toLowerCase().includes(q) ||
         (item.project?.name && item.project.name.toLowerCase().includes(q));
 
+      const matchProject =
+        projectFilter === "ALL" ||
+        String(item.project?.id ?? (item as any).project_id) === projectFilter;
       const matchPriority = priorityFilter === "ALL" || item.priority === priorityFilter;
       const matchType = typeFilter === "ALL" || String(item.type?.id) === typeFilter;
       const matchState =
@@ -441,9 +487,9 @@ export default function YourWorkPage() {
         String(item.state?.id) === stateFilter ||
         item.state?.group === stateFilter;
 
-      return matchSearch && matchPriority && matchType && matchState;
+      return matchSearch && matchProject && matchPriority && matchType && matchState;
     });
-  }, [items, searchQuery, priorityFilter, typeFilter, stateFilter]);
+  }, [items, searchQuery, projectFilter, priorityFilter, typeFilter, stateFilter]);
 
   const listDisplayItems = useMemo(() => {
     if (searchQuery.trim()) return filteredItems;
@@ -624,6 +670,7 @@ export default function YourWorkPage() {
   const handleResetView = () => {
     setViewLayout("kanban");
     setGroupBy("state");
+    setProjectFilter("ALL");
     setPriorityFilter("ALL");
     setTypeFilter("ALL");
     setStateFilter("ALL");
@@ -750,6 +797,31 @@ export default function YourWorkPage() {
                 className="pl-9 h-9 text-sm bg-slate-50 border-slate-200"
               />
             </div>
+
+            {/* Project Filter */}
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="w-[160px] h-9 text-xs bg-slate-50 border-slate-200">
+                <FolderKanban className="mr-1.5 size-3.5 text-indigo-500" />
+                <SelectValue placeholder="Proyecto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos los proyectos</SelectItem>
+                {availableProjects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <div className="flex items-center gap-1.5 max-w-[200px] truncate">
+                      {p.emoji ? (
+                        <span className="text-sm">{p.emoji}</span>
+                      ) : (
+                        <span className="font-mono text-[10px] font-bold text-slate-400">
+                          {p.identifier || "PRJ"}
+                        </span>
+                      )}
+                      <span className="truncate">{p.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Type Filter */}
             <Select value={typeFilter} onValueChange={setTypeFilter}>

@@ -103,6 +103,22 @@ class InstanceAdminController extends Controller
     }
 
     /**
+     * Genera un enlace de restablecimiento de contraseña para un usuario.
+     */
+    public function resetUserPasswordLink(Request $request, int $id): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $sendEmail = (bool) $request->boolean('send_email', false);
+        $result = $this->adminService->generatePasswordResetLink($id, $sendEmail);
+
+        return response()->json([
+            'data' => $result,
+            'message' => 'Enlace de restablecimiento generado correctamente.',
+        ]);
+    }
+
+    /**
      * Prueba el envío de correo electrónico SMTP.
      */
     public function testEmail(Request $request): JsonResponse

@@ -34,7 +34,34 @@ export function ProjectMembersMatrixTable({
 
   if (isLoading) {
     return (
-      <div className="h-64 rounded-xl bg-slate-100 dark:bg-neutral-800 animate-pulse border border-slate-200 dark:border-neutral-700" />
+      <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="h-4 w-60 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+            <div className="h-3 w-80 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          </div>
+          <div className="h-8 w-44 bg-slate-100 dark:bg-neutral-800 rounded-lg animate-pulse" />
+        </div>
+        <div className="border border-slate-100 dark:border-neutral-800 rounded-lg overflow-hidden divide-y divide-slate-100 dark:divide-neutral-800">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-3.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="size-8 rounded-full bg-slate-200 dark:bg-neutral-700 animate-pulse" />
+                <div className="space-y-1">
+                  <div className="h-3.5 w-28 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+                  <div className="h-2.5 w-36 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="h-4 w-16 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                <div className="h-5 w-20 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse" />
+                <div className="h-7 w-20 bg-slate-100 dark:bg-neutral-800 rounded-md animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

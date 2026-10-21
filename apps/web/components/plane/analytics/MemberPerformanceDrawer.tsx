@@ -60,6 +60,24 @@ export function MemberPerformanceDrawer({
 
   if (!member) return null;
 
+  const activeItems: NonNullable<MemberKpiDetail["active_items"]> = Array.isArray(detail?.active_items)
+    ? detail.active_items
+    : detail?.active_items && typeof detail.active_items === "object"
+    ? (Object.values(detail.active_items) as any)
+    : [];
+
+  const typeDistribution: NonNullable<MemberKpiDetail["type_distribution"]> = Array.isArray(detail?.type_distribution)
+    ? detail.type_distribution
+    : detail?.type_distribution && typeof detail.type_distribution === "object"
+    ? (Object.values(detail.type_distribution) as any)
+    : [];
+
+  const weeklyThroughput: NonNullable<MemberKpiDetail["weekly_throughput"]> = Array.isArray(detail?.weekly_throughput)
+    ? detail.weekly_throughput
+    : detail?.weekly_throughput && typeof detail.weekly_throughput === "object"
+    ? (Object.values(detail.weekly_throughput) as any)
+    : [];
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
@@ -168,13 +186,13 @@ export function MemberPerformanceDrawer({
             </div>
 
             {/* Distribución por Tipo de Trabajo */}
-            {detail?.type_distribution && detail.type_distribution.length > 0 && (
+            {typeDistribution.length > 0 && (
               <div className="space-y-3">
                 <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Distribución de Trabajo Entregado
                 </h5>
                 <div className="space-y-2">
-                  {detail.type_distribution.map((item) => (
+                  {typeDistribution.map((item) => (
                     <div key={item.type} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="font-medium text-slate-800 dark:text-slate-200">
@@ -197,13 +215,13 @@ export function MemberPerformanceDrawer({
             )}
 
             {/* Tendencia Semanal de Entregas (Últimas 6 semanas) */}
-            {detail?.weekly_throughput && (
+            {weeklyThroughput.length > 0 && (
               <div className="space-y-3">
                 <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   Ritmo Semanal de Entregables (Últimas 6 semanas)
                 </h5>
                 <div className="grid grid-cols-6 gap-1.5 text-center">
-                  {detail.weekly_throughput.map((week, idx) => (
+                  {weeklyThroughput.map((week, idx) => (
                     <div
                       key={idx}
                       className="p-2 rounded-lg bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-800 space-y-1"
@@ -227,18 +245,18 @@ export function MemberPerformanceDrawer({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Tareas Activas Asignadas ({detail?.active_items.length || 0})
+                  Tareas Activas Asignadas ({activeItems.length})
                 </h5>
                 <span className="text-[11px] text-slate-400">En progreso o pendientes</span>
               </div>
 
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {!detail?.active_items || detail.active_items.length === 0 ? (
+                {activeItems.length === 0 ? (
                   <p className="text-xs text-slate-400 py-3 text-center">
                     No tiene tareas pendientes o activas en este proyecto actualmente.
                   </p>
                 ) : (
-                  detail.active_items.map((item) => (
+                  activeItems.map((item) => (
                     <div
                       key={item.id}
                       className="p-2.5 rounded-lg border border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-900 flex items-start justify-between gap-2 text-xs hover:border-slate-300 transition-colors"

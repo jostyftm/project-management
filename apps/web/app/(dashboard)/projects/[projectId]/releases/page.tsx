@@ -33,6 +33,7 @@ import {
   FileText,
   Tag,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -50,8 +51,9 @@ export default function ProjectReleasesPage() {
   const [availableItems, setAvailableItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Create Release Modal
+  // Create / Edit Release Modal
   const [openCreateModal, setOpenCreateModal] = useState(false);
+  const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [description, setDescription] = useState("");
@@ -85,7 +87,26 @@ export default function ProjectReleasesPage() {
     loadData();
   }, [projectId]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingRelease(null);
+    setName("");
+    setVersion("");
+    setDescription("");
+    setSelectedItemIds([]);
+    setOpenCreateModal(true);
+  };
+
+  const handleOpenEdit = (rel: Release) => {
+    setEditingRelease(rel);
+    setName(rel.name);
+    setVersion(rel.version);
+    setDescription(rel.description || "");
+    const ids = Array.isArray(rel.work_items) ? rel.work_items.map((w: any) => String(w.id)) : [];
+    setSelectedItemIds(ids);
+    setOpenCreateModal(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !version.trim()) {
       toast.error("Por favor completa el nombre y la versión");
@@ -94,23 +115,39 @@ export default function ProjectReleasesPage() {
 
     setIsSubmitting(true);
     try {
-      const created = await releaseService.create(projectId, {
-        name: name.trim(),
-        version: version.trim(),
-        description: description.trim() || undefined,
-        status: "DRAFT",
-        work_item_ids: selectedItemIds,
-      });
+      if (editingRelease) {
+        const updated = await releaseService.update(editingRelease.id, {
+          name: name.trim(),
+          version: version.trim(),
+          description: description.trim() || undefined,
+          work_item_ids: selectedItemIds,
+        });
 
-      toast.success(`Release ${created.version} creado exitosamente`);
-      setReleases((prev) => [created, ...prev]);
+        toast.success(`Release ${updated.version || version} actualizado exitosamente`);
+        setReleases((prev) =>
+          prev.map((r) => (String(r.id) === String(editingRelease.id) ? { ...r, ...updated } : r))
+        );
+      } else {
+        const created = await releaseService.create(projectId, {
+          name: name.trim(),
+          version: version.trim(),
+          description: description.trim() || undefined,
+          status: "DRAFT",
+          work_item_ids: selectedItemIds,
+        });
+
+        toast.success(`Release ${created.version} creado exitosamente`);
+        setReleases((prev) => [created, ...prev]);
+      }
+
       setName("");
       setVersion("");
       setDescription("");
       setSelectedItemIds([]);
+      setEditingRelease(null);
       setOpenCreateModal(false);
     } catch (err) {
-      toast.error("Error al crear el release");
+      toast.error(editingRelease ? "Error al actualizar el release" : "Error al crear el release");
     } finally {
       setIsSubmitting(false);
     }
@@ -161,7 +198,7 @@ export default function ProjectReleasesPage() {
 
         {isAdmin && (
           <Button
-            onClick={() => setOpenCreateModal(true)}
+            onClick={handleOpenCreate}
             className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs font-semibold h-9 shadow-sm"
           >
             <Plus className="size-4" />
@@ -183,7 +220,7 @@ export default function ProjectReleasesPage() {
             Empaqueta entregables, vincula work items y genera notas de versión estructuradas automáticamente.
           </p>
           {isAdmin && (
-            <Button onClick={() => setOpenCreateModal(true)} className="mt-4 bg-indigo-600 text-white text-xs">
+            <Button onClick={handleOpenCreate} className="mt-4 bg-indigo-600 text-white text-xs">
               <Plus className="size-4 mr-1.5" /> Crear Release
             </Button>
           )}
@@ -265,6 +302,19 @@ export default function ProjectReleasesPage() {
 
                   {isAdmin && (
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEdit(rel)}
+                      className="h-8 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200"
+                      title="Editar release"
+                    >
+                      <Pencil className="size-3.5 text-slate-500" />
+                      <span>Editar</span>
+                    </Button>
+                  )}
+
+                  {isAdmin && (
+                    <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDelete(rel.id)}
@@ -280,58 +330,69 @@ export default function ProjectReleasesPage() {
         </div>
       )}
 
-      {/* Modal Crear Release */}
-      <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+      {/* Modal Crear / Editar Release */}
+      <Dialog
+        open={openCreateModal}
+        onOpenChange={(isOpen) => {
+          setOpenCreateModal(isOpen);
+          if (!isOpen) setEditingRelease(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-6 overflow-hidden">
+          <DialogHeader className="shrink-0 pb-2 border-b border-slate-100">
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
               <Rocket className="size-5 text-indigo-600" />
-              Nuevo Release
+              {editingRelease ? "Editar Release" : "Nuevo Release"}
             </DialogTitle>
-            <DialogDescription>
-              Crea una nueva versión para el proyecto {project?.name}.
+            <DialogDescription className="text-xs text-slate-500">
+              {editingRelease
+                ? "Modifica la versión, nombre, notas y work items vinculados."
+                : `Crea una nueva versión para el proyecto ${project?.name}.`}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="rel-version">Versión *</Label>
+          <form onSubmit={handleSave} className="flex-1 overflow-y-auto pr-1 space-y-4 py-3 min-w-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+              <div className="space-y-1.5 min-w-0">
+                <Label htmlFor="rel-version" className="text-xs font-semibold">Versión *</Label>
                 <Input
                   id="rel-version"
                   placeholder="Ej. v1.2.0"
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
                   required
+                  className="w-full text-xs h-9"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="rel-name">Nombre de Versión *</Label>
+              <div className="space-y-1.5 min-w-0">
+                <Label htmlFor="rel-name" className="text-xs font-semibold">Nombre de Versión *</Label>
                 <Input
                   id="rel-name"
                   placeholder="Ej. Lanzamiento Q3"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  className="w-full text-xs h-9"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="rel-desc">Descripción (Opcional)</Label>
+            <div className="space-y-1.5 min-w-0">
+              <Label htmlFor="rel-desc" className="text-xs font-semibold">Descripción (Opcional)</Label>
               <Textarea
                 id="rel-desc"
                 placeholder="Resumen del alcance o cambios destacados..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
+                className="w-full text-xs resize-none"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Vincular Work Items a esta Versión</Label>
-              <div className="flex flex-col gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg max-h-44 overflow-y-auto">
+            <div className="space-y-1.5 min-w-0">
+              <Label className="text-xs font-semibold">Vincular Work Items a esta Versión</Label>
+              <div className="flex flex-col gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg max-h-44 overflow-y-auto w-full">
                 {availableItems.length === 0 ? (
                   <p className="text-xs text-slate-400 p-2">No hay work items en este proyecto.</p>
                 ) : (
@@ -362,13 +423,13 @@ export default function ProjectReleasesPage() {
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenCreateModal(false)}>
+            <DialogFooter className="shrink-0 pt-3 border-t border-slate-100">
+              <Button type="button" variant="outline" size="sm" onClick={() => setOpenCreateModal(false)} className="text-xs">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                {isSubmitting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Guardar Release
+              <Button type="submit" size="sm" disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs">
+                {isSubmitting ? <Loader2 className="size-4 animate-spin mr-1.5" /> : null}
+                {editingRelease ? "Actualizar Release" : "Guardar Release"}
               </Button>
             </DialogFooter>
           </form>

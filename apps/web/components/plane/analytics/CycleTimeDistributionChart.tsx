@@ -25,7 +25,26 @@ export function CycleTimeDistributionChart({
 }: CycleTimeDistributionChartProps) {
   if (isLoading || !stats) {
     return (
-      <div className="h-80 rounded-xl bg-slate-100 dark:bg-neutral-800 animate-pulse border border-slate-200 dark:border-neutral-700" />
+      <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl p-5 shadow-xs space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1.5">
+            <div className="h-4 w-52 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+            <div className="h-3 w-40 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          </div>
+          <div className="h-5 w-20 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse" />
+        </div>
+        <div className="h-56 flex items-end justify-between gap-4 pt-6 px-6">
+          {[30, 85, 60, 40, 20].map((h, idx) => (
+            <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+              <div
+                className="w-full bg-slate-100 dark:bg-neutral-800 rounded-t-md animate-pulse"
+                style={{ height: `${h}%` }}
+              />
+              <div className="h-3 w-10 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

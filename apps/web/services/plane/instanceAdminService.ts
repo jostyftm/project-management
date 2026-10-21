@@ -70,6 +70,15 @@ export interface PaginatedUsersResponse {
   per_page: number;
 }
 
+export interface PasswordResetLinkResponse {
+  reset_url: string;
+  token: string;
+  email: string;
+  user_id: number;
+  user_name: string;
+  expires_in_minutes: number;
+}
+
 export const instanceAdminService = {
   getSettings: async (): Promise<InstanceSettings> => {
     const res = await httpRequestService<{ data: InstanceSettings }>({
@@ -114,6 +123,19 @@ export const instanceAdminService = {
       method: "PUT",
       data: { is_instance_admin: isInstanceAdmin },
     });
+  },
+
+  generatePasswordResetLink: async (
+    userId: number | string,
+    sendEmail = false
+  ): Promise<PasswordResetLinkResponse> => {
+    const res = await httpRequestService<{ data: PasswordResetLinkResponse; message: string }>({
+      url: `${API_BASE_URL}/instance-admin/users/${userId}/reset-password-link`,
+      method: "POST",
+      data: { send_email: sendEmail },
+    });
+
+    return res.data;
   },
 
   testEmail: async (email: string): Promise<{ success: boolean; message: string }> => {

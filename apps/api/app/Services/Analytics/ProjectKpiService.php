@@ -513,9 +513,9 @@ class ProjectKpiService
                     'completed_total' => $completedItems->count(),
                     'completed_points' => (float) $completedItems->sum('estimate_points'),
                 ],
-                'type_distribution' => $typesFormatted,
-                'weekly_throughput' => $weeklyThroughput,
-                'active_items' => $activeItems,
+                'type_distribution' => array_values($typesFormatted),
+                'weekly_throughput' => array_values($weeklyThroughput),
+                'active_items' => array_values($activeItems->toArray()),
             ];
         });
     }

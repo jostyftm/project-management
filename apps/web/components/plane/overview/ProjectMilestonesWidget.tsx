@@ -10,12 +10,38 @@ import { cn } from "@/lib/utils";
 interface ProjectMilestonesWidgetProps {
   milestones: Milestone[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 export function ProjectMilestonesWidget({
   milestones,
   projectId,
+  isLoading,
 }: ProjectMilestonesWidgetProps) {
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Próximos Hitos"
+        description="Objetivos clave y entregas programadas"
+      >
+        <div className="space-y-3.5 py-1">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-2.5 rounded-lg border border-slate-100 dark:border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-32 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+                <div className="h-4 w-16 bg-slate-100 dark:bg-neutral-800 rounded-full animate-pulse" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="h-3 w-20 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                <div className="h-3 w-10 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </WidgetCard>
+    );
+  }
+
   // Próximos 4 hitos no completados, ordenados por fecha objetivo
   const upcomingMilestones = milestones
     .filter((m) => m.status !== "COMPLETED")

@@ -11,11 +11,13 @@ import { Button } from "@/components/ui/button";
 interface ProjectCurrentCycleWidgetProps {
   cycles: Cycle[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 export function ProjectCurrentCycleWidget({
-  cycles,
+  cycles = [],
   projectId,
+  isLoading,
 }: ProjectCurrentCycleWidgetProps) {
   const currentCycle = useMemo(
     () => cycles.find((c) => c.status === "CURRENT"),
@@ -25,6 +27,32 @@ export function ProjectCurrentCycleWidget({
   const completedCount = currentCycle?.completed_items ?? 0;
   const totalCount = currentCycle?.total_items ?? 0;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Ciclo en Curso"
+        description="Sprint activo de desarrollo"
+      >
+        <div className="space-y-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="h-4 w-32 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+              <div className="h-3 w-24 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+            </div>
+            <div className="size-10 rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+          </div>
+          <div className="space-y-1.5 pt-2">
+            <div className="flex justify-between">
+              <div className="h-3 w-20 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              <div className="h-3 w-12 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+            </div>
+            <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+          </div>
+        </div>
+      </WidgetCard>
+    );
+  }
 
   return (
     <WidgetCard

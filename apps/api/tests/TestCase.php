@@ -23,6 +23,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        config(['services.sdi.auth.bypass' => true]);
         config(['app.url' => 'http://localhost']);
         URL::forceRootUrl('http://localhost');
     }

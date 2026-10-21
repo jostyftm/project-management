@@ -19,7 +19,21 @@ class YourWorkService
         $tab = $request->query('tab', 'assigned'); // assigned, created, drafts
 
         $query = WorkItem::where('workspace_id', $workspaceId)
-            ->with(['state', 'type', 'project', 'assignees', 'labels']);
+            ->with([
+                'state',
+                'type',
+                'project',
+                'assignees',
+                'labels',
+                'deliverables.creator',
+                'deliverables.reviewer',
+                'dodItems',
+            ])
+            ->withCount(['deliverables', 'dodItems']);
+
+        if ($request->filled('project_id') && $request->query('project_id') !== 'ALL') {
+            $query->where('project_id', $request->query('project_id'));
+        }
 
         switch ($tab) {
             case 'created':

@@ -49,6 +49,7 @@ import {
   LayoutGrid,
   Check,
   GitBranch,
+  Paperclip,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -119,6 +120,7 @@ export function WorkItemDetailSheet({
   const [milestoneId, setMilestoneId] = useState<string>("");
   const [leadId, setLeadId] = useState<string>("");
   const [selectedSubItemId, setSelectedSubItemId] = useState<string | number | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<string>("deliverables");
 
 
   // New relation
@@ -517,6 +519,40 @@ export function WorkItemDetailSheet({
           </div>
         </div>
 
+        {/* Quick Access Evidence Banner */}
+        {((item.deliverables?.length ?? 0) > 0 || (item.deliverables_count ?? 0) > 0) && (
+          <div className="flex items-center justify-between gap-2 p-2.5 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-emerald-50/70 dark:from-indigo-950/40 dark:via-slate-900/40 dark:to-emerald-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/50 text-xs shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                <Paperclip className="size-3.5" />
+              </span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {item.deliverables?.length ?? item.deliverables_count}{" "}
+                {Number(item.deliverables?.length ?? item.deliverables_count) === 1 ? "evidencia registrada" : "evidencias registradas"}
+              </span>
+              {(item.approved_deliverables_count ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <Check className="size-3" />
+                  {item.approved_deliverables_count} certificadas
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveBottomTab("deliverables");
+                setTimeout(() => {
+                  const el = document.getElementById("work-item-deliverables-section");
+                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 50);
+              }}
+              className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:underline cursor-pointer text-xs shrink-0"
+            >
+              <span>Ver evidencias ↓</span>
+            </button>
+          </div>
+        )}
+
         {/* Rich Text Description with Debounce and Micro-Indicator */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -834,10 +870,16 @@ export function WorkItemDetailSheet({
         )}
 
         {/* Tabs: Deliverables, Relations, Activity & Comments */}
-        <Tabs defaultValue="deliverables" className="w-full">
+        <Tabs value={activeBottomTab} onValueChange={setActiveBottomTab} className="w-full">
           <TabsList className="w-full grid grid-cols-3 bg-slate-100 dark:bg-slate-800">
-            <TabsTrigger value="deliverables" className="text-xs">
-              Entregables
+            <TabsTrigger value="deliverables" className="text-xs flex items-center gap-1.5">
+              <Paperclip className="size-3 text-slate-400" />
+              <span>Evidencias y Entregables</span>
+              {((item.deliverables?.length ?? 0) > 0 || (item.deliverables_count ?? 0) > 0) && (
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                  {item.deliverables?.length ?? item.deliverables_count}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="relations" className="text-xs">
               Relaciones ({((item.outward_relations?.length || 0) + (item.inward_relations?.length || 0))})
@@ -848,7 +890,7 @@ export function WorkItemDetailSheet({
           </TabsList>
 
           {/* Deliverables Tab */}
-          <TabsContent value="deliverables" className="pt-3">
+          <TabsContent value="deliverables" id="work-item-deliverables-section" className="pt-3 scroll-mt-6">
             {effectiveProject ? (
               <WorkItemDeliverablesSection
                 projectId={effectiveProject.id}

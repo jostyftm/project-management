@@ -140,6 +140,18 @@ class InstanceAdminService
     }
 
     /**
+     * Genera un enlace de restablecimiento de contraseña para un usuario.
+     */
+    public function generatePasswordResetLink(int $userId, bool $sendEmail = false): array
+    {
+        $user = User::findOrFail($userId);
+        /** @var AuthService $authService */
+        $authService = app(AuthService::class);
+
+        return $authService->createPasswordResetLink($user, $sendEmail);
+    }
+
+    /**
      * Construye un mailer SMTP dinámico usando la configuración guardada en la BD.
      * Esto asegura que el correo siempre use el servidor SMTP configurado por el admin,
      * independientemente del valor de MAIL_MAILER en el .env.

@@ -464,7 +464,7 @@ export function WorkItemDeliverablesSection({
                   {/* Barra de Acciones */}
                   <div className="pt-2 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
-                      {del.file_path ? (
+                      {del.file_path && (
                         <>
                           <Button
                             variant="outline"
@@ -492,7 +492,8 @@ export function WorkItemDeliverablesSection({
                             <span>Descargar</span>
                           </Button>
                         </>
-                      ) : del.url ? (
+                      )}
+                      {del.url && (
                         <a
                           href={del.url}
                           target="_blank"
@@ -502,7 +503,7 @@ export function WorkItemDeliverablesSection({
                           <ExternalLink className="size-3" />
                           <span>Abrir recurso</span>
                         </a>
-                      ) : null}
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -641,7 +642,7 @@ export function WorkItemDeliverablesSection({
 
       {/* Modal para Crear Entregable */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-neutral-900 z-[80]" overlayClassName="z-[80]">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-neutral-900 z-[95]" overlayClassName="z-[95]">
           <form onSubmit={handleCreateDeliverable}>
             <DialogHeader>
               <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
@@ -753,7 +754,7 @@ export function WorkItemDeliverablesSection({
 
       {/* Modal para Revisar Entregable (Aprobar / Rechazar) */}
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white dark:bg-neutral-900 z-[80]" overlayClassName="z-[80]">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-neutral-900 z-[95]" overlayClassName="z-[95]">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
               {reviewStatus === "APPROVED"
@@ -822,7 +823,10 @@ export function WorkItemDeliverablesSection({
           if (!isOpen) handleClosePreview();
         }}
       >
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6 overflow-hidden">
+        <DialogContent
+          className="sm:max-w-4xl max-h-[90vh] flex flex-col p-4 sm:p-6 overflow-hidden bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-2xl z-[100]"
+          overlayClassName="z-[100]"
+        >
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-neutral-800">
             <div className="flex items-center justify-between gap-3 pr-6">
               <div className="min-w-0">

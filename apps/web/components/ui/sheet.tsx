@@ -46,15 +46,20 @@ function SheetOverlay({
 
 function SheetContent({
   className,
+  overlayClassName,
   children,
   side = "right",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
+  overlayClassName?: string
 }) {
+  const zIndexMatch = className?.match(/\bz-\[?[a-zA-Z0-9_-]+\]?/);
+  const effectiveOverlayClass = overlayClassName || (zIndexMatch ? zIndexMatch[0] : undefined);
+
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={effectiveOverlayClass} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(

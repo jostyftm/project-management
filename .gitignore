@@ -23,6 +23,7 @@ vendor/
 *.env.backup
 *.env.bak
 auth.json
+generar_token
 
 # ==========================================
 # 3. Compilacion y Cache - Next.js / Frontend

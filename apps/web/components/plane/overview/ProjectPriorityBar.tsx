@@ -8,6 +8,7 @@ import { WidgetCard } from "./WidgetCard";
 interface ProjectPriorityBarProps {
   workItems: WorkItem[];
   projectId: string | number;
+  isLoading?: boolean;
 }
 
 const PRIORITIES = [
@@ -18,7 +19,7 @@ const PRIORITIES = [
   { id: "NONE", label: "Ninguna", color: "#94a3b8" },
 ];
 
-export function ProjectPriorityBar({ workItems, projectId }: ProjectPriorityBarProps) {
+export function ProjectPriorityBar({ workItems = [], projectId, isLoading }: ProjectPriorityBarProps) {
   const total = workItems.length;
 
   const data = useMemo(() => {
@@ -41,6 +42,31 @@ export function ProjectPriorityBar({ workItems, projectId }: ProjectPriorityBarP
       };
     });
   }, [workItems, total]);
+
+  if (isLoading) {
+    return (
+      <WidgetCard
+        title="Distribución por Prioridad"
+        description="Carga de tareas según su nivel de urgencia"
+      >
+        <div className="space-y-4 py-2">
+          <div className="h-4 w-full rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+          <div className="space-y-2.5 pt-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-slate-200 dark:bg-neutral-700 animate-pulse" />
+                  <div className="h-3 w-16 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+                </div>
+                <div className="flex-1 max-w-32 h-2 rounded-full bg-slate-100 dark:bg-neutral-800 animate-pulse" />
+                <div className="h-3 w-8 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </WidgetCard>
+    );
+  }
 
   return (
     <WidgetCard

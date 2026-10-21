@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Project } from "@/types/plane-types";
 import { ProjectMemberUser } from "@/services/plane/projectMemberService";
-import { HealthBadgeInfo } from "@/lib/project-health";
+import { HealthBadgeInfo, HEALTH_CONFIG } from "@/lib/project-health";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,22 +29,53 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface ProjectOverviewHeaderProps {
-  project: Project;
-  health: HealthBadgeInfo;
-  members: ProjectMemberUser[];
+  project?: Project | null;
+  health?: HealthBadgeInfo;
+  members?: ProjectMemberUser[];
   onProjectUpdated?: (updated: Project) => void;
+  isLoading?: boolean;
 }
 
 export function ProjectOverviewHeader({
   project,
-  health,
-  members,
+  health = HEALTH_CONFIG.on_track,
+  members = [],
   onProjectUpdated,
+  isLoading,
 }: ProjectOverviewHeaderProps) {
   const [openDatesModal, setOpenDatesModal] = useState(false);
-  const [startDate, setStartDate] = useState(project.start_date || "");
-  const [targetDate, setTargetDate] = useState(project.target_date || "");
+  const [startDate, setStartDate] = useState(project?.start_date || "");
+  const [targetDate, setTargetDate] = useState(project?.target_date || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (project) {
+      setStartDate(project.start_date || "");
+      setTargetDate(project.target_date || "");
+    }
+  }, [project?.start_date, project?.target_date]);
+
+  if (isLoading || !project) {
+    return (
+      <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl p-6 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-6 w-56 bg-slate-200 dark:bg-neutral-700 rounded animate-pulse" />
+            <div className="h-3.5 w-72 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-24 bg-slate-100 dark:bg-neutral-800 rounded-md animate-pulse" />
+            <div className="h-8 w-32 bg-slate-100 dark:bg-neutral-800 rounded-md animate-pulse" />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-slate-100 dark:border-neutral-800">
+          <div className="h-4 w-32 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          <div className="h-4 w-36 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+          <div className="h-4 w-28 bg-slate-100 dark:bg-neutral-800 rounded animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   const isAdmin = project.current_user_role === "ADMIN";
 

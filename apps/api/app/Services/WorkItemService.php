@@ -26,7 +26,7 @@ class WorkItemService
     {
         return (new WorkItem)->search(
             request: $request,
-            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules'],
+            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules', 'deliverables.creator', 'dodItems'],
             callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
 
