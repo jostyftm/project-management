@@ -68,9 +68,9 @@ RUN groupadd --force -g $WWWGROUP sail
 RUN useradd -ms /bin/bash --no-user-group -g $WWWGROUP -u 1337 sail
 RUN git config --global --add safe.directory /var/www/html
 
-COPY start-container /usr/local/bin/start-container
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY php.ini /usr/local/etc/php/conf.d/99-sail.ini
+COPY ./deploy/local/start-container /usr/local/bin/start-container
+COPY ./deploy/local/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./deploy/local/php.ini /usr/local/etc/php/conf.d/99-sail.ini
 RUN chmod +x /usr/local/bin/start-container
 
 EXPOSE 80/tcp

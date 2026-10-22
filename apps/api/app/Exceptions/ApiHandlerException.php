@@ -74,7 +74,9 @@ class ApiHandlerException extends Exception
         }
 
         if ($exception instanceof ValidationException) {
-            return $this->errorResponse($exception->errors(), __('Validation error'), 422);
+            $firstError = collect($exception->errors())->flatten()->first();
+
+            return $this->errorResponse($exception->errors(), $firstError ?: __('Validation error'), 422);
         }
 
         if ($exception instanceof HttpException) {
