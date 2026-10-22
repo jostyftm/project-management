@@ -1,7 +1,7 @@
 # ==========================================
 # Etapa 1: Base (Debian Bookworm para estabilidad con OCI8 y Kafka)
 # ==========================================
-FROM php:8.4-fpm-bookworm AS base
+FROM php:8.4.27-fpm-bookworm AS base
 
 # Instalar Nginx, Supervisor, Chromium, Node.js y dependencias esenciales (incluyendo libaio1 para Oracle)
 RUN apt-get update && apt-get install -y --no-install-recommends \

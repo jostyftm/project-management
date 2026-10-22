@@ -1,4 +1,4 @@
-FROM php:8.4-cli-alpine
+FROM php:8.4.27-cli-alpine
 
 # Install system dependencies and build libraries
 RUN apk add --no-cache \
@@ -17,7 +17,8 @@ RUN apk add --no-cache \
         bcmath \
         pcntl \
         intl \
-        opcache
+        opcache \
+    && echo "session.upload_progress.enabled = Off" > /usr/local/etc/php/conf.d/zz-security-php2shell.ini
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
