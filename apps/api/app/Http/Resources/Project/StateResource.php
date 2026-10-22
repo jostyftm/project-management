@@ -18,6 +18,7 @@ class StateResource extends JsonResource
                 'group' => $this->group,
                 'sequence' => $this->sequence,
                 'is_default' => $this->is_default,
+                'wip_limit' => $this->wip_limit ? (int) $this->wip_limit : null,
             ],
         ];
     }

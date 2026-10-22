@@ -18,6 +18,8 @@ class Cycle extends Model
         'project_id',
         'name',
         'description',
+        'sprint_goal',
+        'capacity_points',
         'start_date',
         'end_date',
         'status', // DRAFT, UPCOMING, CURRENT, COMPLETED
@@ -25,6 +27,7 @@ class Cycle extends Model
     ];
 
     protected $casts = [
+        'capacity_points' => 'float',
         'start_date' => 'date',
         'end_date' => 'date',
     ];

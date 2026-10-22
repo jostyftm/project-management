@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { WorkItem, State, User as UserType } from "@/types/plane-types";
+import { ReadinessBadge } from "@/components/plane/agile/ReadinessBadge";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
@@ -19,6 +20,8 @@ import {
   CircleSlash,
   ChevronDown,
   Paperclip,
+  Clock,
+  ShieldAlert,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -233,6 +236,35 @@ export function WorkItemListRow({
           <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {item.title}
           </span>
+
+          {/* DoR Badge */}
+          {item.readiness && (
+            <span className="hidden lg:inline-flex shrink-0">
+              <ReadinessBadge readiness={item.readiness} />
+            </span>
+          )}
+
+          {/* Blocker Badge */}
+          {item.is_blocked && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded shrink-0"
+              title={item.blocked_reason || "Impedimento activo"}
+            >
+              <AlertOctagon className="size-2.5 text-red-600" />
+              <span>Bloqueada</span>
+            </span>
+          )}
+
+          {/* Aging Badge */}
+          {Boolean(item.age_in_state_days && item.age_in_state_days >= 5 && item.state?.group === 'STARTED') && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded shrink-0"
+              title={`Lleva ${item.age_in_state_days} días en curso`}
+            >
+              <Clock className="size-2.5 text-amber-600" />
+              <span>{item.age_in_state_days}d</span>
+            </span>
+          )}
 
           {/* Subtasks count badge */}
           {hasSubtasks && (

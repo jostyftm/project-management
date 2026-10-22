@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\v1\Activity\ActivityController;
+use App\Http\Controllers\Api\v1\Agile\DailyStandupController;
 use App\Http\Controllers\Api\v1\Auth\AuthController;
 use App\Http\Controllers\Api\v1\Automation\AutomationRuleController;
 use App\Http\Controllers\Api\v1\Automation\RecurringWorkItemController;
@@ -241,6 +242,10 @@ Route::middleware(['auth.sdi'])->group(function () {
             Route::get('projects/{project}/cycles', [CycleController::class, 'index']);
             Route::get('cycles/{cycle}', [CycleController::class, 'show']);
             Route::get('cycles/{cycle}/analytics', [CycleController::class, 'analytics']);
+            Route::get('cycles/{cycle}/planning', [CycleController::class, 'planning']);
+
+            // Daily Standup Ágil
+            Route::get('projects/{project}/daily-standup', [DailyStandupController::class, 'show']);
 
             // Módulos (Visualización para miembros)
             Route::get('projects/{project}/modules', [ModuleController::class, 'index']);
@@ -275,6 +280,7 @@ Route::middleware(['auth.sdi'])->group(function () {
             Route::put('projects/{project}', [ProjectController::class, 'update']);
             Route::delete('projects/{project}', [ProjectController::class, 'destroy']);
             Route::post('projects/{project}/states', [ProjectController::class, 'storeState']);
+            Route::put('projects/{project}/states/{state}', [ProjectController::class, 'updateState']);
             Route::post('projects/{project}/labels', [ProjectController::class, 'storeLabel']);
             Route::post('projects/{project}/work-item-types', [WorkItemTypeController::class, 'store']);
 
@@ -312,6 +318,7 @@ Route::middleware(['auth.sdi'])->group(function () {
 
             // Gestión de Work Items
             Route::post('projects/{project}/work-items', [WorkItemController::class, 'store']);
+            Route::post('projects/{project}/work-items/reorder', [WorkItemController::class, 'reorder']);
             Route::delete('work-items/{work_item}', [WorkItemController::class, 'destroy']);
             Route::post('work-items/{work_item}/relations', [WorkItemRelationController::class, 'store']);
             Route::delete('work-items/relations/{relation}', [WorkItemRelationController::class, 'destroy']);

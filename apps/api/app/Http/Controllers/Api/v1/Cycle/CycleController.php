@@ -10,6 +10,7 @@ use App\Http\Resources\Cycle\CycleResource;
 use App\Models\Cycle;
 use App\Models\Project;
 use App\Models\WorkItem;
+use App\Services\Agile\SprintPlanningService;
 use App\Services\CycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,6 +75,15 @@ class CycleController extends Controller
         ]);
     }
 
+    public function planning(Cycle $cycle): JsonResponse
+    {
+        $planning = app(SprintPlanningService::class)->getPlanning($cycle);
+
+        return response()->json([
+            'data' => $planning,
+        ]);
+    }
+
     public function addWorkItems(Request $request, Cycle $cycle): JsonResponse
     {
         $request->validate([
@@ -81,10 +91,12 @@ class CycleController extends Controller
             'work_item_ids.*' => ['exists:work_items,id'],
         ]);
 
+        $warnings = $this->cycleService->getReadinessWarnings($cycle, $request->work_item_ids);
         $cycle = $this->cycleService->addWorkItems($cycle, $request->work_item_ids);
 
         return response()->json([
             'message' => 'Work items vinculados al ciclo',
+            'warnings' => $warnings,
             'data' => new CycleResource($cycle),
         ]);
     }

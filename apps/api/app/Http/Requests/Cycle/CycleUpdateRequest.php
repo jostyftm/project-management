@@ -16,6 +16,8 @@ class CycleUpdateRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'sprint_goal' => ['nullable', 'string', 'max:2000'],
+            'capacity_points' => ['nullable', 'numeric', 'min:0', 'max:1000'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
             'status' => ['sometimes', 'string', 'in:DRAFT,UPCOMING,CURRENT,COMPLETED'],

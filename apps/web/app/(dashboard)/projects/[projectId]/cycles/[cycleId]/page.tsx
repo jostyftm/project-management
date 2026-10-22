@@ -50,7 +50,9 @@ import {
   MoreHorizontal,
   Edit2,
   Share2,
+  Target,
 } from "lucide-react";
+import { SprintGoalCard } from "@/components/plane/agile/SprintGoalCard";
 import { copyToClipboard } from "@/lib/clipboard";
 
 export default function CycleDetailPage() {
@@ -307,6 +309,17 @@ export default function CycleDetailPage() {
                 : "Ciclo Próximo"}
             </span>
 
+            <Link href={`/projects/${projectId}/cycles/${cycleId}/planning`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8 gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              >
+                <Target className="size-3.5 text-indigo-600" />
+                <span>Planificar Sprint</span>
+              </Button>
+            </Link>
+
             <Button
               variant="outline"
               size="sm"
@@ -323,6 +336,17 @@ export default function CycleDetailPage() {
             </Button>
           </div>
         </div>
+
+        {/* Sprint Goal Card */}
+        <SprintGoalCard
+          sprintGoal={cycle.sprint_goal}
+          cycleId={cycle.id}
+          canEdit={isAdmin}
+          onUpdateGoal={async (newGoal) => {
+            await cycleService.update(cycle.id, { sprint_goal: newGoal });
+            setCycle({ ...cycle, sprint_goal: newGoal });
+          }}
+        />
 
         {/* Main Cycle Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">

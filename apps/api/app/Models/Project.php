@@ -28,6 +28,8 @@ class Project extends Model
         'estimate_system',
         'start_date',
         'target_date',
+        'auto_rollup_parent',
+        'aging_threshold_days',
     ];
 
     protected function casts(): array
@@ -37,6 +39,8 @@ class Project extends Model
             'is_public' => 'boolean',
             'start_date' => 'date',
             'target_date' => 'date',
+            'auto_rollup_parent' => 'boolean',
+            'aging_threshold_days' => 'integer',
         ];
     }
 

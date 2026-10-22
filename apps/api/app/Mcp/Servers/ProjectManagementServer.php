@@ -8,6 +8,7 @@ use App\Mcp\Resources\ProjectListResource;
 use App\Mcp\Resources\ProjectSummaryResource;
 use App\Mcp\Tools\Cycles\CreateCycleTool;
 use App\Mcp\Tools\Cycles\GetCycleTool;
+use App\Mcp\Tools\Cycles\GetSprintPlanningTool;
 use App\Mcp\Tools\Cycles\ListCyclesTool;
 use App\Mcp\Tools\Cycles\UpdateCycleTool;
 use App\Mcp\Tools\Members\AddProjectMemberTool;
@@ -24,6 +25,7 @@ use App\Mcp\Tools\Modules\ListModulesTool;
 use App\Mcp\Tools\Modules\UpdateModuleTool;
 use App\Mcp\Tools\Projects\CreateProjectTool;
 use App\Mcp\Tools\Projects\DeleteProjectTool;
+use App\Mcp\Tools\Projects\GetDailyStandupTool;
 use App\Mcp\Tools\Projects\GetProjectTool;
 use App\Mcp\Tools\Projects\ListProjectsTool;
 use App\Mcp\Tools\Projects\UpdateProjectTool;
@@ -75,6 +77,7 @@ class ProjectManagementServer extends Server
         // Projects
         ListProjectsTool::class,
         GetProjectTool::class,
+        GetDailyStandupTool::class,
         CreateProjectTool::class,
         UpdateProjectTool::class,
         DeleteProjectTool::class,
@@ -89,6 +92,7 @@ class ProjectManagementServer extends Server
         // Cycles / Sprints
         ListCyclesTool::class,
         GetCycleTool::class,
+        GetSprintPlanningTool::class,
         CreateCycleTool::class,
         UpdateCycleTool::class,
 

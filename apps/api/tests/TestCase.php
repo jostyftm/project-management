@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 
 abstract class TestCase extends BaseTestCase
@@ -26,5 +27,6 @@ abstract class TestCase extends BaseTestCase
         config(['services.sdi.auth.bypass' => true]);
         config(['app.url' => 'http://localhost']);
         URL::forceRootUrl('http://localhost');
+        Cache::flush();
     }
 }

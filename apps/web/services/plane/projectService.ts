@@ -82,10 +82,22 @@ export const projectService = {
     return projectService.getStates(projectId);
   },
 
-  createState: async (projectId: string | number, payload: { name: string; color: string; group: string; sequence?: number }) => {
+  createState: async (projectId: string | number, payload: { name: string; color: string; group: string; sequence?: number; wip_limit?: number | null }) => {
     const res = await httpRequestService<{ data: JsonApiItem<State> }>({
       url: `${API_BASE_URL}/projects/${projectId}/states`,
       method: "POST",
+      data: payload,
+    });
+    return {
+      id: res.data.id,
+      ...res.data.attributes,
+    };
+  },
+
+  updateState: async (projectId: string | number, stateId: string | number, payload: Partial<State>) => {
+    const res = await httpRequestService<{ data: JsonApiItem<State> }>({
+      url: `${API_BASE_URL}/projects/${projectId}/states/${stateId}`,
+      method: "PUT",
       data: payload,
     });
     return {

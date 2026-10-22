@@ -14,7 +14,8 @@ class UpdateProjectMemberRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', 'string', 'in:ADMIN,MEMBER,VIEWER'],
+            'role' => ['sometimes', 'string', 'in:ADMIN,MEMBER,VIEWER'],
+            'capacity_points' => ['nullable', 'numeric', 'min:0', 'max:1000'],
         ];
     }
 }

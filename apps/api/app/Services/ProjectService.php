@@ -193,7 +193,23 @@ class ProjectService
             'group' => $data['group'],
             'sequence' => $data['sequence'] ?? 10,
             'is_default' => $data['is_default'] ?? false,
+            'wip_limit' => $data['wip_limit'] ?? null,
         ]);
+    }
+
+    /**
+     * Actualiza un estado del proyecto (incluyendo límite WIP).
+     */
+    public function updateState(Request $request, Project $project, State $state): State
+    {
+        if ($state->project_id !== $project->id) {
+            abort(404, 'Estado no pertenece al proyecto.');
+        }
+
+        $data = $request->validated();
+        $state->update($data);
+
+        return $state;
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Resources\WorkItem;
 use App\Http\Resources\Project\LabelResource;
 use App\Http\Resources\Project\StateResource;
 use App\Http\Resources\WorkItemType\WorkItemTypeResource;
+use App\Services\Agile\WorkItemReadinessEvaluator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,12 +27,24 @@ class WorkItemResource extends JsonResource
                 'description' => $this->description_html,
                 'description_json' => $this->description_json,
                 'priority' => $this->priority,
+                'sort_order' => (float) ($this->sort_order ?? 0),
                 'estimate_points' => $this->estimate_points,
                 'estimate_value' => $this->estimate_value,
                 'start_date' => $this->start_date?->format('Y-m-d'),
                 'target_date' => $this->target_date?->format('Y-m-d'),
                 'completed_at' => $this->completed_at?->toISOString(),
+                'state_changed_at' => $this->state_changed_at?->toISOString(),
+                'age_in_state_days' => $this->state_changed_at ? (int) $this->state_changed_at->diffInDays(now()) : ($this->updated_at ? (int) $this->updated_at->diffInDays(now()) : 0),
                 'is_draft' => $this->is_draft,
+                'is_blocked' => (bool) $this->is_blocked,
+                'blocked_reason' => $this->blocked_reason,
+                'blocked_at' => $this->blocked_at?->toISOString(),
+                'blocked_by' => $this->relationLoaded('blockedByUser') && $this->blockedByUser ? [
+                    'id' => (string) $this->blockedByUser->id,
+                    'name' => $this->blockedByUser->name,
+                ] : null,
+                'rollup_points' => $this->relationLoaded('subItems') ? (float) $this->subItems->sum(fn ($s) => (float) ($s->estimate_points ?? 0)) : null,
+                'readiness' => app(WorkItemReadinessEvaluator::class)->evaluate($this->resource),
                 'lead_id' => $this->lead_id,
                 'created_by' => $this->created_by,
                 'milestone_id' => $this->milestone_id ?? $this->whenLoaded('milestones', fn () => $this->milestones->first()?->id),

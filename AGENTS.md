@@ -11,11 +11,11 @@ Este proyecto cuenta con un servidor oficial MCP implementado con `laravel/mcp`,
 ./scripts/mcp-server.sh
 ```
 
-### Herramientas Disponibles (34 Tools):
+### Herramientas Disponibles (36 Tools):
 - **Espacios de Trabajo (Workspaces):** `list_workspaces`, `get_workspace`, `create_workspace`, `update_workspace`, `delete_workspace`, `list_workspace_members`, `add_workspace_member`, `update_workspace_member_role`, `remove_workspace_member`.
-- **Proyectos:** `list_projects`, `get_project`, `create_project`, `update_project`, `delete_project`.
+- **Proyectos:** `list_projects`, `get_project`, `get_daily_standup`, `create_project`, `update_project`, `delete_project`.
 - **Work Items (Tareas, Historias, Bugs):** `list_work_items`, `get_work_item`, `create_work_item`, `update_work_item`, `delete_work_item`.
-- **Ciclos / Sprints:** `list_cycles`, `get_cycle`, `create_cycle`, `update_cycle`.
+- **Ciclos / Sprints:** `list_cycles`, `get_cycle`, `get_sprint_planning`, `create_cycle`, `update_cycle`.
 - **Módulos:** `list_modules`, `get_module`, `create_module`, `update_module`.
 - **Hitos (Milestones):** `list_milestones`, `get_milestone`, `create_milestone`, `update_milestone`.
 - **Versiones / Releases:** `list_releases`, `get_release`, `create_release`, `update_release`.

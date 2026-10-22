@@ -34,6 +34,7 @@ export interface State {
   group: 'BACKLOG' | 'UNSTARTED' | 'STARTED' | 'COMPLETED' | 'CANCELLED';
   sequence: number;
   is_default?: boolean;
+  wip_limit?: number | null;
 }
 
 export interface Label {
@@ -57,6 +58,8 @@ export interface Cycle {
   id: string | number;
   name: string;
   description?: string | null;
+  sprint_goal?: string | null;
+  capacity_points?: number | null;
   start_date?: string | null;
   end_date?: string | null;
   status: 'DRAFT' | 'UPCOMING' | 'CURRENT' | 'COMPLETED';
@@ -257,6 +260,8 @@ export interface Project {
   estimate_system?: 'FIBONACCI' | 'TSHIRT' | 'NUMERIC' | 'NONE';
   start_date?: string | null;
   target_date?: string | null;
+  aging_threshold_days?: number;
+  auto_rollup_parent?: boolean;
   states?: State[];
   labels?: Label[];
   work_items_count?: number;
@@ -275,12 +280,23 @@ export interface WorkItem {
   description?: string | null;
   description_json?: any;
   priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+  sort_order?: number;
   estimate_points?: number | null;
   estimate_value?: string | null; // e.g. "5" or "M"
   start_date?: string | null;
   target_date?: string | null;
   completed_at?: string | null;
+  state_changed_at?: string | null;
+  age_in_state_days?: number;
   is_draft?: boolean;
+  is_blocked?: boolean;
+  blocked_reason?: string | null;
+  blocked_at?: string | null;
+  readiness?: {
+    is_ready: boolean;
+    missing: string[];
+    reasons?: string[];
+  };
   created_at?: string;
   updated_at?: string;
   state_id?: string | number;
@@ -718,6 +734,156 @@ export interface CsvImportResult {
   imported_count: number;
   errors: string[];
 }
+
+export interface ProjectMember {
+  id: string | number;
+  role: 'ADMIN' | 'MEMBER' | 'VIEWER';
+  capacity_points?: number | null;
+  joined_at?: string;
+  user: User;
+}
+
+export interface DefinitionOfReady {
+  is_ready: boolean;
+  missing: string[];
+  reasons?: string[];
+}
+
+export interface SprintPlanningMember {
+  user: User;
+  role: string;
+  capacity_points: number;
+  assigned_points: number;
+  assigned_items_count: number;
+  load_percentage: number;
+  status: 'optimal' | 'high' | 'overloaded';
+}
+
+export interface SprintPlanningCapacity {
+  effective: number;
+  effective_capacity?: number;
+  committed: number;
+  completed: number;
+  remaining: number;
+  utilization_pct: number;
+  members_sum_capacity?: number;
+  status: 'healthy' | 'at_risk' | 'overloaded';
+}
+
+export interface SprintPlanningVelocity {
+  rolling_average: number;
+  recent_cycles_count: number;
+  history: {
+    cycle_id: number | string;
+    cycle_name: string;
+    completed_points: number;
+    committed_points: number;
+    status: string;
+  }[];
+}
+
+export interface SprintPlanningItem {
+  id: string | number;
+  sequence_id: number;
+  identifier: string;
+  title: string;
+  estimate_points?: number | null;
+  priority: 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+  sort_order?: number;
+  is_blocked?: boolean;
+  blocked_reason?: string | null;
+  state?: {
+    id: string | number;
+    name: string;
+    color: string;
+    group: string;
+  } | null;
+  assignees?: { id: string | number; name: string }[];
+  dor: DefinitionOfReady;
+}
+
+export interface SprintPlanning {
+  cycle: Cycle;
+  cycle_id: string | number;
+  cycle_name: string;
+  sprint_goal?: string | null;
+  velocity: SprintPlanningVelocity;
+  capacity: SprintPlanningCapacity;
+  members: SprintPlanningMember[];
+  not_ready_items: {
+    id: string | number;
+    identifier: string;
+    title: string;
+    missing: string[];
+  }[];
+  suggestions: {
+    id: string | number;
+    identifier: string;
+    title: string;
+    estimate_points: number;
+    priority: string;
+  }[];
+  backlog?: SprintPlanningItem[];
+  sprint_items?: SprintPlanningItem[];
+}
+
+export interface DailyStandupMemberWork {
+  items: {
+    id: string | number;
+    identifier: string;
+    title: string;
+    priority?: string;
+    state?: { name: string; color: string; group: string } | null;
+    days_in_state?: number;
+    is_aging?: boolean;
+  }[];
+  commits?: {
+    hash: string;
+    message: string;
+    author_name?: string;
+    committed_at?: string;
+  }[];
+}
+
+export interface DailyStandupMemberBlocker {
+  id: string | number;
+  identifier: string;
+  title: string;
+  is_blocked: boolean;
+  blocked_reason: string;
+  blocked_at?: string | null;
+}
+
+export interface DailyStandupMember {
+  user: User;
+  role: string;
+  yesterday: DailyStandupMemberWork;
+  today: DailyStandupMemberWork;
+  blockers: {
+    items: DailyStandupMemberBlocker[];
+  };
+}
+
+export interface DailyStandup {
+  date: string;
+  project: {
+    id: string | number;
+    name: string;
+    identifier: string;
+  };
+  cycle?: {
+    id: string | number;
+    name: string;
+    sprint_goal?: string | null;
+  } | null;
+  summary: {
+    total_members: number;
+    total_blockers: number;
+    aging_items_count: number;
+  };
+  members: DailyStandupMember[];
+}
+
 
 
 

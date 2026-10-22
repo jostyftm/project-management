@@ -14,6 +14,11 @@ class ProjectMember extends Model
         'project_id',
         'user_id',
         'role',
+        'capacity_points',
+    ];
+
+    protected $casts = [
+        'capacity_points' => 'float',
     ];
 
     public function project(): BelongsTo

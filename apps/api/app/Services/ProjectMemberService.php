@@ -189,15 +189,16 @@ class ProjectMemberService
     }
 
     /**
-     * Actualiza el rol de un miembro.
+     * Actualiza el rol o la capacidad de un miembro.
      */
-    public function updateMemberRole(Project $project, int $userId, string $role): ProjectMember
+    public function updateMemberRole(Project $project, int $userId, array|string $roleOrData): ProjectMember
     {
         $member = ProjectMember::where('project_id', $project->id)
             ->where('user_id', $userId)
             ->firstOrFail();
 
-        $member->update(['role' => $role]);
+        $updateData = is_array($roleOrData) ? $roleOrData : ['role' => $roleOrData];
+        $member->update($updateData);
 
         return $member;
     }

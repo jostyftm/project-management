@@ -21,6 +21,7 @@ class State extends Model
         'group',
         'sequence',
         'is_default',
+        'wip_limit',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class State extends Model
         return [
             'sequence' => 'integer',
             'is_default' => 'boolean',
+            'wip_limit' => 'integer',
         ];
     }
 
