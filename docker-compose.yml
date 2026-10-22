@@ -71,7 +71,7 @@ services:
       dockerfile: ./deploy/local/Dockerfile.local
       args:
         WWWGROUP: "${WWWGROUP:-1000}"
-    image: "sail-8.5/app"
+    image: "api_project_managment:local"
     container_name: project_managment
     extra_hosts:
       - "host.docker.internal:host-gateway"

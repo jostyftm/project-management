@@ -16,15 +16,158 @@ use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class CycleService
 {
     /**
+     * Determina el estado del ciclo según la fecha actual y su rango de fechas.
+     */
+    public function determineStatusFromDates(?string $startDate, ?string $endDate, ?string $fallbackStatus = 'UPCOMING'): string
+    {
+        if (! $startDate || ! $endDate) {
+            return $fallbackStatus ?? 'UPCOMING';
+        }
+
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+        $today = now()->startOfDay();
+
+        if ($today->lt($start)) {
+            return 'UPCOMING';
+        }
+
+        if ($today->between($start, $end)) {
+            return 'CURRENT';
+        }
+
+        if ($today->gt($end)) {
+            return 'COMPLETED';
+        }
+
+        return $fallbackStatus ?? 'UPCOMING';
+    }
+
+    /**
+     * Verifica si un rango de fechas se solapa con un ciclo con estado CURRENT en el proyecto.
+     */
+    public function checkCurrentCycleOverlap(int $projectId, ?string $startDate, ?string $endDate, ?int $ignoreCycleId = null): ?Cycle
+    {
+        if (! $startDate || ! $endDate) {
+            return null;
+        }
+
+        $start = Carbon::parse($startDate)->format('Y-m-d');
+        $end = Carbon::parse($endDate)->format('Y-m-d');
+
+        return Cycle::where('project_id', $projectId)
+            ->where('status', 'CURRENT')
+            ->when($ignoreCycleId, fn ($q) => $q->where('id', '!=', $ignoreCycleId))
+            ->whereNotNull('start_date')
+            ->whereNotNull('end_date')
+            ->where(function ($q) use ($start, $end) {
+                $q->where('start_date', '<=', $end)
+                    ->where('end_date', '>=', $start);
+            })
+            ->first();
+    }
+
+    /**
+     * Valida que no haya solapamiento con un ciclo actual del proyecto.
+     * Arroja ValidationException (HTTP 422) si hay solapamiento o si ya existe un ciclo CURRENT.
+     */
+    public function validateNoOverlap(int $projectId, ?string $startDate, ?string $endDate, ?string $status = null, ?int $ignoreCycleId = null): void
+    {
+        if ($startDate && $endDate) {
+            $overlapping = $this->checkCurrentCycleOverlap($projectId, $startDate, $endDate, $ignoreCycleId);
+            if ($overlapping) {
+                $currStart = $overlapping->start_date ? Carbon::parse($overlapping->start_date)->format('Y-m-d') : '';
+                $currEnd = $overlapping->end_date ? Carbon::parse($overlapping->end_date)->format('Y-m-d') : '';
+                $startStr = Carbon::parse($startDate)->format('Y-m-d');
+                $endStr = Carbon::parse($endDate)->format('Y-m-d');
+
+                throw ValidationException::withMessages([
+                    'start_date' => ["Las fechas del ciclo ({$startStr} al {$endStr}) se solapan con el ciclo actual activo '{$overlapping->name}' ({$currStart} al {$currEnd})."],
+                ]);
+            }
+        }
+
+        if ($status === 'CURRENT') {
+            $existingCurrent = Cycle::where('project_id', $projectId)
+                ->where('status', 'CURRENT')
+                ->when($ignoreCycleId, fn ($q) => $q->where('id', '!=', $ignoreCycleId))
+                ->first();
+
+            if ($existingCurrent) {
+                throw ValidationException::withMessages([
+                    'status' => ["Ya existe un ciclo actual activo en el proyecto ('{$existingCurrent->name}'). No puede haber más de un ciclo actual simultáneamente."],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Sincroniza automáticamente los estados de los ciclos del proyecto según la fecha actual.
+     */
+    public function syncProjectCycleStatuses(Project $project): int
+    {
+        $today = now()->startOfDay();
+        $cycles = Cycle::where('project_id', $project->id)
+            ->whereNotNull('start_date')
+            ->whereNotNull('end_date')
+            ->whereNotIn('status', ['DRAFT'])
+            ->orderBy('start_date', 'asc')
+            ->get();
+
+        $updatedCount = 0;
+        $hasCurrent = false;
+
+        // 1. Finalizar ciclos cuya fecha de fin ya expiró
+        foreach ($cycles as $cycle) {
+            $end = Carbon::parse($cycle->end_date)->endOfDay();
+
+            if ($today->gt($end) && $cycle->status !== 'COMPLETED') {
+                $cycle->update(['status' => 'COMPLETED']);
+                $updatedCount++;
+            }
+        }
+
+        // 2. Activar o programar ciclos no finalizados
+        foreach ($cycles->fresh() as $cycle) {
+            if ($cycle->status === 'COMPLETED') {
+                continue;
+            }
+
+            $start = Carbon::parse($cycle->start_date)->startOfDay();
+            $end = Carbon::parse($cycle->end_date)->endOfDay();
+
+            if ($today->between($start, $end)) {
+                if (! $hasCurrent) {
+                    if ($cycle->status !== 'CURRENT') {
+                        $cycle->update(['status' => 'CURRENT']);
+                        $updatedCount++;
+                    }
+                    $hasCurrent = true;
+                }
+            } elseif ($today->lt($start)) {
+                if ($cycle->status !== 'UPCOMING') {
+                    $cycle->update(['status' => 'UPCOMING']);
+                    $updatedCount++;
+                }
+            }
+        }
+
+        return $updatedCount;
+    }
+
+    /**
      * Lista ciclos para un proyecto con filtros de estado.
      */
     public function list(Request $request, Project $project): Collection|AbstractPaginator
     {
+        $this->syncProjectCycleStatuses($project);
+
         return (new Cycle)->search(
             request: $request,
             relationships: ['owner', 'workItems.state'],
@@ -53,14 +196,31 @@ class CycleService
         $user = $request->user();
         $workspaceId = app('current_workspace_id');
 
+        $startDate = $data['start_date'] ?? null;
+        $endDate = $data['end_date'] ?? null;
+        $requestedStatus = $data['status'] ?? null;
+
+        $status = ($requestedStatus === 'DRAFT')
+            ? 'DRAFT'
+            : ($startDate && $endDate
+                ? $this->determineStatusFromDates($startDate, $endDate, $requestedStatus ?? 'UPCOMING')
+                : ($requestedStatus ?? 'UPCOMING'));
+
+        $this->validateNoOverlap(
+            projectId: $project->id,
+            startDate: $startDate,
+            endDate: $endDate,
+            status: $status
+        );
+
         return Cycle::create([
             'workspace_id' => $workspaceId,
             'project_id' => $project->id,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
-            'start_date' => $data['start_date'] ?? null,
-            'end_date' => $data['end_date'] ?? null,
-            'status' => $data['status'] ?? 'UPCOMING',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'status' => $status,
             'owned_by' => $data['owned_by'] ?? $user?->id,
         ]);
     }
@@ -71,6 +231,29 @@ class CycleService
     public function update(Request $request, Cycle $cycle): Cycle
     {
         $data = $request->validated();
+
+        $startDate = array_key_exists('start_date', $data) ? $data['start_date'] : ($cycle->start_date ? Carbon::parse($cycle->start_date)->format('Y-m-d') : null);
+        $endDate = array_key_exists('end_date', $data) ? $data['end_date'] : ($cycle->end_date ? Carbon::parse($cycle->end_date)->format('Y-m-d') : null);
+        $requestedStatus = array_key_exists('status', $data) ? $data['status'] : null;
+
+        if ($requestedStatus === null && (array_key_exists('start_date', $data) || array_key_exists('end_date', $data))) {
+            if ($startDate && $endDate && $cycle->status !== 'DRAFT') {
+                $data['status'] = $this->determineStatusFromDates($startDate, $endDate, $cycle->status);
+            }
+        } elseif ($requestedStatus && $requestedStatus !== 'DRAFT' && $startDate && $endDate) {
+            $data['status'] = $this->determineStatusFromDates($startDate, $endDate, $requestedStatus);
+        }
+
+        $effectiveStatus = $data['status'] ?? $cycle->status;
+
+        $this->validateNoOverlap(
+            projectId: $cycle->project_id,
+            startDate: $startDate,
+            endDate: $endDate,
+            status: $requestedStatus ? $effectiveStatus : null,
+            ignoreCycleId: $cycle->id
+        );
+
         $cycle->update($data);
 
         return $cycle->load(['owner', 'workItems']);
@@ -375,8 +558,8 @@ class CycleService
         $unstarted = $unstartedCount;
         $completionRate = $scope > 0 ? round(($done / $scope) * 100, 1) : 0.0;
 
-        $todayIdeal = $scope > 0 ? round(max(0, $scope - (($todayIndex / $totalDays) * $scope)), 1) : 0;
-        $trailingCount = max(0, round($pending - $todayIdeal, 1));
+        $todayIdeal = 0.0;
+        $trailingCount = 0.0;
 
         $dates = [];
         $workItemsSeries = [];
@@ -422,10 +605,16 @@ class CycleService
                 return $updatedAt && $updatedAt->between($currentDayStart, $currentDayEnd) && Carbon::parse($item->created_at)->lt($currentDayStart);
             })->count();
 
-            $idealPending = $scope > 0 ? round(max(0, $scope - (($i / $totalDays) * $scope)), 1) : 0;
-            $idealCompleted = $scope > 0 ? round(min($scope, ($i / $totalDays) * $scope), 1) : 0;
-            $idealPendingPoints = $totalPoints > 0 ? round(max(0, $totalPoints - (($i / $totalDays) * $totalPoints)), 1) : 0;
-            $idealCompletedPoints = $totalPoints > 0 ? round(min($totalPoints, ($i / $totalDays) * $totalPoints), 1) : 0;
+            // Avance ideal dinámico por día recalculado según el alcance efectivo de la jornada
+            $idealPending = $dayScope > 0 ? round(max(0, $dayScope * (1.0 - ($i / $totalDays))), 1) : 0.0;
+            $idealCompleted = $dayScope > 0 ? round(min($dayScope, $dayScope * ($i / $totalDays)), 1) : 0.0;
+            $idealPendingPoints = $dayScopePoints > 0 ? round(max(0, $dayScopePoints * (1.0 - ($i / $totalDays))), 1) : 0.0;
+            $idealCompletedPoints = $dayScopePoints > 0 ? round(min($dayScopePoints, $dayScopePoints * ($i / $totalDays)), 1) : 0.0;
+
+            if ($i === $todayIndex) {
+                $todayScope = $dayScope;
+                $todayIdeal = $idealPending;
+            }
 
             if ($scope === 0) {
                 $dayPending = 0;
@@ -501,6 +690,12 @@ class CycleService
                 'modified_today' => $modifiedThatDay,
             ];
         }
+
+        $effectiveTodayScope = isset($todayScope) ? $todayScope : $scope;
+        if (! isset($todayIdeal) || $todayIdeal === 0.0) {
+            $todayIdeal = $effectiveTodayScope > 0 ? round(max(0, $effectiveTodayScope * (1.0 - ($todayIndex / $totalDays))), 1) : 0.0;
+        }
+        $trailingCount = max(0, round($pending - $todayIdeal, 1));
 
         return [
             'cycle_id' => $cycle->id,

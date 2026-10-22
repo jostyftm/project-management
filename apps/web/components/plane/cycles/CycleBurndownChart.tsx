@@ -166,13 +166,14 @@ export function CycleBurndownChart({
         .join(" ")
     : `M ${getX(0)} ${getY(scopeVal)} L ${getX(dates.length - 1)} ${getY(scopeVal)}`;
 
-  // 2. Ideal line: diagonal
-  // In Burndown: from (0, scope) to (last, 0)
-  // In Burnup: from (0, 0) to (last, scope)
-  const idealPath =
-    chartType === "burndown"
-      ? `M ${getX(0)} ${getY(rawSeries[0]?.scope ?? scopeVal)} L ${getX(dates.length - 1)} ${getY(0)}`
-      : `M ${getX(0)} ${getY(0)} L ${getX(dates.length - 1)} ${getY(rawSeries[rawSeries.length - 1]?.scope ?? scopeVal)}`;
+  // 2. Ideal line: dynamic curve calculated from daily scope and linear projection
+  const idealPath = rawSeries
+    .map((pt, i) => {
+      const val = chartType === "burndown" ? (pt?.ideal_pending ?? 0) : (pt?.ideal_completed ?? 0);
+      const cmd = i === 0 ? "M" : "L";
+      return `${cmd} ${getX(i)} ${getY(val)}`;
+    })
+    .join(" ");
 
   // 3. Primary line: Pending (Burndown) or Completed (Burnup) up to todayIndex
   const activePoints = rawSeries.slice(0, todayIndex + 1);
