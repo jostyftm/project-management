@@ -593,7 +593,11 @@ export default function ProjectWorkItemsPage() {
       toast.success(`Estado cambiado a "${targetState?.name ?? 'Nuevo estado'}"`);
       await loadData(true);
     } catch (err: any) {
-      toast.error("No se pudo actualizar el estado");
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "No se pudo actualizar el estado";
+      toast.error(errorMsg, { duration: 6000 });
       loadData(true);
     }
   };

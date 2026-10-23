@@ -262,6 +262,7 @@ export interface Project {
   target_date?: string | null;
   aging_threshold_days?: number;
   auto_rollup_parent?: boolean;
+  require_evidence_to_complete?: boolean;
   states?: State[];
   labels?: Label[];
   work_items_count?: number;
@@ -512,6 +513,14 @@ export interface Sticky {
   updated_at?: string;
 }
 
+export interface CommentAttachment {
+  name: string;
+  original_name?: string;
+  url: string;
+  size?: number;
+  mime?: string;
+}
+
 export interface Comment {
   id: string | number;
   workspace_id: string | number;
@@ -520,6 +529,9 @@ export interface Comment {
   page_id?: string | number | null;
   user_id: string | number;
   content: string;
+  type?: 'COMMENT' | 'WORK_LOG';
+  is_work_log?: boolean;
+  attachments?: CommentAttachment[];
   mentioned_user_ids?: (string | number)[];
   created_at: string;
   updated_at?: string;
@@ -882,6 +894,73 @@ export interface DailyStandup {
     aging_items_count: number;
   };
   members: DailyStandupMember[];
+}
+
+export interface DailyStandupDayBreakdown {
+  date: string;
+  has_worked: boolean;
+  completed_items: { id: string; identifier: string; title: string }[];
+  evidences: { id: string; preview: string; attachments: CommentAttachment[] }[];
+  deliverables: { id: string; title: string; type: string }[];
+  commits: { message: string; hash: string; item_identifier: string }[];
+  advances_count: number;
+}
+
+export interface DailyStandupRangeMember {
+  user: User;
+  role: string;
+  days_worked_count: number;
+  working_days_worked: number;
+  participation_rate: number;
+  worked_dates: string[];
+  tasks_completed_count: number;
+  activities_count: number;
+  commits_count: number;
+  evidences_count: number;
+  daily_breakdown: DailyStandupDayBreakdown[];
+}
+
+export interface DailyStandupDaySummary {
+  date: string;
+  day_of_week: string;
+  is_working_day: boolean;
+  active_members_count: number;
+  members: {
+    user: { id: string; name: string; email: string };
+    role: string;
+    completed_count: number;
+    commits_count: number;
+    deliverables_count: number;
+    evidences_count: number;
+  }[];
+}
+
+export interface DailyStandupRangeReport {
+  start_date: string;
+  end_date: string;
+  total_calendar_days: number;
+  total_working_days: number;
+  project: {
+    id: string;
+    name: string;
+    identifier: string;
+    require_evidence_to_complete: boolean;
+  };
+  cycle?: {
+    id: string;
+    name: string;
+    sprint_goal?: string | null;
+  } | null;
+  summary: {
+    total_members: number;
+    active_members: number;
+    total_tasks_completed: number;
+    total_activities: number;
+    total_commits: number;
+    total_evidences: number;
+  };
+  members: DailyStandupRangeMember[];
+  days: DailyStandupDaySummary[];
 }
 
 

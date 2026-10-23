@@ -14,6 +14,8 @@ use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -364,4 +366,134 @@ test('it automatically rolls up parent state when all children are completed', f
 
     // El padre debe haberse completado automáticamente
     expect($parent->fresh()->state_id)->toBe($this->completedState->id);
+});
+
+test('it generates daily standup history by date range with worked days calculation', function () {
+    $startDate = Carbon::now()->subDays(5)->format('Y-m-d');
+    $endDate = Carbon::now()->format('Y-m-d');
+
+    // Registrar actividad de avance para el dev hace 2 días
+    $activity = Activity::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'actor_id' => $this->dev->id,
+        'entity_type' => 'WORK_ITEM',
+        'entity_id' => 999,
+        'action' => 'STATE_CHANGED',
+        'changes_diff' => ['state_id' => $this->startedState->id],
+    ]);
+    $activity->created_at = Carbon::now()->subDays(2);
+    $activity->saveQuietly();
+
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', $this->workspace->id)
+        ->getJson("/api/v1/projects/{$this->project->id}/daily-standup/history?start_date={$startDate}&end_date={$endDate}");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure([
+            'data' => [
+                'start_date',
+                'end_date',
+                'total_calendar_days',
+                'total_working_days',
+                'summary' => ['total_members', 'active_members'],
+                'members' => [
+                    '*' => ['user', 'days_worked_count', 'worked_dates', 'daily_breakdown'],
+                ],
+                'days',
+            ],
+        ]);
+
+    $report = $response->json('data');
+    $devMember = collect($report['members'])->firstWhere('user.id', (string) $this->dev->id);
+    expect($devMember)->not->toBeNull();
+    expect($devMember['days_worked_count'])->toBeGreaterThanOrEqual(1);
+    expect($devMember['worked_dates'])->toContain(Carbon::now()->subDays(2)->format('Y-m-d'));
+});
+
+test('it distinguishes casual comments vs evidence with caption and computes days worked', function () {
+    Storage::fake('s3');
+
+    $item = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 10,
+        'created_by' => $this->user->id,
+        'title' => 'Historia para evidencias',
+        'state_id' => $this->startedState->id,
+    ]);
+
+    // 1. Imagen SIN caption -> is_work_log debe ser false y action COMMENTED
+    $fileNoCaption = UploadedFile::fake()->image('screenshot1.png');
+    $resNoCaption = $this->actingAs($this->dev)
+        ->withHeader('X-Workspace-Id', $this->workspace->id)
+        ->postJson('/api/v1/comments', [
+            'content' => 'Adjunto imagen sin caption',
+            'work_item_id' => $item->id,
+            'project_id' => $this->project->id,
+            'caption' => '',
+            'attachment' => $fileNoCaption,
+        ]);
+
+    $resNoCaption->assertStatus(201);
+    expect($resNoCaption->json('data.attributes.is_work_log'))->toBeFalse();
+
+    // 2. Imagen CON caption descriptivo -> is_work_log debe ser true y action EVIDENCE_SUBMITTED
+    $fileWithCaption = UploadedFile::fake()->image('screenshot2.png');
+    $resWithCaption = $this->actingAs($this->dev)
+        ->withHeader('X-Workspace-Id', $this->workspace->id)
+        ->postJson('/api/v1/comments', [
+            'content' => 'Evidencia de pruebas automatizadas',
+            'work_item_id' => $item->id,
+            'project_id' => $this->project->id,
+            'caption' => 'Captura de suite de pruebas aprobadas con 100% de cobertura',
+            'attachment' => $fileWithCaption,
+        ]);
+
+    $resWithCaption->assertStatus(201);
+    expect($resWithCaption->json('data.attributes.is_work_log'))->toBeTrue();
+});
+
+test('it enforces require_evidence_to_complete before transitioning to COMPLETED', function () {
+    // Activar configuración en el proyecto
+    $this->project->update(['require_evidence_to_complete' => true]);
+
+    $item = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 20,
+        'created_by' => $this->user->id,
+        'title' => 'Tarea que exige evidencia',
+        'state_id' => $this->startedState->id,
+    ]);
+
+    // 1. Intento de pasar a COMPLETED sin evidencia -> Error 422
+    $response = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', $this->workspace->id)
+        ->putJson("/api/v1/work-items/{$item->id}", [
+            'state_id' => $this->completedState->id,
+        ]);
+
+    $response->assertStatus(422);
+
+    // 2. Adjuntar un entregable formal de evidencia
+    WorkItemDeliverable::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'work_item_id' => $item->id,
+        'created_by' => $this->dev->id,
+        'title' => 'Prueba de regresión',
+        'type' => 'FILE',
+        'file_path' => 'projects/test/deliverable.pdf',
+    ]);
+
+    // 3. Reintentar transición a COMPLETED -> Exitoso 200
+    $successResponse = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', $this->workspace->id)
+        ->putJson("/api/v1/work-items/{$item->id}", [
+            'state_id' => $this->completedState->id,
+        ]);
+
+    $successResponse->assertStatus(200);
+    expect($item->fresh()->state_id)->toBe($this->completedState->id);
 });

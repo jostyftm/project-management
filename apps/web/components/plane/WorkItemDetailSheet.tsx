@@ -337,8 +337,10 @@ export function WorkItemDetailSheet({
       }));
       toast.success("Tarea actualizada correctamente");
       onUpdated(updated);
-    } catch {
-      toast.error("Error al actualizar");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Error al actualizar la tarea", {
+        duration: 6000,
+      });
     }
   };
 

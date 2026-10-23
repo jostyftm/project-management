@@ -82,6 +82,25 @@ class WorkItemDeliverableService
             'status' => 'PENDING_REVIEW',
         ]);
 
+        try {
+            app(ActivityService::class)->logActivity(
+                $project->workspace_id,
+                $project->id,
+                $user->id,
+                'WORK_ITEM',
+                $workItem->id,
+                'DELIVERABLE_ADDED',
+                [
+                    'deliverable_id' => $deliverable->id,
+                    'title' => $deliverable->title,
+                    'type' => $deliverable->type,
+                    'file_name' => $deliverable->file_name,
+                ]
+            );
+        } catch (\Throwable) {
+            // Silencioso en caso de no poder registrar actividad secundaria
+        }
+
         return $deliverable->load(['creator', 'reviewer']);
     }
 

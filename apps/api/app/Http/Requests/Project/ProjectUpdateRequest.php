@@ -54,6 +54,7 @@ class ProjectUpdateRequest extends FormRequest
             'estimate_system' => ['sometimes', 'string', 'in:FIBONACCI,TSHIRT,NUMERIC,NONE'],
             'auto_rollup_parent' => ['sometimes', 'boolean'],
             'aging_threshold_days' => ['sometimes', 'integer', 'min:1', 'max:90'],
+            'require_evidence_to_complete' => ['sometimes', 'boolean'],
             'start_date' => ['nullable', 'date'],
             'target_date' => ['nullable', 'date'],
         ];

@@ -17,11 +17,16 @@ class Comment extends Model
         'work_item_id',
         'page_id',
         'user_id',
+        'type',
+        'is_work_log',
         'content',
+        'attachments',
         'mentioned_user_ids',
     ];
 
     protected $casts = [
+        'is_work_log' => 'boolean',
+        'attachments' => 'array',
         'mentioned_user_ids' => 'array',
     ];
 

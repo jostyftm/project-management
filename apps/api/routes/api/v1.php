@@ -133,6 +133,7 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::get('pages/{page}/comments', [CommentController::class, 'indexByPage']);
         Route::post('comments', [CommentController::class, 'store']);
         Route::delete('comments/{id}', [CommentController::class, 'destroy']);
+        Route::get('comments/{comment}/attachments/{index}', [CommentController::class, 'attachment']);
 
         // Server-Sent Events (SSE) Live Stream
         Route::get('live-stream', [StreamController::class, 'stream']);
@@ -246,6 +247,7 @@ Route::middleware(['auth.sdi'])->group(function () {
 
             // Daily Standup Ágil
             Route::get('projects/{project}/daily-standup', [DailyStandupController::class, 'show']);
+            Route::get('projects/{project}/daily-standup/history', [DailyStandupController::class, 'history']);
 
             // Módulos (Visualización para miembros)
             Route::get('projects/{project}/modules', [ModuleController::class, 'index']);

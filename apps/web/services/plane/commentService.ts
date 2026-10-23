@@ -46,11 +46,35 @@ export const commentService = {
     page_id?: string | number | null;
     project_id?: string | number | null;
     mentioned_user_ids?: (string | number)[];
+    type?: 'COMMENT' | 'WORK_LOG';
+    is_work_log?: boolean;
+    caption?: string;
+    attachment?: File | null;
   }): Promise<Comment> => {
+    let dataToSend: any = payload;
+
+    if (payload.attachment instanceof File) {
+      const formData = new FormData();
+      formData.append("content", payload.content || payload.caption || "Evidencia adjunta");
+      if (payload.work_item_id) formData.append("work_item_id", String(payload.work_item_id));
+      if (payload.page_id) formData.append("page_id", String(payload.page_id));
+      if (payload.project_id) formData.append("project_id", String(payload.project_id));
+      if (payload.type) formData.append("type", payload.type);
+      if (typeof payload.is_work_log === "boolean") {
+        formData.append("is_work_log", payload.is_work_log ? "1" : "0");
+      }
+      if (payload.caption) formData.append("caption", payload.caption);
+      formData.append("attachment", payload.attachment);
+      if (payload.mentioned_user_ids && payload.mentioned_user_ids.length > 0) {
+        payload.mentioned_user_ids.forEach((id) => formData.append("mentioned_user_ids[]", String(id)));
+      }
+      dataToSend = formData;
+    }
+
     const res = await httpRequestService<{ data: JsonApiItem<Comment> }>({
       url: `${API_BASE_URL}/comments`,
       method: "POST",
-      data: payload,
+      data: dataToSend,
     });
 
     return {

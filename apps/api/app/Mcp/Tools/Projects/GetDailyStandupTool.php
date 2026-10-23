@@ -34,6 +34,12 @@ class GetDailyStandupTool extends Tool
             'date' => $schema->string()
                 ->description('Fecha opcional de consulta en formato YYYY-MM-DD. Por defecto toma la fecha actual.')
                 ->nullable(),
+            'start_date' => $schema->string()
+                ->description('Fecha inicial opcional para reporte de historial por rango (YYYY-MM-DD).')
+                ->nullable(),
+            'end_date' => $schema->string()
+                ->description('Fecha final opcional para reporte de historial por rango (YYYY-MM-DD).')
+                ->nullable(),
         ];
     }
 
@@ -54,10 +60,18 @@ class GetDailyStandupTool extends Tool
 
         $dateStr = $request->get('date');
         $date = $dateStr ? Carbon::parse($dateStr) : null;
+        $startDateStr = $request->get('start_date');
+        $endDateStr = $request->get('end_date');
+        $startDate = $startDateStr ? Carbon::parse($startDateStr) : null;
+        $endDate = $endDateStr ? Carbon::parse($endDateStr) : null;
         $cycleId = $request->get('cycle_id') ? (int) $request->get('cycle_id') : null;
 
         $service = app(DailyStandupService::class);
-        $data = $service->generate($project, $date, $cycleId);
+        if ($startDate || $endDate) {
+            $data = $service->generateRange($project, $startDate, $endDate, $cycleId);
+        } else {
+            $data = $service->generate($project, $date, $cycleId);
+        }
 
         return Response::text($this->formatJson($data));
     }

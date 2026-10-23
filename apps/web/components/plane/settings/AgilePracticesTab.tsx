@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Target, Layers, Clock, GitMerge, Save, Loader2, Info, AlertTriangle } from "lucide-react";
+import { Target, Layers, Clock, GitMerge, Save, Loader2, Info, AlertTriangle, FileCheck } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,7 @@ export function AgilePracticesTab({
   const [states, setStates] = useState<State[]>([]);
   const [agingDays, setAgingDays] = useState<number>(project?.aging_threshold_days || 5);
   const [autoRollup, setAutoRollup] = useState<boolean>(project?.auto_rollup_parent ?? true);
+  const [requireEvidence, setRequireEvidence] = useState<boolean>(project?.require_evidence_to_complete ?? false);
   const [stateWipLimits, setStateWipLimits] = useState<Record<string, number | "">>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -59,6 +60,7 @@ export function AgilePracticesTab({
       const updatedProject = await projectService.update(projectId, {
         aging_threshold_days: Number(agingDays) || 5,
         auto_rollup_parent: autoRollup,
+        require_evidence_to_complete: requireEvidence,
       });
 
       // 2. Guardar límites WIP de cada estado
@@ -77,6 +79,7 @@ export function AgilePracticesTab({
         ...project,
         aging_threshold_days: Number(agingDays) || 5,
         auto_rollup_parent: autoRollup,
+        require_evidence_to_complete: requireEvidence,
       });
 
       toast.success("Prácticas ágiles actualizadas exitosamente");
@@ -208,7 +211,44 @@ export function AgilePracticesTab({
         </CardContent>
       </Card>
 
-      {/* 3. Umbral de Envejecimiento de Tareas (Task Aging) */}
+      {/* 3. Evidencias Requeridas para Completar Tareas (DoD Estricto) */}
+      <Card className="border-slate-200 bg-white">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+              <FileCheck className="size-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Evidencias Obligatorias de Cierre (Definition of Done)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Garantiza que ninguna tarea se cierre sin comprobantes reales de ejecución
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg bg-slate-50/50 cursor-pointer hover:bg-slate-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={requireEvidence}
+              onChange={(e) => setRequireEvidence(e.target.checked)}
+              className="size-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 mt-0.5"
+            />
+            <div className="space-y-0.5">
+              <span className="text-xs font-semibold text-slate-900 block">
+                Exigir al menos una evidencia comprobable para marcar tareas como "COMPLETED"
+              </span>
+              <p className="text-[11px] text-slate-500">
+                Al activar esta regla, el sistema bloqueará la transición de cualquier tarea a completado si no cuenta con al menos un entregable formal adjunto o una imagen con descripción en la sección de actividad. Evita el cierre fraudulento de historias de usuario.
+              </p>
+            </div>
+          </label>
+        </CardContent>
+      </Card>
+
+      {/* 4. Umbral de Envejecimiento de Tareas (Task Aging) */}
       <Card className="border-slate-200 bg-white">
         <CardHeader>
           <div className="flex items-center gap-2">

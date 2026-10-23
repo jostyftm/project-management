@@ -312,6 +312,24 @@ class WorkItemService
                 } else {
                     $data['completed_at'] = null;
                 }
+
+                // Validación de evidencia obligatoria para pasar a COMPLETED
+                if ($newState && strtoupper($newState->group) === 'COMPLETED') {
+                    $project = $workItem->project;
+                    if ($project && (bool) $project->require_evidence_to_complete) {
+                        $hasDeliverable = $workItem->deliverables()->exists();
+                        $hasEvidenceComment = $workItem->comments()
+                            ->where(function ($q) {
+                                $q->where('is_work_log', true)
+                                    ->orWhereNotNull('attachments');
+                            })
+                            ->exists();
+
+                        if (! $hasDeliverable && ! $hasEvidenceComment) {
+                            abort(422, 'No se puede completar la tarea: la configuración del proyecto exige adjuntar al menos una evidencia (entregable formal o captura con descripción en la sección de actividad).');
+                        }
+                    }
+                }
             }
 
             if (array_key_exists('is_blocked', $data)) {

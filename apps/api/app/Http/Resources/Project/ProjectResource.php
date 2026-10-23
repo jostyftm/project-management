@@ -24,6 +24,7 @@ class ProjectResource extends JsonResource
                 'estimate_system' => $this->estimate_system ?? 'FIBONACCI',
                 'auto_rollup_parent' => (bool) ($this->auto_rollup_parent ?? true),
                 'aging_threshold_days' => (int) ($this->aging_threshold_days ?? 5),
+                'require_evidence_to_complete' => (bool) ($this->require_evidence_to_complete ?? false),
                 'start_date' => $this->start_date?->format('Y-m-d'),
                 'target_date' => $this->target_date?->format('Y-m-d'),
                 'completed_work_items_count' => $this->workItems()->whereHas('state', fn ($q) => $q->where('group', 'COMPLETED'))->count(),
