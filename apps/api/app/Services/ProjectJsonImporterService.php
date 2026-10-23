@@ -290,6 +290,8 @@ class ProjectJsonImporterService
     {
         $candidatePaths = [
             $filePath,
+            database_path('data/jsvr_coding.json'),
+            base_path('database/data/jsvr_coding.json'),
             storage_path('app/imports/jsvr_coding.json'),
             base_path('storage/app/imports/jsvr_coding.json'),
             '/home/ubuntu/maestria/jsvr_coding.json',

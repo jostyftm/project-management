@@ -48,6 +48,8 @@ class UpdateWorkItemTool extends Tool
                 ->description('Asignar a un módulo específico'),
             'milestone_id' => $schema->integer()
                 ->description('Asignar a un hito (milestone) específico'),
+            'start_date' => $schema->string()
+                ->description('Nueva fecha de inicio (formato YYYY-MM-DD o vacío para remover)'),
             'target_date' => $schema->string()
                 ->description('Nueva fecha objetivo (formato YYYY-MM-DD)'),
             'parent' => $schema->string()
@@ -122,8 +124,12 @@ class UpdateWorkItemTool extends Tool
                 }
             }
 
+            if ($request->has('start_date')) {
+                $updates['start_date'] = $request->get('start_date') ?: null;
+            }
+
             if ($request->has('target_date')) {
-                $updates['target_date'] = $request->get('target_date');
+                $updates['target_date'] = $request->get('target_date') ?: null;
             }
 
             if ($request->has('parent')) {

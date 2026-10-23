@@ -53,6 +53,8 @@ class CreateWorkItemTool extends Tool
                 ->description('ID del hito (milestone) al que pertenecerá'),
             'lead_id' => $schema->integer()
                 ->description('ID del usuario responsable / líder'),
+            'start_date' => $schema->string()
+                ->description('Fecha de inicio (formato YYYY-MM-DD)'),
             'target_date' => $schema->string()
                 ->description('Fecha objetivo de culminación (formato YYYY-MM-DD)'),
             'parent' => $schema->string()
@@ -168,6 +170,7 @@ class CreateWorkItemTool extends Tool
                 'lead_id' => $request->get('lead_id'),
                 'milestone_id' => $request->get('milestone_id'),
                 'estimate_points' => $request->get('estimate_points'),
+                'start_date' => $request->get('start_date'),
                 'target_date' => $request->get('target_date'),
                 'completed_at' => $completedAt,
                 'created_by' => $user?->id,

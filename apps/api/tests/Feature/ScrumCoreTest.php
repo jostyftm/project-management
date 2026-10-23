@@ -412,7 +412,8 @@ test('it generates daily standup history by date range with worked days calculat
 });
 
 test('it distinguishes casual comments vs evidence with caption and computes days worked', function () {
-    Storage::fake('s3');
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
 
     $item = WorkItem::create([
         'workspace_id' => $this->workspace->id,

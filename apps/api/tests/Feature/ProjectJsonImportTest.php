@@ -27,6 +27,10 @@ it('imports the jsvr_coding.json project dataset into the univalle workspace', f
         '--force' => true,
     ]);
 
+    if ($exitCode !== 0) {
+        test()->fail("project:import-json falló con código {$exitCode}:\n".Artisan::output());
+    }
+
     expect($exitCode)->toBe(0);
 
     // 1. Workspace
