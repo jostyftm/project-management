@@ -10,6 +10,7 @@ use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemRelation;
+use App\Services\Agile\WorkItemRollupService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
@@ -26,9 +27,13 @@ class WorkItemService
     {
         return (new WorkItem)->search(
             request: $request,
-            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules', 'deliverables.creator', 'dodItems'],
+            relationships: ['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'milestones', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules', 'deliverables.creator', 'dodItems', 'outwardRelations.target.state', 'inwardRelations.source.state', 'blockedByUser'],
             callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
+
+                if (! $request->has('sort')) {
+                    $builder->orderBy('sort_order', 'asc');
+                }
 
                 if ($request->has('cycle_id')) {
                     $builder->whereHas('cycles', function ($q) use ($request) {
@@ -52,9 +57,13 @@ class WorkItemService
                 if ($request->has('lead_id')) {
                     $builder->where('lead_id', $request->lead_id);
                 }
+
+                if ($request->has('is_blocked')) {
+                    $builder->where('is_blocked', filter_var($request->is_blocked, FILTER_VALIDATE_BOOLEAN));
+                }
             },
-            filters: ['title', 'state_id', 'type_id', 'priority', 'is_draft', 'lead_id', 'milestone_id'],
-            sorts: ['created_at', 'sequence_id', 'priority', 'target_date']
+            filters: ['title', 'state_id', 'type_id', 'priority', 'is_draft', 'lead_id', 'milestone_id', 'is_blocked'],
+            sorts: ['created_at', 'sequence_id', 'priority', 'target_date', 'sort_order']
         );
     }
 
@@ -123,6 +132,14 @@ class WorkItemService
                 $descJson = ['html' => $descHtml];
             }
 
+            $sortOrder = array_key_exists('sort_order', $data) ? (float) $data['sort_order'] : null;
+            if ($sortOrder === null) {
+                $maxSort = (float) (WorkItem::where('project_id', $project->id)->max('sort_order') ?? 0);
+                $sortOrder = $maxSort + 1000.0;
+            }
+
+            $isBlocked = (bool) ($data['is_blocked'] ?? false);
+
             $workItem = WorkItem::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
@@ -133,6 +150,7 @@ class WorkItemService
                 'state_id' => $stateId,
                 'type_id' => $data['type_id'] ?? null,
                 'priority' => $data['priority'] ?? 'NONE',
+                'sort_order' => $sortOrder,
                 'parent_id' => $data['parent_id'] ?? null,
                 'lead_id' => $data['lead_id'] ?? null,
                 'milestone_id' => $data['milestone_id'] ?? null,
@@ -141,7 +159,12 @@ class WorkItemService
                 'start_date' => $data['start_date'] ?? null,
                 'target_date' => $data['target_date'] ?? null,
                 'completed_at' => $completedAt,
+                'state_changed_at' => now(),
                 'is_draft' => $data['is_draft'] ?? false,
+                'is_blocked' => $isBlocked,
+                'blocked_reason' => $isBlocked ? ($data['blocked_reason'] ?? null) : null,
+                'blocked_at' => $isBlocked ? now() : null,
+                'blocked_by_user_id' => $isBlocked ? $user->id : null,
                 'created_by' => $user->id,
             ]);
 
@@ -221,6 +244,14 @@ class WorkItemService
                 Log::warning('Error despachando notificaciones de creación de work item: '.$e->getMessage());
             }
 
+            if ($workItem->parent_id) {
+                try {
+                    app(WorkItemRollupService::class)->syncParentStatus($workItem);
+                } catch (Throwable $e) {
+                    Log::warning('Error en roll-up de nuevo work item: '.$e->getMessage());
+                }
+            }
+
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'cycles', 'modules']);
         });
     }
@@ -259,25 +290,59 @@ class WorkItemService
                 abort(404, 'Recurso no encontrado.');
             }
 
-            // Validar que únicamente modifique el estado (state_id)
+            // Validar que únicamente modifique el estado (state_id) o reporte impedimentos
             $payloadKeys = array_keys($data);
-            $disallowedKeys = array_diff($payloadKeys, ['state_id']);
+            $disallowedKeys = array_diff($payloadKeys, ['state_id', 'is_blocked', 'blocked_reason']);
             if (! empty($disallowedKeys)) {
-                abort(403, 'Los miembros únicamente pueden cambiar el estado de la tarea.');
+                abort(403, 'Los miembros únicamente pueden cambiar el estado o reportar impedimentos en la tarea.');
             }
         }
 
         return DB::transaction(function () use ($data, $user, $workItem) {
             $originalStateId = $workItem->state_id;
             $originalLeadId = $workItem->lead_id;
+            $originalIsBlocked = (bool) $workItem->is_blocked;
             $originalAssigneeIds = $workItem->assignees()->pluck('users.id')->all();
 
             if (array_key_exists('state_id', $data) && $data['state_id'] != $originalStateId) {
+                $data['state_changed_at'] = now();
                 $newState = $data['state_id'] ? State::find($data['state_id']) : null;
                 if ($newState && in_array(strtoupper($newState->group), ['COMPLETED', 'CANCELLED'])) {
                     $data['completed_at'] = now();
                 } else {
                     $data['completed_at'] = null;
+                }
+
+                // Validación de evidencia obligatoria para pasar a COMPLETED
+                if ($newState && strtoupper($newState->group) === 'COMPLETED') {
+                    $project = $workItem->project;
+                    if ($project && (bool) $project->require_evidence_to_complete) {
+                        $hasDeliverable = $workItem->deliverables()->exists();
+                        $hasEvidenceComment = $workItem->comments()
+                            ->where(function ($q) {
+                                $q->where('is_work_log', true)
+                                    ->orWhereNotNull('attachments');
+                            })
+                            ->exists();
+
+                        if (! $hasDeliverable && ! $hasEvidenceComment) {
+                            abort(422, 'No se puede completar la tarea: la configuración del proyecto exige adjuntar al menos una evidencia (entregable formal o captura con descripción en la sección de actividad).');
+                        }
+                    }
+                }
+            }
+
+            if (array_key_exists('is_blocked', $data)) {
+                $newIsBlocked = (bool) $data['is_blocked'];
+                if ($newIsBlocked && ! $originalIsBlocked) {
+                    $data['is_blocked'] = true;
+                    $data['blocked_at'] = now();
+                    $data['blocked_by_user_id'] = $user->id;
+                } elseif (! $newIsBlocked && $originalIsBlocked) {
+                    $data['is_blocked'] = false;
+                    $data['blocked_at'] = null;
+                    $data['blocked_by_user_id'] = null;
+                    $data['blocked_reason'] = null;
                 }
             }
 
@@ -330,6 +395,10 @@ class WorkItemService
                 $action = 'STATE_CHANGED';
             }
 
+            if (isset($changes['is_blocked'])) {
+                $action = $workItem->is_blocked ? 'BLOCKED' : 'UNBLOCKED';
+            }
+
             // Excluir description_json, description_html y updated_at del historial de actividades
             $relevantChanges = collect($changes)->except(['description_json', 'description_html', 'updated_at'])->all();
 
@@ -343,6 +412,49 @@ class WorkItemService
                     'action' => $action,
                     'changes_diff' => $relevantChanges,
                 ]);
+            }
+
+            // Notificar impedimento si aplica
+            if ($action === 'BLOCKED') {
+                try {
+                    $recipientIds = collect();
+                    $projectLeadId = $workItem->project?->lead_id;
+                    if ($projectLeadId) {
+                        $recipientIds->push($projectLeadId);
+                    } else {
+                        // Fallback a los administradores del proyecto (Scrum Masters)
+                        $adminIds = $workItem->project?->members()
+                            ->wherePivot('role', 'ADMIN')
+                            ->pluck('users.id')
+                            ->all() ?? [];
+                        $recipientIds = $recipientIds->merge($adminIds);
+                    }
+
+                    $recipientIds = $recipientIds
+                        ->filter(fn ($id) => ! empty($id) && (int) $id !== (int) $user->id)
+                        ->unique();
+
+                    if ($recipientIds->isNotEmpty()) {
+                        $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
+                        $workItemUrl = "{$frontendUrl}/projects/{$workItem->project_id}/work-items?selected={$workItem->id}";
+                        $notificationService = app(NotificationService::class);
+                        foreach ($recipientIds as $recipientId) {
+                            $notificationService->sendNotification(
+                                workspaceId: $workItem->workspace_id,
+                                recipientId: $recipientId,
+                                actorId: $user->id,
+                                type: 'BLOCKER_REPORTED',
+                                entityType: 'WORK_ITEM',
+                                entityId: $workItem->id,
+                                title: 'Impedimento reportado en tarea',
+                                message: "{$user->name} reportó un impedimento en «{$workItem->title}»: ".($workItem->blocked_reason ?: 'Sin detalle'),
+                                targetUrl: $workItemUrl
+                            );
+                        }
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('Error notificando impedimento: '.$e->getMessage());
+                }
             }
 
             // Notificar cambio de estado si aplica (In-App y Job encolado)
@@ -440,8 +552,52 @@ class WorkItemService
                 Log::warning('Error notificando nuevas asignaciones: '.$e->getMessage());
             }
 
+            if ($workItem->parent_id) {
+                try {
+                    app(WorkItemRollupService::class)->syncParentStatus($workItem);
+                } catch (Throwable $e) {
+                    Log::warning('Error en roll-up de work item: '.$e->getMessage());
+                }
+            }
+
             return $workItem->load(['state', 'type', 'assignees', 'labels', 'creator', 'lead', 'milestone', 'project', 'parent', 'subItems.state', 'subItems.lead', 'subItems.assignees', 'cycles', 'modules']);
         });
+    }
+
+    /**
+     * Reordena un work item en la lista del backlog mediante ordenamiento fraccional.
+     */
+    public function reorder(Project $project, int $itemId, ?int $beforeId, ?int $afterId): WorkItem
+    {
+        $item = WorkItem::where('project_id', $project->id)->findOrFail($itemId);
+
+        $beforeOrder = $beforeId ? WorkItem::where('project_id', $project->id)->find($beforeId)?->sort_order : null;
+        $afterOrder = $afterId ? WorkItem::where('project_id', $project->id)->find($afterId)?->sort_order : null;
+
+        $newOrder = match (true) {
+            $beforeOrder !== null && $afterOrder !== null => ($beforeOrder + $afterOrder) / 2,
+            $beforeOrder !== null => $beforeOrder + 1000.0,
+            $afterOrder !== null => max(0.0, $afterOrder - 1000.0),
+            default => 1000.0,
+        };
+
+        // Si la brecha es muy pequeña, renormalizar
+        if ($beforeOrder !== null && $afterOrder !== null && abs($beforeOrder - $afterOrder) < 0.0001) {
+            $allItems = WorkItem::where('project_id', $project->id)->orderBy('sort_order')->get();
+            $counter = 1000.0;
+            foreach ($allItems as $it) {
+                if ($it->id === $item->id) {
+                    continue;
+                }
+                $it->update(['sort_order' => $counter]);
+                $counter += 1000.0;
+            }
+            $newOrder = ($beforeOrder + $afterOrder) / 2;
+        }
+
+        $item->update(['sort_order' => $newOrder]);
+
+        return $item;
     }
 
     /**

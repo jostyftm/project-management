@@ -125,4 +125,17 @@ export const workItemService = {
       method: "DELETE",
     });
   },
+
+  reorder: async (projectId: string | number, payload: {
+    items?: { id: string | number; order: number }[];
+    item_id?: string | number;
+    before_id?: string | number | null;
+    after_id?: string | number | null;
+  }) => {
+    return httpRequestService<{ success?: boolean; data?: JsonApiItem<WorkItem> }>({
+      url: `${API_BASE_URL}/projects/${projectId}/work-items/reorder`,
+      method: "POST",
+      data: payload,
+    });
+  },
 };

@@ -9,6 +9,7 @@ use App\Models\Page;
 use App\Models\User;
 use App\Models\WorkItem;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -22,9 +23,9 @@ class CommentService
     /**
      * Create a comment on a work item or a page, with automatic mentions parsing and notifications.
      */
-    public function createComment(array $data, User $author): Comment
+    public function createComment(array $data, User $author, ?UploadedFile $file = null): Comment
     {
-        return DB::transaction(function () use ($data, $author) {
+        return DB::transaction(function () use ($data, $author, $file) {
             $workspaceId = $data['workspace_id'];
             $workItemId = $data['work_item_id'] ?? null;
             $pageId = $data['page_id'] ?? null;
@@ -65,18 +66,72 @@ class CommentService
                 $projectId = $projectId ?: $page->project_id;
             }
 
+            $caption = trim((string) ($data['caption'] ?? ''));
+            $attachments = $data['attachments'] ?? [];
+            if ($file && $projectId) {
+                $diskName = config('filesystems.default');
+                $filePath = $file->store("projects/{$projectId}/comments", $diskName);
+                $fileName = $file->getClientOriginalName();
+                $fileSize = $file->getSize();
+                $fileMime = $file->getClientMimeType();
+
+                $attachments[] = [
+                    'name' => $fileName,
+                    'file_path' => $filePath,
+                    'disk' => $diskName,
+                    'mime' => $fileMime,
+                    'size' => $fileSize,
+                    'caption' => $caption ?: null,
+                    'url' => null,
+                ];
+            }
+
+            // Determine is_work_log and type:
+            // Regla: si trae imagen/adjunto, SÓLO computa como work_log si tiene caption descriptivo (>= 5 chars)
+            $hasAttachments = ! empty($attachments);
+            $hasValidCaption = false;
+            foreach ($attachments as $att) {
+                if (! empty($att['caption']) && mb_strlen(trim($att['caption'])) >= 5) {
+                    $hasValidCaption = true;
+                    break;
+                }
+            }
+
+            $explicitWorkLog = filter_var($data['is_work_log'] ?? false, FILTER_VALIDATE_BOOLEAN) || (($data['type'] ?? '') === 'WORK_LOG');
+            $isWorkLog = $hasAttachments ? $hasValidCaption : $explicitWorkLog;
+            $commentType = $isWorkLog ? 'WORK_LOG' : 'COMMENT';
+
             $comment = Comment::create([
                 'workspace_id' => $workspaceId,
                 'project_id' => $projectId,
                 'work_item_id' => $workItemId,
                 'page_id' => $pageId,
                 'user_id' => $author->id,
+                'type' => $commentType,
+                'is_work_log' => $isWorkLog,
                 'content' => $content,
+                'attachments' => $attachments,
                 'mentioned_user_ids' => $mentionedUserIds,
             ]);
 
+            // Generar URLs públicas/locales para adjuntos
+            if (! empty($attachments)) {
+                $updatedAttachments = [];
+                foreach ($comment->attachments as $index => $att) {
+                    $att['url'] = url("/api/v1/comments/{$comment->id}/attachments/{$index}");
+                    $updatedAttachments[] = $att;
+                }
+                $comment->update(['attachments' => $updatedAttachments]);
+            }
+
             // Handle Work Item context
             if ($workItem) {
+                $action = match (true) {
+                    $hasAttachments && $hasValidCaption => 'EVIDENCE_SUBMITTED',
+                    $isWorkLog => 'WORK_LOG',
+                    default => 'COMMENTED',
+                };
+
                 // 1. Log activity
                 $this->activityService->logActivity(
                     $workspaceId,
@@ -84,10 +139,14 @@ class CommentService
                     $author->id,
                     'WORK_ITEM',
                     $workItem->id,
-                    'COMMENTED',
+                    $action,
                     [
                         'comment_id' => $comment->id,
                         'preview' => Str::limit($content, 80),
+                        'is_work_log' => $isWorkLog,
+                        'has_attachments' => $hasAttachments,
+                        'has_caption' => $hasValidCaption,
+                        'caption' => $caption ?: null,
                     ]
                 );
 

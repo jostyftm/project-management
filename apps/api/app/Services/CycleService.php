@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
+use App\Services\Agile\WorkItemReadinessEvaluator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
@@ -266,6 +267,32 @@ class CycleService
         $cycle->workItems()->syncWithoutDetaching($workItemIds);
 
         return $cycle->load('workItems');
+    }
+
+    /**
+     * Evalúa advertencias de Definition of Ready (DoR) para los ítems asociados.
+     */
+    public function getReadinessWarnings(Cycle $cycle, array $workItemIds): array
+    {
+        $evaluator = app(WorkItemReadinessEvaluator::class);
+        $items = WorkItem::whereIn('id', $workItemIds)
+            ->with(['dodItems', 'outwardRelations.target.state', 'inwardRelations.source.state'])
+            ->get();
+
+        $warnings = [];
+        foreach ($items as $item) {
+            $readiness = $evaluator->evaluate($item);
+            if (! $readiness['is_ready']) {
+                $warnings[] = [
+                    'work_item_id' => (string) $item->id,
+                    'sequence_id' => $item->sequence_id,
+                    'title' => $item->title,
+                    'missing' => $readiness['missing'],
+                ];
+            }
+        }
+
+        return $warnings;
     }
 
     /**

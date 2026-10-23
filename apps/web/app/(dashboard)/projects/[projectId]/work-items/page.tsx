@@ -20,7 +20,17 @@ import { workItemService } from "@/services/plane/workItemService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { cycleService } from "@/services/plane/cycleService";
 import { projectMemberService } from "@/services/plane/projectMemberService";
-import { WorkItemListRow, ProjectMemberOption, CycleOption } from "@/components/plane/work-items/WorkItemListRow";
+import {
+  WorkItemListRow,
+  SortableWorkItemListRow,
+  ProjectMemberOption,
+  CycleOption,
+} from "@/components/plane/work-items/WorkItemListRow";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { Project, State, WorkItem, WorkItemType, SavedView } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +45,8 @@ import { CalendarView } from "@/components/plane/views/CalendarView";
 import { GanttView } from "@/components/plane/views/GanttView";
 import { SavedViewsBar } from "@/components/plane/views/SavedViewsBar";
 import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
+import { BlockerDialog } from "@/components/plane/agile/BlockerDialog";
+import { ReadinessBadge } from "@/components/plane/agile/ReadinessBadge";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   Kanban,
@@ -51,6 +63,11 @@ import {
   ChevronRight,
   Loader2,
   FileSpreadsheet,
+  ShieldAlert,
+  AlertOctagon,
+  Clock,
+  AlertTriangle,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -90,6 +107,8 @@ function KanbanCard({
   onStateChange,
   onDelete,
   onClick,
+  onBlockerClick,
+  agingThresholdDays,
   isAdmin = true,
   canDrag = true,
   isAssigned = true,
@@ -99,6 +118,8 @@ function KanbanCard({
   onStateChange: (itemId: string | number, newStateId: string | number) => void;
   onDelete: (itemId: string | number) => void;
   onClick: (item: WorkItem) => void;
+  onBlockerClick?: (item: WorkItem) => void;
+  agingThresholdDays?: number;
   isAdmin?: boolean;
   canDrag?: boolean;
   isAssigned?: boolean;
@@ -110,6 +131,9 @@ function KanbanCard({
   });
 
   const priorityInfo = getPriorityBadge(item.priority);
+  const isAging =
+    (item.age_in_state_days ?? 0) >= (agingThresholdDays || 5) &&
+    item.state?.group === "STARTED";
 
   if (isDragging) {
     return (
@@ -128,6 +152,7 @@ function KanbanCard({
       onClick={() => onClick(item)}
       className={cn(
         "group relative bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs hover:border-indigo-300 hover:shadow-sm transition-all select-none",
+        item.is_blocked && "border-l-4 border-l-red-500 bg-red-50/15",
         canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
         !isAssigned ? "opacity-55 hover:opacity-100 transition-opacity bg-slate-50/40" : "opacity-100"
       )}
@@ -150,6 +175,23 @@ function KanbanCard({
           <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full border", priorityInfo.color)}>
             {priorityInfo.label}
           </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onBlockerClick?.(item);
+            }}
+            className={cn(
+              "size-5 transition-opacity cursor-pointer",
+              item.is_blocked
+                ? "text-red-600 hover:text-red-700 opacity-100"
+                : "text-slate-300 hover:text-amber-600 opacity-0 group-hover:opacity-100"
+            )}
+            title={item.is_blocked ? "Gestionar impedimento" : "Reportar impedimento"}
+          >
+            <ShieldAlert className="size-3" />
+          </Button>
           {isAdmin && (
             <Button
               variant="ghost"
@@ -166,9 +208,25 @@ function KanbanCard({
         </div>
       </div>
 
-      <h4 className="text-sm font-medium text-slate-900 line-clamp-2 mb-3">
+      <h4 className="text-sm font-medium text-slate-900 line-clamp-2 mb-2">
         {item.title}
       </h4>
+
+      {item.is_blocked && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onBlockerClick?.(item);
+          }}
+          className="flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-200 text-red-700 rounded text-[11px] mb-2 font-medium cursor-pointer hover:bg-red-100/80 transition-colors"
+          title={item.blocked_reason || "Impedimento reportado (Click para gestionar)"}
+        >
+          <AlertOctagon className="size-3 text-red-600 shrink-0" />
+          <span className="truncate">
+            {item.blocked_reason || "Impedimento reportado"}
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100">
         <div className="flex items-center gap-2">
@@ -181,6 +239,16 @@ function KanbanCard({
               {item.estimate_points} pts
             </span>
           ) : null}
+
+          {isAging && (
+            <span
+              className="flex items-center gap-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200"
+              title={`Esta tarea lleva ${item.age_in_state_days} días en este estado`}
+            >
+              <Clock className="size-2.5" />
+              {item.age_in_state_days}d
+            </span>
+          )}
 
           {item.sub_items && item.sub_items.length > 0 && (
             <span className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
@@ -259,6 +327,7 @@ function KanbanCardPreview({ item }: { item: WorkItem }) {
 }
 
 // Droppable Kanban Column (supports State or Priority grouping)
+// Droppable Kanban Column (supports State or Priority grouping)
 function KanbanColumn({
   columnId,
   title,
@@ -268,6 +337,8 @@ function KanbanColumn({
   onStateChange,
   onDelete,
   onCardClick,
+  onBlockerClick,
+  agingThresholdDays,
   isAdmin = true,
   canModifyItemState,
   isAssignedToMe,
@@ -280,6 +351,8 @@ function KanbanColumn({
   onStateChange: (itemId: string | number, newStateId: string | number) => void;
   onDelete: (itemId: string | number) => void;
   onCardClick: (item: WorkItem) => void;
+  onBlockerClick?: (item: WorkItem) => void;
+  agingThresholdDays?: number;
   isAdmin?: boolean;
   canModifyItemState?: (item: WorkItem) => boolean;
   isAssignedToMe?: (item: WorkItem) => boolean;
@@ -288,15 +361,21 @@ function KanbanColumn({
     id: columnId,
   });
 
+  const currentState = states.find((s) => String(s.id) === String(columnId));
+  const wipLimit = currentState?.wip_limit;
+  const isWipExceeded = wipLimit !== undefined && wipLimit !== null && wipLimit > 0 && items.length > wipLimit;
+  const isWipReached = wipLimit !== undefined && wipLimit !== null && wipLimit > 0 && items.length === wipLimit;
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col min-w-[280px] max-w-[320px] w-full bg-slate-100/70 border border-slate-200/80 rounded-xl p-3 max-h-[calc(100vh-14rem)] transition-colors",
+        "flex flex-col min-w-[280px] max-w-[320px] w-full rounded-xl p-3 max-h-[calc(100vh-14rem)] transition-colors border",
+        isWipExceeded ? "bg-red-50/30 border-red-200" : "bg-slate-100/70 border-slate-200/80",
         isOver && "bg-indigo-50/60 border-indigo-300 ring-2 ring-indigo-200"
       )}
     >
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className={cn("flex items-center justify-between mb-3 px-1", isWipExceeded && "bg-red-100/60 -mx-1 p-1 rounded-lg border border-red-200")}>
         <div className="flex items-center gap-2">
           <span
             className="size-2.5 rounded-full"
@@ -304,9 +383,28 @@ function KanbanColumn({
           />
           <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
         </div>
-        <span className="text-xs font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full shadow-xs">
-          {items.length}
-        </span>
+        <div>
+          {wipLimit && wipLimit > 0 ? (
+            <span
+              className={cn(
+                "text-xs font-bold px-2 py-0.5 rounded-full border shadow-xs flex items-center gap-1",
+                isWipExceeded
+                  ? "bg-red-100 text-red-700 border-red-300 animate-pulse"
+                  : isWipReached
+                  ? "bg-amber-100 text-amber-800 border-amber-300"
+                  : "bg-white border-slate-200 text-slate-600"
+              )}
+              title={isWipExceeded ? `Límite WIP superado (${items.length}/${wipLimit})` : `Límite WIP: ${wipLimit}`}
+            >
+              {isWipExceeded && <AlertTriangle className="size-3 text-red-600" />}
+              {items.length} / {wipLimit}
+            </span>
+          ) : (
+            <span className="text-xs font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full shadow-xs">
+              {items.length}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-2.5 pr-0.5">
@@ -323,6 +421,8 @@ function KanbanColumn({
               onStateChange={onStateChange}
               onDelete={onDelete}
               onClick={onCardClick}
+              onBlockerClick={onBlockerClick}
+              agingThresholdDays={agingThresholdDays}
               isAdmin={isAdmin}
               canDrag={canModifyItemState ? canModifyItemState(item) : isAdmin}
               isAssigned={isAssignedToMe ? isAssignedToMe(item) : true}
@@ -333,7 +433,6 @@ function KanbanColumn({
     </div>
   );
 }
-
 export default function ProjectWorkItemsPage() {
   const params = useParams();
   const router = useRouter();
@@ -356,6 +455,7 @@ export default function ProjectWorkItemsPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [stateFilter, setStateFilter] = useState<string>("ALL");
+  const [blockerModalItem, setBlockerModalItem] = useState<WorkItem | null>(null);
 
   const { user } = useAuth();
   const isAdmin = project?.current_user_role === "ADMIN";
@@ -484,10 +584,40 @@ export default function ProjectWorkItemsPage() {
     try {
       await workItemService.update(itemId, { state_id: nextStateId });
       const targetState = states.find((s) => String(s.id) === String(nextStateId));
+      if (targetState?.wip_limit && targetState.wip_limit > 0) {
+        const countInTarget = workItems.filter((i) => String(i.state_id) === String(nextStateId)).length;
+        if (countInTarget + 1 > targetState.wip_limit) {
+          toast.warning(`⚠️ Has superado el límite WIP de «${targetState.name}» (${countInTarget + 1}/${targetState.wip_limit})`);
+        }
+      }
       toast.success(`Estado cambiado a "${targetState?.name ?? 'Nuevo estado'}"`);
+      await loadData(true);
     } catch (err: any) {
-      toast.error("No se pudo actualizar el estado");
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "No se pudo actualizar el estado";
+      toast.error(errorMsg, { duration: 6000 });
       loadData(true);
+    }
+  };
+
+  const handleSaveBlocker = async (itemId: string | number, isBlocked: boolean, reason?: string | null) => {
+    try {
+      await workItemService.update(itemId, {
+        is_blocked: isBlocked,
+        blocked_reason: reason,
+      });
+      setWorkItems((prev) =>
+        prev.map((it) =>
+          String(it.id) === String(itemId)
+            ? { ...it, is_blocked: isBlocked, blocked_reason: reason }
+            : it
+        )
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Error al actualizar el estado de bloqueo");
+      throw err;
     }
   };
 
@@ -577,6 +707,7 @@ export default function ProjectWorkItemsPage() {
     try {
       await workItemService.update(itemId, payload);
       toast.success("Tarea actualizada");
+      await loadData(true);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Error al actualizar la tarea");
       loadData(true);
@@ -612,6 +743,40 @@ export default function ProjectWorkItemsPage() {
 
   const handleDragCancel = () => {
     setActiveDragItem(null);
+  };
+
+  const handleListDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = listDisplayItems.findIndex((it) => String(it.id) === String(active.id));
+    const newIndex = listDisplayItems.findIndex((it) => String(it.id) === String(over.id));
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reorderedList = arrayMove(listDisplayItems, oldIndex, newIndex);
+
+    // Optimistic local update of workItems
+    const reorderedIdsMap = new Map(reorderedList.map((item, idx) => [String(item.id), idx + 1]));
+    setWorkItems((prev) => {
+      const remaining = prev.filter((it) => !reorderedIdsMap.has(String(it.id)));
+      const updatedList = reorderedList.map((it, idx) => ({ ...it, sort_order: idx + 1 }));
+      return [...updatedList, ...remaining];
+    });
+
+    try {
+      if (projectId) {
+        const payloadItems = reorderedList.map((item, index) => ({
+          id: item.id,
+          order: index + 1,
+        }));
+        await workItemService.reorder(projectId, { items: payloadItems });
+        toast.success("Prioridad actualizada (Stack Ranking)");
+      }
+    } catch (err: any) {
+      toast.error("Error al reordenar prioridad");
+      loadData(true);
+    }
   };
 
   const handleOpenDetail = (item: WorkItem) => {
@@ -680,9 +845,16 @@ export default function ProjectWorkItemsPage() {
   }, [workItems, search, priorityFilter, typeFilter, stateFilter]);
 
   const listDisplayItems = useMemo(() => {
-    if (search.trim()) return filteredItems;
-    const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
-    return roots.length > 0 ? roots : filteredItems;
+    let items = filteredItems;
+    if (!search.trim()) {
+      const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
+      if (roots.length > 0) items = roots;
+    }
+    return [...items].sort((a, b) => {
+      const orderA = typeof a.sort_order === "number" ? a.sort_order : 999999;
+      const orderB = typeof b.sort_order === "number" ? b.sort_order : 999999;
+      return orderA - orderB;
+    });
   }, [filteredItems, search]);
 
   if (isLoading) {
@@ -932,6 +1104,8 @@ export default function ProjectWorkItemsPage() {
                       onStateChange={handleStateChange}
                       onDelete={handleDeleteItem}
                       onCardClick={handleOpenDetail}
+                      onBlockerClick={(it) => setBlockerModalItem(it)}
+                      agingThresholdDays={project?.aging_threshold_days || 5}
                       isAdmin={isAdmin}
                       canModifyItemState={canModifyItemState}
                       isAssignedToMe={isAssignedToMe}
@@ -953,6 +1127,8 @@ export default function ProjectWorkItemsPage() {
                       onStateChange={handleStateChange}
                       onDelete={handleDeleteItem}
                       onCardClick={handleOpenDetail}
+                      onBlockerClick={(it) => setBlockerModalItem(it)}
+                      agingThresholdDays={project?.aging_threshold_days || 5}
                       isAdmin={isAdmin}
                       canModifyItemState={canModifyItemState}
                       isAssignedToMe={isAssignedToMe}
@@ -969,28 +1145,55 @@ export default function ProjectWorkItemsPage() {
       {viewLayout === "list" && (
         /* Modern Two-Column List View with Expandable Subtasks and Interactive Pills */
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          {/* Header con indicador claro de Stack Ranking */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="uppercase tracking-wider text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                Stack Ranking / Backlog Priorizado ({listDisplayItems.length})
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-normal text-slate-500 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                <GripVertical className="size-3 text-slate-400" /> Arrastra para reordenar prioridad
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-normal">
+              Orden de mayor a menor prioridad
+            </div>
+          </div>
+
           {listDisplayItems.length === 0 ? (
             <div className="p-12 text-center text-sm text-slate-400">
               No hay work items que coincidan con los filtros.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {listDisplayItems.map((item) => (
-                <WorkItemListRow
-                  key={item.id}
-                  item={item}
-                  states={states}
-                  members={members}
-                  cycles={cycles}
-                  onSelect={handleOpenDetail}
-                  onUpdate={handleQuickUpdate}
-                  onDelete={handleDeleteItem}
-                  isAdmin={isAdmin}
-                  canModifyState={canModifyItemState(item)}
-                  showProjectBadge={false}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragEnd={handleListDragEnd}
+            >
+              <SortableContext
+                items={listDisplayItems.map((item) => String(item.id))}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {listDisplayItems.map((item, index) => (
+                    <SortableWorkItemListRow
+                      key={item.id}
+                      item={item}
+                      states={states}
+                      members={members}
+                      cycles={cycles}
+                      onSelect={handleOpenDetail}
+                      onUpdate={handleQuickUpdate}
+                      onDelete={handleDeleteItem}
+                      isAdmin={isAdmin}
+                      canModifyState={canModifyItemState(item)}
+                      showProjectBadge={false}
+                      rankIndex={index}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}
@@ -1045,6 +1248,14 @@ export default function ProjectWorkItemsPage() {
           }
           loadData(true);
         }}
+      />
+
+      {/* Modal para Gestión de Bloqueos e Impedimentos */}
+      <BlockerDialog
+        isOpen={!!blockerModalItem}
+        onClose={() => setBlockerModalItem(null)}
+        workItem={blockerModalItem}
+        onSaveBlocker={handleSaveBlocker}
       />
     </div>
   );

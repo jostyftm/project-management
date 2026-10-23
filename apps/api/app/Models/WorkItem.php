@@ -25,6 +25,7 @@ class WorkItem extends Model
         'state_id',
         'type_id',
         'priority',
+        'sort_order',
         'parent_id',
         'lead_id',
         'milestone_id',
@@ -33,7 +34,12 @@ class WorkItem extends Model
         'start_date',
         'target_date',
         'completed_at',
+        'state_changed_at',
         'is_draft',
+        'is_blocked',
+        'blocked_reason',
+        'blocked_at',
+        'blocked_by_user_id',
         'created_by',
     ];
 
@@ -43,10 +49,14 @@ class WorkItem extends Model
             'sequence_id' => 'integer',
             'description_json' => 'array',
             'estimate_points' => 'float',
+            'sort_order' => 'float',
             'start_date' => 'date',
             'target_date' => 'date',
             'completed_at' => 'datetime',
+            'state_changed_at' => 'datetime',
             'is_draft' => 'boolean',
+            'is_blocked' => 'boolean',
+            'blocked_at' => 'datetime',
         ];
     }
 
@@ -73,6 +83,11 @@ class WorkItem extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function blockedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'blocked_by_user_id');
     }
 
     public function lead(): BelongsTo

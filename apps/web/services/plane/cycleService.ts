@@ -1,6 +1,6 @@
 import { API_BASE_URL } from "@/config/enviroments";
 import { httpRequestService } from "@/lib/request";
-import { Cycle, CycleAnalytics } from "@/types/plane-types";
+import { Cycle, CycleAnalytics, SprintPlanning } from "@/types/plane-types";
 
 interface JsonApiItem<T> {
   id: string;
@@ -92,6 +92,14 @@ export const cycleService = {
   getAnalytics: async (cycleId: string | number) => {
     const res = await httpRequestService<{ data: CycleAnalytics }>({
       url: `${API_BASE_URL}/cycles/${cycleId}/analytics`,
+      method: "GET",
+    });
+    return res.data;
+  },
+
+  planning: async (cycleId: string | number) => {
+    const res = await httpRequestService<{ data: SprintPlanning }>({
+      url: `${API_BASE_URL}/cycles/${cycleId}/planning`,
       method: "GET",
     });
     return res.data;

@@ -36,6 +36,8 @@ import {
 import { WorkItemGitHubWidget } from "@/components/plane/work-items/WorkItemGitHubWidget";
 import { WorkItemSubtasksSection } from "@/components/plane/work-items/WorkItemSubtasksSection";
 import { WorkItemDeliverablesSection } from "@/components/plane/work-items/WorkItemDeliverablesSection";
+import { ReadinessBadge } from "@/components/plane/agile/ReadinessBadge";
+import { BlockerDialog } from "@/components/plane/agile/BlockerDialog";
 import { Project, State, WorkItem, WorkItemType, Cycle, Module, Milestone } from "@/types/plane-types";
 import {
   Plus,
@@ -50,6 +52,9 @@ import {
   Check,
   GitBranch,
   Paperclip,
+  ShieldAlert,
+  AlertOctagon,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -272,6 +277,7 @@ export function WorkItemDetailSheet({
 
   const { user } = useAuth();
   const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+  const [blockerDialogOpen, setBlockerDialogOpen] = useState(false);
 
   const effectiveProject: Project | null = project || internalProject || (item?.project as unknown as Project) || null;
   const effectiveStates = states && states.length > 0 ? states : internalStates;
@@ -302,11 +308,23 @@ export function WorkItemDetailSheet({
   // Allow admins, assignees, leads, creators, project members, or users in personal views (no fixed project prop) to change state
   const canChangeState = isAdmin || isAssignee || isCreator || isProjectMember || !project;
 
+  const handleSaveBlocker = async (itemId: string | number, isBlocked: boolean, reason?: string | null) => {
+    await workItemService.update(itemId, {
+      is_blocked: isBlocked,
+      blocked_reason: reason,
+    });
+    const updated = await workItemService.get(itemId);
+    setItem(updated);
+    onUpdated(updated);
+  };
+
   // Quick update helper for structured properties (shows toast)
   const handleUpdateField = async (payload: Partial<WorkItem> & Record<string, any>) => {
     if (!item) return;
-    const isStateOnly = Object.keys(payload).length === 1 && "state_id" in payload;
-    if (!isAdmin && (!canChangeState || !isStateOnly)) return;
+    const isAllowedForNonAdmin = canChangeState && Object.keys(payload).every((k) =>
+      ["state_id", "is_blocked", "blocked_reason"].includes(k)
+    );
+    if (!isAdmin && !isAllowedForNonAdmin) return;
 
     try {
       const updated = await workItemService.update(item.id, payload);
@@ -319,8 +337,10 @@ export function WorkItemDetailSheet({
       }));
       toast.success("Tarea actualizada correctamente");
       onUpdated(updated);
-    } catch {
-      toast.error("Error al actualizar");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Error al actualizar la tarea", {
+        duration: 6000,
+      });
     }
   };
 
@@ -443,58 +463,87 @@ export function WorkItemDetailSheet({
         {/* Header: Identifier, Type, Switcher, Title */}
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className={cn(
-            "flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap",
+            "flex flex-col gap-2.5",
+            activeMode === "page" && "sm:flex-row sm:items-center sm:justify-between",
             activeMode !== "page" && "pr-10 sm:pr-12"
           )}>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded">
+            {/* Fila 1: Metadatos del ítem (Identificador, Tipo y Definition of Ready) */}
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded shrink-0">
                 {item.identifier}
               </span>
 
               {/* Work Item Type Selector */}
-              <Select
-                value={typeId}
-                disabled={!isAdmin}
-                onValueChange={(val) => {
-                  setTypeId(val);
-                  handleUpdateField({ type_id: val });
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 disabled:opacity-75 disabled:cursor-not-allowed">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
-                        <span>{t.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="shrink-0 max-w-[140px]">
+                <Select
+                  value={typeId}
+                  disabled={!isAdmin}
+                  onValueChange={(val) => {
+                    setTypeId(val);
+                    handleUpdateField({ type_id: val });
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 disabled:opacity-75 disabled:cursor-not-allowed">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {types.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                          <span>{t.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Definition of Ready Badge */}
+              <div className="shrink-0">
+                <ReadinessBadge readiness={item.readiness} />
+              </div>
             </div>
 
-            {/* View Mode Switcher and Git Branch Modal Button */}
-            <div className="flex items-center gap-2">
-              {(canChangeState || isAdmin) && (
+            {/* Fila 2: Acciones rápidas (Bloqueo, Rama Git, Selector de Modos) */}
+            <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={item.is_blocked ? "destructive" : "outline"}
                   size="sm"
-                  onClick={() => setIsGitModalOpen(true)}
-                  className="h-7 text-xs px-2.5 font-mono gap-1.5 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                  title="Abrir modal para crear rama o copiar comando Git para terminal local"
+                  onClick={() => setBlockerDialogOpen(true)}
+                  className={cn(
+                    "h-7 text-xs px-2.5 gap-1.5 shrink-0",
+                    !item.is_blocked && "text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-red-50 hover:text-red-700"
+                  )}
+                  title={item.is_blocked ? "Gestionar impedimento" : "Reportar impedimento / bloqueo"}
                 >
-                  <GitBranch className="size-3 text-indigo-600 dark:text-indigo-400" />
-                  <span>Rama Git</span>
+                  <ShieldAlert className="size-3" />
+                  <span>{item.is_blocked ? "Bloqueada" : "Bloqueo"}</span>
                 </Button>
-              )}
-              <WorkItemViewModeSwitcher
-                currentMode={activeMode}
-                onChangeMode={handleModeSwitch}
-              />
+
+                {(canChangeState || isAdmin) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsGitModalOpen(true)}
+                    className="h-7 text-xs px-2.5 font-mono gap-1.5 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 shrink-0"
+                    title="Abrir modal para crear rama o copiar comando Git para terminal local"
+                  >
+                    <GitBranch className="size-3 text-indigo-600 dark:text-indigo-400" />
+                    <span>Rama Git</span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="shrink-0">
+                <WorkItemViewModeSwitcher
+                  currentMode={activeMode}
+                  onChangeMode={handleModeSwitch}
+                />
+              </div>
             </div>
           </div>
 
@@ -518,6 +567,45 @@ export function WorkItemDetailSheet({
             />
           </div>
         </div>
+
+        {/* Impediment (Blocker) Banner */}
+        {item.is_blocked && (
+          <div className="flex items-center justify-between gap-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl text-xs text-red-800 dark:text-red-200 shadow-2xs">
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertOctagon className="size-4 text-red-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 min-w-0">
+                <span className="font-bold block">Impedimento Activo:</span>
+                <p className="text-red-700 dark:text-red-300 italic truncate">
+                  "{item.blocked_reason || "Sin detalle especificado"}"
+                </p>
+                {item.blocked_at && (
+                  <span className="text-[10px] text-red-500 block">
+                    Reportado: {new Date(item.blocked_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setBlockerDialogOpen(true)}
+              className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-100 shrink-0 cursor-pointer"
+            >
+              Gestionar
+            </Button>
+          </div>
+        )}
+
+        {/* Aging Task Alert */}
+        {Boolean(item.age_in_state_days && item.age_in_state_days >= 5 && item.state?.group === 'STARTED') && (
+          <div className="flex items-center gap-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl text-xs text-amber-800 dark:text-amber-200">
+            <Clock className="size-4 text-amber-600 shrink-0" />
+            <span>
+              Esta tarea lleva <strong>{item.age_in_state_days} días</strong> en curso en el estado «{item.state?.name}». Considera revisar cuellos de botella o desglosarla.
+            </span>
+          </div>
+        )}
 
         {/* Quick Access Evidence Banner */}
         {((item.deliverables?.length ?? 0) > 0 || (item.deliverables_count ?? 0) > 0) && (
@@ -1039,6 +1127,14 @@ export function WorkItemDetailSheet({
             }}
           />
         )}
+
+        {/* Blocker Modal */}
+        <BlockerDialog
+          isOpen={blockerDialogOpen}
+          onClose={() => setBlockerDialogOpen(false)}
+          workItem={item}
+          onSaveBlocker={handleSaveBlocker}
+        />
       </div>
     );
   };

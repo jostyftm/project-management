@@ -8,10 +8,12 @@ use App\Http\Requests\Project\ProjectCreateRequest;
 use App\Http\Requests\Project\ProjectListRequest;
 use App\Http\Requests\Project\ProjectUpdateRequest;
 use App\Http\Requests\Project\StateCreateRequest;
+use App\Http\Requests\Project\StateUpdateRequest;
 use App\Http\Resources\Project\LabelResource;
 use App\Http\Resources\Project\ProjectResource;
 use App\Http\Resources\Project\StateResource;
 use App\Models\Project;
+use App\Models\State;
 use App\Services\ProjectService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -87,6 +89,16 @@ class ProjectController extends Controller
     public function storeState(StateCreateRequest $request, Project $project): JsonResource
     {
         $state = $this->projectService->createState($request, $project);
+
+        return new StateResource($state);
+    }
+
+    /**
+     * Actualizar estado del proyecto (límite WIP, nombre, color).
+     */
+    public function updateState(StateUpdateRequest $request, Project $project, State $state): JsonResource
+    {
+        $state = $this->projectService->updateState($request, $project, $state);
 
         return new StateResource($state);
     }

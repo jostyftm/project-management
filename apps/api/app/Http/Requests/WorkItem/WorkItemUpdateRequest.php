@@ -83,6 +83,9 @@ class WorkItemUpdateRequest extends FormRequest
              * Borrador
              */
             'is_draft' => ['sometimes', 'boolean'],
+            'is_blocked' => ['sometimes', 'boolean'],
+            'blocked_reason' => ['nullable', 'string', 'max:1000'],
+            'sort_order' => ['sometimes', 'numeric'],
             'type_id' => ['nullable', 'exists:work_item_types,id'],
             'lead_id' => ['nullable', 'exists:users,id'],
             'milestone_id' => ['nullable', 'exists:milestones,id'],

@@ -2,7 +2,10 @@
 
 import React, { useState } from "react";
 import { WorkItem, State, User as UserType } from "@/types/plane-types";
+import { ReadinessBadge } from "@/components/plane/agile/ReadinessBadge";
 import { cn } from "@/lib/utils";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronRight,
   GitBranch,
@@ -19,6 +22,9 @@ import {
   CircleSlash,
   ChevronDown,
   Paperclip,
+  Clock,
+  ShieldAlert,
+  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,7 +52,7 @@ export interface CycleOption {
   status?: string;
 }
 
-interface WorkItemListRowProps {
+export interface WorkItemListRowProps {
   item: WorkItem;
   states: State[];
   members?: ProjectMemberOption[];
@@ -58,6 +64,8 @@ interface WorkItemListRowProps {
   canModifyState?: boolean;
   showProjectBadge?: boolean;
   isSubtask?: boolean;
+  rankIndex?: number;
+  dragHandleProps?: React.HTMLAttributes<any>;
 }
 
 const PRIORITY_OPTIONS = [
@@ -113,6 +121,8 @@ export function WorkItemListRow({
   canModifyState = true,
   showProjectBadge = false,
   isSubtask = false,
+  rankIndex,
+  dragHandleProps,
 }: WorkItemListRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
@@ -176,7 +186,27 @@ export function WorkItemListRow({
         )}
       >
         {/* COLUMNA 1: Identificador, Nombre y Jerarquía */}
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Stack Ranking Drag Handle & Rank Badge */}
+          {!isSubtask && (
+            <div
+              {...(dragHandleProps || {})}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "flex items-center gap-1 shrink-0 -ml-1 px-1 py-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+                dragHandleProps ? "cursor-grab active:cursor-grabbing touch-none" : "cursor-default"
+              )}
+              title="Arrastrar para reordenar prioridad (Stack Ranking)"
+            >
+              <GripVertical className="size-4 shrink-0 text-slate-400" />
+              {typeof rankIndex === "number" && (
+                <span className="text-[11px] font-mono font-medium text-slate-400 dark:text-slate-500 min-w-4 text-center shrink-0">
+                  #{rankIndex + 1}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Subtasks expand/collapse toggle */}
           {hasSubtasks ? (
             <button
@@ -196,11 +226,11 @@ export function WorkItemListRow({
               />
             </button>
           ) : isSubtask ? (
-            <div className="size-4 shrink-0 flex items-center justify-center text-slate-300 dark:text-slate-700">
+            <div className="size-4 shrink-0 flex items-center justify-center text-slate-300 dark:text-slate-700 ml-4">
               <span className="w-2.5 h-px bg-slate-300 dark:bg-slate-700" />
             </div>
           ) : (
-            <div className="size-6 -ml-1 shrink-0" />
+            <div className="size-1 shrink-0" />
           )}
 
           {/* Identifier badge */}
@@ -233,6 +263,35 @@ export function WorkItemListRow({
           <span className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {item.title}
           </span>
+
+          {/* DoR Badge */}
+          {item.readiness && (
+            <span className="hidden lg:inline-flex shrink-0">
+              <ReadinessBadge readiness={item.readiness} />
+            </span>
+          )}
+
+          {/* Blocker Badge */}
+          {item.is_blocked && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded shrink-0"
+              title={item.blocked_reason || "Impedimento activo"}
+            >
+              <AlertOctagon className="size-2.5 text-red-600" />
+              <span>Bloqueada</span>
+            </span>
+          )}
+
+          {/* Aging Badge */}
+          {Boolean(item.age_in_state_days && item.age_in_state_days >= 5 && item.state?.group === 'STARTED') && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded shrink-0"
+              title={`Lleva ${item.age_in_state_days} días en curso`}
+            >
+              <Clock className="size-2.5 text-amber-600" />
+              <span>{item.age_in_state_days}d</span>
+            </span>
+          )}
 
           {/* Subtasks count badge */}
           {hasSubtasks && (
@@ -578,6 +637,34 @@ export function WorkItemListRow({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+export function SortableWorkItemListRow(props: WorkItemListRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: String(props.item.id) });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex: isDragging ? 20 : undefined,
+    position: "relative",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <WorkItemListRow
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
     </div>
   );
 }

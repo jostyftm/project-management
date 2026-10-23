@@ -17,6 +17,10 @@ class CycleResource extends JsonResource
             'attributes' => [
                 'name' => $this->name,
                 'description' => $this->description,
+                'sprint_goal' => $this->sprint_goal,
+                'capacity_points' => $this->capacity_points ? (float) $this->capacity_points : null,
+                'committed_points' => (float) $this->workItems->sum(fn ($i) => (float) ($i->estimate_points ?? 0)),
+                'completed_points' => (float) $this->workItems->filter(fn ($i) => in_array($i->state?->group, ['COMPLETED', 'CANCELLED']))->sum(fn ($i) => (float) ($i->estimate_points ?? 0)),
                 'start_date' => $this->start_date?->format('Y-m-d'),
                 'end_date' => $this->end_date?->format('Y-m-d'),
                 'status' => $this->status,

@@ -48,6 +48,7 @@ class StateCreateRequest extends FormRequest
              * @example false
              */
             'is_default' => ['sometimes', 'boolean'],
+            'wip_limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
 }

@@ -31,6 +31,7 @@ class ProjectMemberController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->pivot->role ?? 'MEMBER',
+                    'capacity_points' => $user->pivot->capacity_points ? (float) $user->pivot->capacity_points : null,
                     'joined_at' => $user->pivot->created_at?->toISOString(),
                 ]),
                 'invitations' => $invitations->map(fn ($inv) => [
@@ -72,7 +73,7 @@ class ProjectMemberController extends Controller
         $member = $this->memberService->updateMemberRole(
             $project,
             $userId,
-            $request->validated('role')
+            $request->validated()
         );
 
         return response()->json([
@@ -80,8 +81,9 @@ class ProjectMemberController extends Controller
                 'id' => (string) $member->id,
                 'user_id' => (string) $member->user_id,
                 'role' => $member->role,
+                'capacity_points' => $member->capacity_points ? (float) $member->capacity_points : null,
             ],
-            'message' => 'Rol actualizado con éxito.',
+            'message' => 'Miembro actualizado con éxito.',
         ]);
     }
 

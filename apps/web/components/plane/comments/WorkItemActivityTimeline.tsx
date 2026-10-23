@@ -6,6 +6,8 @@ import { commentService } from "@/services/plane/commentService";
 import { activityService } from "@/services/plane/activityService";
 import { projectMemberService, ProjectMemberUser } from "@/services/plane/projectMemberService";
 import { useAuth } from "@/hooks/use-auth";
+import { storage } from "@/lib/storage";
+import { ACCESS_TOKEN } from "@/config/constants";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,6 +21,12 @@ import {
   ArrowRight,
   AtSign,
   User as UserIcon,
+  Image as ImageIcon,
+  Paperclip,
+  X,
+  ExternalLink,
+  AlertCircle,
+  FileCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -83,6 +91,52 @@ export function WorkItemActivityTimeline({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStartIndex, setMentionStartIndex] = useState<number>(-1);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+
+  // Attachment state (Image / screenshot upload)
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten archivos de imagen como evidencia (PNG, JPG, WebP, etc.)");
+      return;
+    }
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setAttachedFile(file);
+    setFilePreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf("image") !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          handleFileChange(file);
+          toast.info("Captura de pantalla pegada. Agrega una descripción (mín. 5 letras) para validarla como avance.");
+        }
+        break;
+      }
+    }
+  };
+
+  const removeAttachment = () => {
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setAttachedFile(null);
+    setFilePreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -254,24 +308,41 @@ export function WorkItemActivityTimeline({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || isSubmitting) return;
+    if ((!newComment.trim() && !attachedFile) || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
+      const captionText = newComment.trim();
+      const isWorkLog = attachedFile ? captionText.length >= 5 : false;
+
       const created = await commentService.create({
-        content: newComment.trim(),
+        content: captionText || (attachedFile ? "Evidencia adjunta" : ""),
         work_item_id: workItemId || undefined,
         page_id: pageId || undefined,
         project_id: projectId || undefined,
+        attachment: attachedFile || undefined,
+        caption: captionText,
+        type: attachedFile ? "WORK_LOG" : "COMMENT",
+        is_work_log: isWorkLog,
       });
 
       setComments((prev) => [...prev, created]);
       setNewComment("");
+      removeAttachment();
       setMentionQuery(null);
       setMentionStartIndex(-1);
-      toast.success("Comentario publicado");
+
+      if (attachedFile) {
+        if (isWorkLog) {
+          toast.success("Evidencia de trabajo registrada exitosamente (computa como día de trabajo)");
+        } else {
+          toast.warning("Imagen adjuntada. Sin descripción de al menos 5 letras no computará como día de trabajo.");
+        }
+      } else {
+        toast.success("Comentario publicado");
+      }
     } catch {
-      toast.error("Error al publicar comentario");
+      toast.error("Error al publicar comentario o evidencia");
     } finally {
       setIsSubmitting(false);
     }
@@ -332,6 +403,30 @@ export function WorkItemActivityTimeline({
         return (
           <span>
             <strong>{actorName}</strong> actualizó los miembros asignados
+          </span>
+        );
+      case "EVIDENCE_SUBMITTED":
+        return (
+          <span>
+            <strong>{actorName}</strong> adjuntó una <strong className="text-emerald-700 dark:text-emerald-400">evidencia gráfica</strong> con avance de trabajo
+          </span>
+        );
+      case "WORK_LOG":
+        return (
+          <span>
+            <strong>{actorName}</strong> registró un <strong className="text-indigo-700 dark:text-indigo-400">avance de trabajo</strong>
+          </span>
+        );
+      case "DELIVERABLE_ADDED":
+        return (
+          <span>
+            <strong>{actorName}</strong> añadió un <strong className="text-blue-700 dark:text-blue-400">entregable formal</strong> a la tarea
+          </span>
+        );
+      case "DOD_COMPLETED":
+        return (
+          <span>
+            <strong>{actorName}</strong> completó un <strong className="text-emerald-700 dark:text-emerald-400">criterio de aceptación (DoD)</strong>
           </span>
         );
       default:
@@ -398,6 +493,19 @@ export function WorkItemActivityTimeline({
                     <span className="font-bold text-slate-800 dark:text-slate-200">
                       {comment.user?.name || "Usuario"}
                     </span>
+
+                    {/* Badge de tipo de comentario / evidencia */}
+                    {comment.is_work_log ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="size-2.5 text-emerald-600" />
+                        Evidencia de Trabajo
+                      </span>
+                    ) : comment.attachments && comment.attachments.length > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-normal bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200">
+                        <Paperclip className="size-2.5" />
+                        Adjunto casual (sin caption)
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="flex items-center gap-2 text-[10px] text-slate-400">
@@ -420,6 +528,47 @@ export function WorkItemActivityTimeline({
                 <div className="text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line pl-8">
                   {renderCommentContent(comment.content)}
                 </div>
+
+                {/* Renderizar imágenes y adjuntos */}
+                {comment.attachments && comment.attachments.length > 0 && (
+                  <div className="pl-8 pt-2 flex flex-wrap gap-2">
+                    {comment.attachments.map((att, attIdx) => {
+                      const token = storage.get(ACCESS_TOKEN);
+                      const finalUrl = att.url?.includes("?")
+                        ? `${att.url}&token=${token}`
+                        : `${att.url}?token=${token}`;
+                      return (
+                        <div
+                          key={attIdx}
+                          className="group relative border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-900 max-w-xs shadow-sm hover:shadow transition-shadow"
+                        >
+                          <a
+                            href={finalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <img
+                              src={finalUrl}
+                              alt={att.original_name || att.name || "Evidencia adjunta"}
+                              className="max-h-48 w-full object-cover group-hover:opacity-95 transition-opacity"
+                              loading="lazy"
+                            />
+                            <div className="p-1.5 bg-white/95 dark:bg-slate-900/95 flex items-center justify-between gap-1 text-[10px] text-slate-600 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
+                              <span
+                                className="truncate max-w-[180px] font-medium"
+                                title={att.original_name || att.name}
+                              >
+                                {att.original_name || att.name}
+                              </span>
+                              <ExternalLink className="size-2.5 text-slate-400 group-hover:text-indigo-600 shrink-0" />
+                            </div>
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })
@@ -488,25 +637,113 @@ export function WorkItemActivityTimeline({
         </div>
       )}
 
-      {/* Comment Input */}
+      {/* Comment & Evidence Input */}
       <form onSubmit={handleSubmit} className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+        {/* Preview de imagen adjunta y validación de caption */}
+        {attachedFile && (
+          <div className="p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {filePreviewUrl && (
+                  <img
+                    src={filePreviewUrl}
+                    alt="Preview"
+                    className="size-10 rounded-md object-cover border border-indigo-200 shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                    {attachedFile.name}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {(attachedFile.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={removeAttachment}
+                className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-white transition-colors cursor-pointer"
+                title="Quitar imagen"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Banner de regla estricta: Caption >= 5 chars */}
+            <div
+              className={cn(
+                "px-2.5 py-1.5 rounded-lg text-[11px] flex items-center gap-1.5 font-medium transition-colors",
+                newComment.trim().length >= 5
+                  ? "bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                  : "bg-amber-100/70 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+              )}
+            >
+              {newComment.trim().length >= 5 ? (
+                <>
+                  <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                  <span>
+                    <strong>Evidencia válida:</strong> La descripción ({newComment.trim().length} car.) computará como avance y día de trabajo.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="size-3.5 text-amber-600 shrink-0" />
+                  <span>
+                    <strong>Atención:</strong> Agrega una descripción (mín. 5 letras) en el campo de texto para que compute como día de trabajo.
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <Textarea
           ref={textareaRef}
-          placeholder="Escribe un comentario... Usa @ para autocompletar compañeros del proyecto"
+          placeholder={
+            attachedFile
+              ? "Describe el avance realizado en esta captura (mínimo 5 letras)..."
+              : "Escribe un comentario o pega una captura con Ctrl+V... Usa @ para mencionar"
+          }
           value={newComment}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           rows={2}
           className="text-xs resize-none bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
         />
 
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400">
-            Escribe <strong>@</strong> para autocompletar · Markdown compatible
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileChange(file);
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-8 text-xs text-slate-600 hover:text-indigo-600 border-slate-200 gap-1.5 cursor-pointer"
+              title="Adjuntar imagen o captura de pantalla"
+            >
+              <ImageIcon className="size-3.5" />
+              <span>Adjuntar Evidencia</span>
+            </Button>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              o pega con <strong>Ctrl+V</strong>
+            </span>
+          </div>
+
           <Button
             type="submit"
-            disabled={!newComment.trim() || isSubmitting}
+            disabled={(!newComment.trim() && !attachedFile) || isSubmitting}
             size="sm"
             className="h-8 bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold cursor-pointer"
           >
@@ -515,7 +752,7 @@ export function WorkItemActivityTimeline({
             ) : (
               <Send className="size-3.5" />
             )}
-            <span>Comentar</span>
+            <span>{attachedFile ? "Enviar Evidencia" : "Comentar"}</span>
           </Button>
         </div>
       </form>

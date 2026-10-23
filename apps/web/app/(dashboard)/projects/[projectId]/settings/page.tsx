@@ -22,6 +22,7 @@ import { ProjectMembersTab } from "@/components/plane/projects/ProjectMembersTab
 import { ProjectNotFoundView } from "@/components/plane/ProjectNotFoundView";
 import { ProjectGitHubSettingsTab } from "@/components/plane/integrations/ProjectGitHubSettingsTab";
 import { SlackSettingsTab } from "@/components/plane/integrations/SlackSettingsTab";
+import { AgilePracticesTab } from "@/components/plane/settings/AgilePracticesTab";
 import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectModal";
 import { ProjectBreadcrumb } from "@/components/plane/common/ProjectBreadcrumb";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -35,6 +36,7 @@ import {
   MessageSquare,
   Settings,
   AlertTriangle,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -157,6 +159,10 @@ export default function ProjectSettingsPage() {
           <TabsTrigger value="general" className="text-xs gap-1.5">
             <Settings className="size-3.5" />
             General y Estimaciones
+          </TabsTrigger>
+          <TabsTrigger value="agile" className="text-xs gap-1.5">
+            <Target className="size-3.5" />
+            Prácticas Ágiles (WIP & Roll-up)
           </TabsTrigger>
           <TabsTrigger value="members" className="text-xs gap-1.5">
             <Users className="size-3.5" />
@@ -317,6 +323,15 @@ export default function ProjectSettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab Agile: WIP Limits, Aging & Rollup */}
+        <TabsContent value="agile" className="space-y-6 mt-0">
+          <AgilePracticesTab
+            projectId={projectId}
+            project={project}
+            onProjectUpdated={(up) => setProject(up)}
+          />
         </TabsContent>
 
         {/* Tab 2: Project Members */}
