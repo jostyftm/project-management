@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { workItemService } from "@/services/plane/workItemService";
 import { cycleService } from "@/services/plane/cycleService";
@@ -55,6 +56,7 @@ import {
   ShieldAlert,
   AlertOctagon,
   Clock,
+  Calendar,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -124,6 +126,10 @@ export function WorkItemDetailSheet({
   const [moduleId, setModuleId] = useState<string>("");
   const [milestoneId, setMilestoneId] = useState<string>("");
   const [leadId, setLeadId] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [targetDate, setTargetDate] = useState<string>("");
+  const [startCalOpen, setStartCalOpen] = useState(false);
+  const [dueCalOpen, setDueCalOpen] = useState(false);
   const [selectedSubItemId, setSelectedSubItemId] = useState<string | number | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<string>("deliverables");
 
@@ -263,6 +269,9 @@ export function WorkItemDetailSheet({
 
         const rawLeadId = (itemData as any).lead_id || (itemData as any).lead?.id || "";
         setLeadId(rawLeadId ? String(rawLeadId) : "");
+
+        setStartDate(itemData.start_date ? itemData.start_date.substring(0, 10) : "");
+        setTargetDate(itemData.target_date ? itemData.target_date.substring(0, 10) : "");
       } catch {
         toast.error("Error al cargar los detalles del work item");
       } finally {
@@ -335,6 +344,12 @@ export function WorkItemDetailSheet({
         cycles: updated.cycles?.length ? updated.cycles : (prev?.cycles ?? []),
         modules: updated.modules?.length ? updated.modules : (prev?.modules ?? []),
       }));
+      if (updated.start_date !== undefined) {
+        setStartDate(updated.start_date ? updated.start_date.substring(0, 10) : "");
+      }
+      if (updated.target_date !== undefined) {
+        setTargetDate(updated.target_date ? updated.target_date.substring(0, 10) : "");
+      }
       toast.success("Tarea actualizada correctamente");
       onUpdated(updated);
     } catch (err: any) {
@@ -342,6 +357,46 @@ export function WorkItemDetailSheet({
         duration: 6000,
       });
     }
+  };
+
+  const formatDateDisplay = (dateStr?: string | null, fallback = "Sin definir") => {
+    if (!dateStr) return fallback;
+    try {
+      const d = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString("es-ES", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const handleDateChange = async (field: "start_date" | "target_date", newDate: string | null) => {
+    if (!isAdmin) {
+      toast.error("Solo los administradores del proyecto pueden modificar las fechas");
+      return;
+    }
+
+    const cleanDate = newDate?.trim() || null;
+
+    if (field === "start_date") {
+      if (cleanDate && targetDate && cleanDate > targetDate) {
+        toast.error("La fecha de inicio no puede ser posterior a la fecha de vencimiento");
+        return;
+      }
+      setStartDate(cleanDate || "");
+    } else {
+      if (cleanDate && startDate && cleanDate < startDate) {
+        toast.error("La fecha de vencimiento no puede ser anterior a la fecha de inicio");
+        return;
+      }
+      setTargetDate(cleanDate || "");
+    }
+
+    await handleUpdateField({ [field]: cleanDate });
   };
 
   // Debounced and silent description saving (NO toast on success)
@@ -446,6 +501,9 @@ export function WorkItemDetailSheet({
   };
 
   const estimateSystem = effectiveProject?.estimate_system || "FIBONACCI";
+  const currentState = effectiveStates.find((s) => String(s.id) === String(stateId)) || item?.state;
+  const isCompletedOrCancelled = ["COMPLETED", "CANCELLED"].includes(currentState?.group?.toUpperCase() || "");
+  const isOverdue = Boolean(targetDate && !isCompletedOrCancelled && new Date(`${targetDate}T23:59:59`).getTime() < Date.now());
 
   // Inner form content reused across Sheet, Modal, and Page
   const renderInnerContent = () => {
@@ -856,6 +914,117 @@ export function WorkItemDetailSheet({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* 7. Fecha de inicio */}
+          <div className="flex items-center justify-between gap-3 p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+            <span className="text-slate-500 dark:text-slate-400 font-medium shrink-0 w-28 flex items-center gap-1.5">
+              <Calendar className="size-3 text-slate-400" /> Fecha inicio:
+            </span>
+            <Popover open={startCalOpen} onOpenChange={isAdmin ? setStartCalOpen : undefined}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  title={!isAdmin ? "Solo los administradores del proyecto pueden modificar las fechas" : "Modificar fecha de inicio"}
+                  className={cn(
+                    "h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs rounded-md px-2.5 flex items-center justify-between text-left transition-all",
+                    !isAdmin ? "cursor-not-allowed opacity-75" : "hover:border-indigo-300 dark:hover:border-indigo-700 cursor-pointer",
+                    startDate ? "font-medium text-slate-900 dark:text-slate-100" : "text-slate-400"
+                  )}
+                >
+                  <span className="truncate">{formatDateDisplay(startDate, "Sin definir")}</span>
+                  <Calendar className="size-3 text-slate-400 shrink-0 ml-1.5" />
+                </button>
+              </PopoverTrigger>
+              {isAdmin && (
+                <PopoverContent align="end" className="w-56 p-3 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 z-[100]">
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Fecha de inicio</div>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    max={targetDate || undefined}
+                    onChange={(e) => {
+                      setStartCalOpen(false);
+                      handleDateChange("start_date", e.target.value || null);
+                    }}
+                    className="h-8 text-xs"
+                  />
+                  {startDate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setStartCalOpen(false);
+                        handleDateChange("start_date", null);
+                      }}
+                      className="w-full mt-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                    >
+                      Limpiar fecha
+                    </Button>
+                  )}
+                </PopoverContent>
+              )}
+            </Popover>
+          </div>
+
+          {/* 8. Fecha de vencimiento */}
+          <div className="flex items-center justify-between gap-3 p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+            <span className="text-slate-500 dark:text-slate-400 font-medium shrink-0 w-28 flex items-center gap-1.5">
+              <Clock className="size-3 text-slate-400" /> Vencimiento:
+            </span>
+            <Popover open={dueCalOpen} onOpenChange={isAdmin ? setDueCalOpen : undefined}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  title={!isAdmin ? "Solo los administradores del proyecto pueden modificar las fechas" : (isOverdue ? "Tarea con fecha límite vencida. Clic para modificar fecha de vencimiento" : "Modificar fecha de vencimiento")}
+                  className={cn(
+                    "h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs rounded-md px-2.5 flex items-center justify-between text-left transition-all",
+                    !isAdmin ? "cursor-not-allowed opacity-75" : "hover:border-indigo-300 dark:hover:border-indigo-700 cursor-pointer",
+                    isOverdue
+                      ? "border-red-200 dark:border-red-900/60 bg-red-50/40 dark:bg-red-950/30 text-red-700 dark:text-red-400 font-semibold"
+                      : (targetDate ? "font-medium text-slate-900 dark:text-slate-100" : "text-slate-400")
+                  )}
+                >
+                  <span className="truncate flex items-center gap-1">
+                    {formatDateDisplay(targetDate, "Sin definir")}
+                    {isOverdue && <span className="text-[10px] text-red-600 dark:text-red-400 font-bold ml-1">(Vencida)</span>}
+                  </span>
+                  <Clock className={cn("size-3 shrink-0 ml-1.5", isOverdue ? "text-red-500" : "text-slate-400")} />
+                </button>
+              </PopoverTrigger>
+              {isAdmin && (
+                <PopoverContent align="end" className="w-56 p-3 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 z-[100]">
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Fecha de vencimiento</div>
+                  <Input
+                    type="date"
+                    value={targetDate}
+                    min={startDate || undefined}
+                    onChange={(e) => {
+                      setDueCalOpen(false);
+                      handleDateChange("target_date", e.target.value || null);
+                    }}
+                    className="h-8 text-xs"
+                  />
+                  {targetDate && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDueCalOpen(false);
+                        handleDateChange("target_date", null);
+                      }}
+                      className="w-full mt-2 h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                    >
+                      Limpiar fecha
+                    </Button>
+                  )}
+                </PopoverContent>
+              )}
+            </Popover>
           </div>
         </div>
 

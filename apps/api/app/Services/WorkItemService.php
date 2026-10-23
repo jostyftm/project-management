@@ -140,6 +140,10 @@ class WorkItemService
 
             $isBlocked = (bool) ($data['is_blocked'] ?? false);
 
+            if (! empty($data['start_date']) && ! empty($data['target_date']) && $data['start_date'] > $data['target_date']) {
+                abort(422, 'La fecha de inicio no puede ser posterior a la fecha de vencimiento.');
+            }
+
             $workItem = WorkItem::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
@@ -303,6 +307,15 @@ class WorkItemService
             $originalLeadId = $workItem->lead_id;
             $originalIsBlocked = (bool) $workItem->is_blocked;
             $originalAssigneeIds = $workItem->assignees()->pluck('users.id')->all();
+
+            if (array_key_exists('start_date', $data) || array_key_exists('target_date', $data)) {
+                $effectiveStartDate = array_key_exists('start_date', $data) ? $data['start_date'] : $workItem->start_date?->format('Y-m-d');
+                $effectiveTargetDate = array_key_exists('target_date', $data) ? $data['target_date'] : $workItem->target_date?->format('Y-m-d');
+
+                if ($effectiveStartDate && $effectiveTargetDate && $effectiveStartDate > $effectiveTargetDate) {
+                    abort(422, 'La fecha de inicio no puede ser posterior a la fecha de vencimiento.');
+                }
+            }
 
             if (array_key_exists('state_id', $data) && $data['state_id'] != $originalStateId) {
                 $data['state_changed_at'] = now();
