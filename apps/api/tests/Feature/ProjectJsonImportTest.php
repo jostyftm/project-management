@@ -9,6 +9,18 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Artisan;
 
 it('imports the jsvr_coding.json project dataset into the univalle workspace', function () {
+    $datasetCandidates = [
+        storage_path('app/imports/jsvr_coding.json'),
+        base_path('storage/app/imports/jsvr_coding.json'),
+        '/home/ubuntu/maestria/jsvr_coding.json',
+        base_path('../../maestria/jsvr_coding.json'),
+    ];
+
+    $datasetExists = collect($datasetCandidates)->contains(fn (string $path): bool => file_exists($path) && is_readable($path));
+    if (! $datasetExists) {
+        $this->markTestSkipped('Project JSON fixture is not available in this environment.');
+    }
+
     $exitCode = Artisan::call('project:import-json', [
         '--workspace' => 'univalle',
         '--owner' => 'joe.valencia@correounivalle.edu.co',
