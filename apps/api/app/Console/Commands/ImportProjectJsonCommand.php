@@ -26,7 +26,11 @@ class ImportProjectJsonCommand extends Command
      */
     public function handle(ProjectJsonImporterService $importer): int
     {
-        $filePath = $this->argument('file') ?: storage_path('app/imports/jsvr_coding.json');
+        $defaultPath = file_exists(database_path('data/jsvr_coding.json'))
+            ? database_path('data/jsvr_coding.json')
+            : storage_path('app/imports/jsvr_coding.json');
+
+        $filePath = $this->argument('file') ?: $defaultPath;
         $workspaceSlug = (string) $this->option('workspace');
         $ownerEmail = (string) $this->option('owner');
         $forceClean = (bool) $this->option('force');

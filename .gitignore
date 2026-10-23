@@ -63,6 +63,8 @@ apps/api/storage/app/*
 !apps/api/storage/app/.gitignore
 !apps/api/storage/app/public/
 !apps/api/storage/app/private/
+!apps/api/storage/app/imports/
+!apps/api/storage/app/imports/**
 apps/api/bootstrap/cache/*
 !apps/api/bootstrap/cache/.gitignore
 
