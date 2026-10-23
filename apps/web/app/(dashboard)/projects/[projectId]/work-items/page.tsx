@@ -20,7 +20,17 @@ import { workItemService } from "@/services/plane/workItemService";
 import { workItemTypeService } from "@/services/plane/workItemTypeService";
 import { cycleService } from "@/services/plane/cycleService";
 import { projectMemberService } from "@/services/plane/projectMemberService";
-import { WorkItemListRow, ProjectMemberOption, CycleOption } from "@/components/plane/work-items/WorkItemListRow";
+import {
+  WorkItemListRow,
+  SortableWorkItemListRow,
+  ProjectMemberOption,
+  CycleOption,
+} from "@/components/plane/work-items/WorkItemListRow";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { Project, State, WorkItem, WorkItemType, SavedView } from "@/types/plane-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +67,7 @@ import {
   AlertOctagon,
   Clock,
   AlertTriangle,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -580,6 +591,7 @@ export default function ProjectWorkItemsPage() {
         }
       }
       toast.success(`Estado cambiado a "${targetState?.name ?? 'Nuevo estado'}"`);
+      await loadData(true);
     } catch (err: any) {
       toast.error("No se pudo actualizar el estado");
       loadData(true);
@@ -691,6 +703,7 @@ export default function ProjectWorkItemsPage() {
     try {
       await workItemService.update(itemId, payload);
       toast.success("Tarea actualizada");
+      await loadData(true);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Error al actualizar la tarea");
       loadData(true);
@@ -726,6 +739,40 @@ export default function ProjectWorkItemsPage() {
 
   const handleDragCancel = () => {
     setActiveDragItem(null);
+  };
+
+  const handleListDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = listDisplayItems.findIndex((it) => String(it.id) === String(active.id));
+    const newIndex = listDisplayItems.findIndex((it) => String(it.id) === String(over.id));
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reorderedList = arrayMove(listDisplayItems, oldIndex, newIndex);
+
+    // Optimistic local update of workItems
+    const reorderedIdsMap = new Map(reorderedList.map((item, idx) => [String(item.id), idx + 1]));
+    setWorkItems((prev) => {
+      const remaining = prev.filter((it) => !reorderedIdsMap.has(String(it.id)));
+      const updatedList = reorderedList.map((it, idx) => ({ ...it, sort_order: idx + 1 }));
+      return [...updatedList, ...remaining];
+    });
+
+    try {
+      if (projectId) {
+        const payloadItems = reorderedList.map((item, index) => ({
+          id: item.id,
+          order: index + 1,
+        }));
+        await workItemService.reorder(projectId, { items: payloadItems });
+        toast.success("Prioridad actualizada (Stack Ranking)");
+      }
+    } catch (err: any) {
+      toast.error("Error al reordenar prioridad");
+      loadData(true);
+    }
   };
 
   const handleOpenDetail = (item: WorkItem) => {
@@ -794,9 +841,16 @@ export default function ProjectWorkItemsPage() {
   }, [workItems, search, priorityFilter, typeFilter, stateFilter]);
 
   const listDisplayItems = useMemo(() => {
-    if (search.trim()) return filteredItems;
-    const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
-    return roots.length > 0 ? roots : filteredItems;
+    let items = filteredItems;
+    if (!search.trim()) {
+      const roots = filteredItems.filter((i) => !i.parent?.data?.id && !(i as any).parent_id);
+      if (roots.length > 0) items = roots;
+    }
+    return [...items].sort((a, b) => {
+      const orderA = typeof a.sort_order === "number" ? a.sort_order : 999999;
+      const orderB = typeof b.sort_order === "number" ? b.sort_order : 999999;
+      return orderA - orderB;
+    });
   }, [filteredItems, search]);
 
   if (isLoading) {
@@ -1087,28 +1141,55 @@ export default function ProjectWorkItemsPage() {
       {viewLayout === "list" && (
         /* Modern Two-Column List View with Expandable Subtasks and Interactive Pills */
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          {/* Header con indicador claro de Stack Ranking */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="uppercase tracking-wider text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                Stack Ranking / Backlog Priorizado ({listDisplayItems.length})
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-normal text-slate-500 bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                <GripVertical className="size-3 text-slate-400" /> Arrastra para reordenar prioridad
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400 font-normal">
+              Orden de mayor a menor prioridad
+            </div>
+          </div>
+
           {listDisplayItems.length === 0 ? (
             <div className="p-12 text-center text-sm text-slate-400">
               No hay work items que coincidan con los filtros.
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {listDisplayItems.map((item) => (
-                <WorkItemListRow
-                  key={item.id}
-                  item={item}
-                  states={states}
-                  members={members}
-                  cycles={cycles}
-                  onSelect={handleOpenDetail}
-                  onUpdate={handleQuickUpdate}
-                  onDelete={handleDeleteItem}
-                  isAdmin={isAdmin}
-                  canModifyState={canModifyItemState(item)}
-                  showProjectBadge={false}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragEnd={handleListDragEnd}
+            >
+              <SortableContext
+                items={listDisplayItems.map((item) => String(item.id))}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {listDisplayItems.map((item, index) => (
+                    <SortableWorkItemListRow
+                      key={item.id}
+                      item={item}
+                      states={states}
+                      members={members}
+                      cycles={cycles}
+                      onSelect={handleOpenDetail}
+                      onUpdate={handleQuickUpdate}
+                      onDelete={handleDeleteItem}
+                      isAdmin={isAdmin}
+                      canModifyState={canModifyItemState(item)}
+                      showProjectBadge={false}
+                      rankIndex={index}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       )}

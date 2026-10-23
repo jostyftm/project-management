@@ -461,76 +461,87 @@ export function WorkItemDetailSheet({
         {/* Header: Identifier, Type, Switcher, Title */}
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className={cn(
-            "flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap",
+            "flex flex-col gap-2.5",
+            activeMode === "page" && "sm:flex-row sm:items-center sm:justify-between",
             activeMode !== "page" && "pr-10 sm:pr-12"
           )}>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded">
+            {/* Fila 1: Metadatos del ítem (Identificador, Tipo y Definition of Ready) */}
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="font-mono text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-2 py-0.5 rounded shrink-0">
                 {item.identifier}
               </span>
 
               {/* Work Item Type Selector */}
-              <Select
-                value={typeId}
-                disabled={!isAdmin}
-                onValueChange={(val) => {
-                  setTypeId(val);
-                  handleUpdateField({ type_id: val });
-                }}
-              >
-                <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 disabled:opacity-75 disabled:cursor-not-allowed">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {types.map((t) => (
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      <div className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
-                        <span>{t.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="shrink-0 max-w-[140px]">
+                <Select
+                  value={typeId}
+                  disabled={!isAdmin}
+                  onValueChange={(val) => {
+                    setTypeId(val);
+                    handleUpdateField({ type_id: val });
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 disabled:opacity-75 disabled:cursor-not-allowed">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {types.map((t) => (
+                      <SelectItem key={t.id} value={String(t.id)}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: t.color }} />
+                          <span>{t.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Definition of Ready Badge */}
-              <ReadinessBadge readiness={item.readiness} />
+              <div className="shrink-0">
+                <ReadinessBadge readiness={item.readiness} />
+              </div>
             </div>
 
-            {/* View Mode Switcher, Blocker Button and Git Branch Modal Button */}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={item.is_blocked ? "destructive" : "outline"}
-                size="sm"
-                onClick={() => setBlockerDialogOpen(true)}
-                className={cn(
-                  "h-7 text-xs px-2.5 gap-1.5",
-                  !item.is_blocked && "text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-red-50 hover:text-red-700"
-                )}
-                title={item.is_blocked ? "Gestionar impedimento" : "Reportar impedimento / bloqueo"}
-              >
-                <ShieldAlert className="size-3" />
-                <span>{item.is_blocked ? "Bloqueada" : "Bloqueo"}</span>
-              </Button>
-
-              {(canChangeState || isAdmin) && (
+            {/* Fila 2: Acciones rápidas (Bloqueo, Rama Git, Selector de Modos) */}
+            <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={item.is_blocked ? "destructive" : "outline"}
                   size="sm"
-                  onClick={() => setIsGitModalOpen(true)}
-                  className="h-7 text-xs px-2.5 font-mono gap-1.5 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
-                  title="Abrir modal para crear rama o copiar comando Git para terminal local"
+                  onClick={() => setBlockerDialogOpen(true)}
+                  className={cn(
+                    "h-7 text-xs px-2.5 gap-1.5 shrink-0",
+                    !item.is_blocked && "text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-red-50 hover:text-red-700"
+                  )}
+                  title={item.is_blocked ? "Gestionar impedimento" : "Reportar impedimento / bloqueo"}
                 >
-                  <GitBranch className="size-3 text-indigo-600 dark:text-indigo-400" />
-                  <span>Rama Git</span>
+                  <ShieldAlert className="size-3" />
+                  <span>{item.is_blocked ? "Bloqueada" : "Bloqueo"}</span>
                 </Button>
-              )}
-              <WorkItemViewModeSwitcher
-                currentMode={activeMode}
-                onChangeMode={handleModeSwitch}
-              />
+
+                {(canChangeState || isAdmin) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsGitModalOpen(true)}
+                    className="h-7 text-xs px-2.5 font-mono gap-1.5 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 shrink-0"
+                    title="Abrir modal para crear rama o copiar comando Git para terminal local"
+                  >
+                    <GitBranch className="size-3 text-indigo-600 dark:text-indigo-400" />
+                    <span>Rama Git</span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="shrink-0">
+                <WorkItemViewModeSwitcher
+                  currentMode={activeMode}
+                  onChangeMode={handleModeSwitch}
+                />
+              </div>
             </div>
           </div>
 

@@ -29,7 +29,7 @@ export default function CyclePlanningPage() {
   }, [projectId, cycleId]);
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
+    <div className="flex-1 w-full min-w-0 p-4 md:p-8 pt-6">
       {/* Breadcrumb & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>

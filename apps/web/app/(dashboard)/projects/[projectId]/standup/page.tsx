@@ -21,7 +21,7 @@ export default function DailyStandupPage() {
   }, [projectId]);
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 w-full min-w-0">
       {/* Breadcrumb & Header */}
       <div className="pb-2 border-b border-slate-200">
         <ProjectBreadcrumb

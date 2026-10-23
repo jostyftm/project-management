@@ -31,6 +31,10 @@ class WorkItemService
             callback: function ($builder) use ($project, $request) {
                 $builder->where('project_id', $project->id);
 
+                if (! $request->has('sort')) {
+                    $builder->orderBy('sort_order', 'asc');
+                }
+
                 if ($request->has('cycle_id')) {
                     $builder->whereHas('cycles', function ($q) use ($request) {
                         $q->where('cycles.id', $request->cycle_id);
@@ -395,21 +399,40 @@ class WorkItemService
             // Notificar impedimento si aplica
             if ($action === 'BLOCKED') {
                 try {
+                    $recipientIds = collect();
                     $projectLeadId = $workItem->project?->lead_id;
-                    if ($projectLeadId && (int) $projectLeadId !== (int) $user->id) {
+                    if ($projectLeadId) {
+                        $recipientIds->push($projectLeadId);
+                    } else {
+                        // Fallback a los administradores del proyecto (Scrum Masters)
+                        $adminIds = $workItem->project?->members()
+                            ->wherePivot('role', 'ADMIN')
+                            ->pluck('users.id')
+                            ->all() ?? [];
+                        $recipientIds = $recipientIds->merge($adminIds);
+                    }
+
+                    $recipientIds = $recipientIds
+                        ->filter(fn ($id) => ! empty($id) && (int) $id !== (int) $user->id)
+                        ->unique();
+
+                    if ($recipientIds->isNotEmpty()) {
                         $frontendUrl = rtrim(config('app.frontend_url', 'http://localhost:3000'), '/');
                         $workItemUrl = "{$frontendUrl}/projects/{$workItem->project_id}/work-items?selected={$workItem->id}";
-                        app(NotificationService::class)->sendNotification(
-                            workspaceId: $workItem->workspace_id,
-                            recipientId: $projectLeadId,
-                            actorId: $user->id,
-                            type: 'BLOCKER_REPORTED',
-                            entityType: 'WORK_ITEM',
-                            entityId: $workItem->id,
-                            title: 'Impedimento reportado en tarea',
-                            message: "{$user->name} reportó un impedimento en «{$workItem->title}»: ".($workItem->blocked_reason ?: 'Sin detalle'),
-                            targetUrl: $workItemUrl
-                        );
+                        $notificationService = app(NotificationService::class);
+                        foreach ($recipientIds as $recipientId) {
+                            $notificationService->sendNotification(
+                                workspaceId: $workItem->workspace_id,
+                                recipientId: $recipientId,
+                                actorId: $user->id,
+                                type: 'BLOCKER_REPORTED',
+                                entityType: 'WORK_ITEM',
+                                entityId: $workItem->id,
+                                title: 'Impedimento reportado en tarea',
+                                message: "{$user->name} reportó un impedimento en «{$workItem->title}»: ".($workItem->blocked_reason ?: 'Sin detalle'),
+                                targetUrl: $workItemUrl
+                            );
+                        }
                     }
                 } catch (Throwable $e) {
                     Log::warning('Error notificando impedimento: '.$e->getMessage());

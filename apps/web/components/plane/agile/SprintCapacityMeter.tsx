@@ -80,7 +80,7 @@ export function SprintCapacityMeter({
         </div>
         <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
           <div
-            className={cn("h-full transition-all duration-300 rounded-full", barColor)}
+            className={cn("h-full transition-all duration-500 ease-out rounded-full", barColor)}
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         </div>

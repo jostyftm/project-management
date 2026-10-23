@@ -88,6 +88,8 @@ class ApiHandlerException extends Exception
         }
 
         if ($exception instanceof InvalidArgumentException) {
+            dd($exception);
+
             return $this->errorResponse([], $exception->getMessage(), 500);
         }
 

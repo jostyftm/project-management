@@ -51,15 +51,15 @@ export function SprintPlanningView({
   const [warningItem, setWarningItem] = useState<SprintPlanningItem | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const loadPlanning = async () => {
+  const loadPlanning = async (isSilent = false) => {
     try {
-      setIsLoading(true);
+      if (!isSilent) setIsLoading(true);
       const res = await cycleService.planning(cycleId);
       setData(res);
     } catch (err: any) {
       toast.error(err?.message || "Error al cargar la planificación del Sprint");
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
@@ -89,7 +89,7 @@ export function SprintPlanningView({
       await cycleService.addWorkItems(cycleId, [item.id]);
       toast.success(`«${item.title}» agregada al Sprint`);
       setWarningItem(null);
-      await loadPlanning();
+      await loadPlanning(true);
     } catch (err: any) {
       toast.error(err?.message || "Error al agregar la tarea al Sprint");
     } finally {
@@ -102,7 +102,7 @@ export function SprintPlanningView({
       setIsProcessing(true);
       await cycleService.removeWorkItem(cycleId, item.id);
       toast.success(`«${item.title}» devuelta al Backlog`);
-      await loadPlanning();
+      await loadPlanning(true);
     } catch (err: any) {
       toast.error(err?.message || "Error al remover la tarea del Sprint");
     } finally {
@@ -140,7 +140,7 @@ export function SprintPlanningView({
       await workItemService.reorder(projectId, { items: payloadItems });
     } catch (err: any) {
       toast.error("Error al persistir el reordenamiento del backlog");
-      await loadPlanning();
+      await loadPlanning(true);
     }
   };
 
@@ -148,10 +148,10 @@ export function SprintPlanningView({
     if (!data?.suggestions || data.suggestions.length === 0) return;
     try {
       setIsProcessing(true);
-      const ids = data.suggestions.map((s) => s.id);
-      await cycleService.addWorkItems(cycleId, ids);
-      toast.success(`${ids.length} tareas sugeridas añadidas al Sprint`);
-      await loadPlanning();
+      const itemIds = data.suggestions.map((s) => s.id);
+      await cycleService.addWorkItems(cycleId, itemIds);
+      toast.success(`${itemIds.length} sugerencias agregadas al Sprint`);
+      await loadPlanning(true);
     } catch (err: any) {
       toast.error(err?.message || "Error al agregar sugerencias");
     } finally {
@@ -246,12 +246,18 @@ export function SprintPlanningView({
       {/* 4. Columnas Gemelas: Backlog vs Sprint Scope */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Columna Izquierda: Product Backlog Stack-Ranked */}
-        <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-4 space-y-3">
+        <div
+          className={cn(
+            "bg-slate-50/70 border border-slate-200 rounded-xl p-4 space-y-3 transition-opacity duration-200 relative",
+            isProcessing && "opacity-60 pointer-events-none"
+          )}
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Layers className="size-4 text-slate-500" />
-              <h3 className="text-sm font-bold text-slate-800">
-                Product Backlog Priorizado ({data.backlog?.length || 0})
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span>Product Backlog Priorizado ({data.backlog?.length || 0})</span>
+                {isProcessing && <RefreshCw className="size-3 text-indigo-600 animate-spin" />}
               </h3>
             </div>
             <span className="text-[11px] text-slate-500 font-medium">Stack Ranking Ágil</span>
@@ -355,12 +361,18 @@ export function SprintPlanningView({
         </div>
 
         {/* Columna Derecha: Sprint Scope */}
-        <div className="bg-indigo-50/40 border border-indigo-200/80 rounded-xl p-4 space-y-3">
+        <div
+          className={cn(
+            "bg-indigo-50/40 border border-indigo-200/80 rounded-xl p-4 space-y-3 transition-opacity duration-200 relative",
+            isProcessing && "opacity-60 pointer-events-none"
+          )}
+        >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Calendar className="size-4 text-indigo-600" />
-              <h3 className="text-sm font-bold text-slate-900">
-                Alcance del Sprint ({data.sprint_items?.length || 0} tareas)
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>Alcance del Sprint ({data.sprint_items?.length || 0} tareas)</span>
+                {isProcessing && <RefreshCw className="size-3 text-indigo-600 animate-spin" />}
               </h3>
             </div>
             <span className="text-xs font-bold text-indigo-700">

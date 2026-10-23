@@ -74,7 +74,7 @@ export function BlockerDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md z-[120]">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className={isCurrentlyBlocked ? "p-2 bg-red-100 rounded-lg text-red-600" : "p-2 bg-amber-100 rounded-lg text-amber-600"}>
