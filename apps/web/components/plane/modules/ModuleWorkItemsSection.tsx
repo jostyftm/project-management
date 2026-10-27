@@ -76,16 +76,16 @@ export function ModuleWorkItemsSection({
 
   const isAdmin = project?.current_user_role === "ADMIN";
 
-  const loadModuleWorkItems = useCallback(async () => {
+  const loadModuleWorkItems = useCallback(async (silent = false) => {
     if (!module?.id) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     try {
       const items = await workItemService.list(projectId, { module_id: module.id });
       setWorkItems(items);
     } catch {
       toast.error("Error al cargar los work items del módulo");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [module?.id, projectId]);
 
@@ -178,7 +178,7 @@ export function ModuleWorkItemsSection({
       onModuleUpdated();
     } catch {
       toast.error("No se pudo actualizar el estado");
-      loadModuleWorkItems();
+      loadModuleWorkItems(true);
     }
   };
 
@@ -493,8 +493,13 @@ export function ModuleWorkItemsSection({
           onOpenChange={(isOpen) => {
             if (!isOpen) setSelectedWorkItemId(null);
           }}
-          onUpdated={() => {
-            loadModuleWorkItems();
+          onUpdated={(updatedItem?: WorkItem) => {
+            if (updatedItem) {
+              setWorkItems((prev) =>
+                prev.map((i) => (String(i.id) === String(updatedItem.id) ? { ...i, ...updatedItem } : i))
+              );
+            }
+            loadModuleWorkItems(true);
             onModuleUpdated();
           }}
         />

@@ -376,9 +376,9 @@ export default function YourWorkPage() {
     })
   );
 
-  const fetchItems = useCallback(async (tab: YourWorkTab) => {
+  const fetchItems = useCallback(async (tab: YourWorkTab, silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await yourWorkService.list(tab);
       setItems(data);
 
@@ -404,9 +404,9 @@ export default function YourWorkPage() {
       }
     } catch (err) {
       console.error("Error fetching your work:", err);
-      setItems([]);
+      if (!silent) setItems([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [projectStatesMap, projectMembersMap, projectCyclesMap]);
 
@@ -516,7 +516,7 @@ export default function YourWorkPage() {
       toast.success(`Estado actualizado a "${targetState?.name || 'Nuevo estado'}"`);
     } catch {
       toast.error("Error al actualizar el estado");
-      fetchItems(activeTab);
+      fetchItems(activeTab, true);
     }
   };
 
@@ -535,7 +535,7 @@ export default function YourWorkPage() {
       toast.success(`Prioridad cambiada a "${pBadge.label}"`);
     } catch {
       toast.error("Error al actualizar la prioridad");
-      fetchItems(activeTab);
+      fetchItems(activeTab, true);
     }
   };
 
@@ -603,7 +603,7 @@ export default function YourWorkPage() {
       toast.success("Tarea actualizada");
     } catch {
       toast.error("Error al actualizar la tarea");
-      fetchItems(activeTab);
+      fetchItems(activeTab, true);
     }
   };
 
@@ -1042,8 +1042,13 @@ export default function YourWorkPage() {
             }}
             viewMode={detailViewMode}
             onViewModeChange={setDetailViewMode}
-            onUpdated={() => {
-              fetchItems(activeTab);
+            onUpdated={(updatedItem?: WorkItem) => {
+              if (updatedItem) {
+                setItems((prev) =>
+                  prev.map((i) => (String(i.id) === String(updatedItem.id) ? { ...i, ...updatedItem } : i))
+                );
+              }
+              fetchItems(activeTab, true);
             }}
           />
         );

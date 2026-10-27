@@ -103,7 +103,8 @@ export function WorkItemDetailSheet({
   });
 
   const isOverlay = Boolean(onOpenChange);
-  const activeMode = propViewMode || (isOverlay && internalMode === "page" ? "sheet" : internalMode);
+  const requestedMode = propViewMode || internalMode;
+  const activeMode = isOverlay && requestedMode === "page" ? "sheet" : requestedMode;
 
   const [item, setItem] = useState<WorkItem | null>(null);
   const [internalProject, setInternalProject] = useState<Project | null>(null);
@@ -477,9 +478,9 @@ export function WorkItemDetailSheet({
       });
       toast.success("Relación creada");
       setRelationTargetId("");
-      onUpdated();
       const updated = await workItemService.get(item.id);
       setItem(updated);
+      onUpdated(updated);
     } catch {
       toast.error("Error al agregar relación");
     } finally {
@@ -492,9 +493,9 @@ export function WorkItemDetailSheet({
     try {
       await workItemService.deleteRelation(relId);
       toast.success("Relación eliminada");
-      onUpdated();
       const updated = await workItemService.get(item.id);
       setItem(updated);
+      onUpdated(updated);
     } catch {
       toast.error("Error al eliminar relación");
     }
@@ -1308,8 +1309,14 @@ export function WorkItemDetailSheet({
     );
   };
 
+  // If used as an overlay, but either closed or without workItemId, render nothing
+  if (isOverlay && (!open || !workItemId)) {
+    return null;
+  }
+
   // Render according to activeMode:
   if (activeMode === "page") {
+    if (!open) return null;
     return (
       <div className="w-full p-4 sm:p-6 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {renderInnerContent()}

@@ -68,10 +68,10 @@ export default function ProjectMilestonesPage() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
     if (!projectId) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [projData, milestonesData, itemsData, statesData] = await Promise.all([
         projectService.get(projectId),
         milestoneService.list(projectId),
@@ -85,7 +85,7 @@ export default function ProjectMilestonesPage() {
     } catch (err) {
       console.error("Error loading milestones:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -609,8 +609,22 @@ export default function ProjectMilestonesPage() {
           onOpenChange={(isOpen) => {
             if (!isOpen) setSelectedWorkItemId(null);
           }}
-          onUpdated={() => {
-            loadData();
+          onUpdated={(updatedItem?: WorkItem) => {
+            if (updatedItem) {
+              setMilestoneItemsMap((prev) => {
+                const next = { ...prev };
+                Object.keys(next).forEach((mId) => {
+                  next[mId] = next[mId].map((it) =>
+                    String(it.id) === String(updatedItem.id) ? { ...it, ...updatedItem } : it
+                  );
+                });
+                return next;
+              });
+              setAvailableItems((prev) =>
+                prev.map((it) => (String(it.id) === String(updatedItem.id) ? { ...it, ...updatedItem } : it))
+              );
+            }
+            loadData(true);
             // Refresh items for all expanded milestones
             Object.keys(expandedMilestones).forEach((mId) => {
               if (expandedMilestones[mId]) {
