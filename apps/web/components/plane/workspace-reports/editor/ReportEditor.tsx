@@ -43,6 +43,10 @@ export function ReportEditor({ initialReport, workspaceId }: ReportEditorProps) 
   } = useReportEditorStore();
 
   const [blocksData, setBlocksData] = useState<Record<string, any>>({});
+  const [globalFilters, setGlobalFilters] = useState<import("@/types/workspace-report-types").GlobalReportFilters>(
+    (initialReport.layout_config as any)?.global_filters || {}
+  );
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [snapshotsModalOpen, setSnapshotsModalOpen] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,18 +55,51 @@ export function ReportEditor({ initialReport, workspaceId }: ReportEditorProps) 
   useEffect(() => {
     setReport(initialReport);
     setBlocks(initialReport.blocks || []);
+    if ((initialReport.layout_config as any)?.global_filters) {
+      setGlobalFilters((initialReport.layout_config as any).global_filters);
+    }
   }, [initialReport, setReport, setBlocks]);
 
   // Fetch all block resolved data
-  const refreshBlocksData = useCallback(async () => {
-    if (!initialReport.id) return;
+  const refreshBlocksData = useCallback(
+    async (filtersToUse?: import("@/types/workspace-report-types").GlobalReportFilters) => {
+      if (!initialReport.id) return;
+      try {
+        const filters = filtersToUse !== undefined ? filtersToUse : globalFilters;
+        const data = await workspaceReportService.getAllData(workspaceId, initialReport.id, filters);
+        setBlocksData(data || {});
+      } catch (e) {
+        console.error("Error fetching report data", e);
+      }
+    },
+    [workspaceId, initialReport.id, globalFilters]
+  );
+
+  const handleGlobalFiltersChange = (newFilters: import("@/types/workspace-report-types").GlobalReportFilters) => {
+    setGlobalFilters(newFilters);
+    refreshBlocksData(newFilters);
+  };
+
+  const handleSaveDefaultFilters = async () => {
+    if (!report) return;
+    setIsSavingDefaults(true);
     try {
-      const data = await workspaceReportService.getAllData(workspaceId, initialReport.id);
-      setBlocksData(data || {});
-    } catch (e) {
-      console.error("Error fetching report data", e);
+      const updatedLayout = {
+        ...(report.layout_config || {}),
+        global_filters: globalFilters,
+      };
+      await workspaceReportService.update(workspaceId, report.id, {
+        layout_config: updatedLayout,
+      });
+      setReport({ ...report, layout_config: updatedLayout });
+      toast.success("Filtros guardados como predeterminados");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar filtros");
+    } finally {
+      setIsSavingDefaults(false);
     }
-  }, [workspaceId, initialReport.id]);
+  };
 
   useEffect(() => {
     refreshBlocksData();
@@ -301,6 +338,10 @@ export function ReportEditor({ initialReport, workspaceId }: ReportEditorProps) 
             selectedBlockId={selectedBlockId}
             blocksData={blocksData}
             zoom={zoom}
+            globalFilters={globalFilters}
+            onGlobalFiltersChange={handleGlobalFiltersChange}
+            onSaveDefaultFilters={handleSaveDefaultFilters}
+            isSavingDefaults={isSavingDefaults}
             onSelectBlock={selectBlock}
             onReorderBlocks={handleReorderBlocks}
             onDeleteBlock={handleDeleteBlock}

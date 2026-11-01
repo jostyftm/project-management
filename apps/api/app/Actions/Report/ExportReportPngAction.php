@@ -29,8 +29,8 @@ class ExportReportPngAction
         ];
         $resolvedData = $this->resolverService->resolveAll($report, $scope);
 
-        // 2. Renderizar el HTML optimizado
-        $html = $this->htmlRenderer->render($report, $resolvedData);
+        // 2. Renderizar el HTML optimizado con pie de página en flujo para captura de imagen completa
+        $html = $this->htmlRenderer->render($report, $resolvedData, true);
 
         // 3. Ejecutar Browsershot sobre Chromium headless
         $chromePath = config('services.browsershot.chrome_path', '/usr/bin/chromium');

@@ -43,6 +43,20 @@ export function HeatmapBlock({ block, data }: HeatmapBlockProps) {
     }
   });
 
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  let lastMonth = "";
+  const monthLabels = columns.map((week) => {
+    const firstDay = week[0];
+    if (!firstDay?.date) return "";
+    const mIdx = new Date(firstDay.date + "T00:00:00").getMonth();
+    const mStr = monthNames[mIdx] || "";
+    if (mStr !== lastMonth) {
+      lastMonth = mStr;
+      return mStr;
+    }
+    return "";
+  });
+
   const getCellColor = (level: number) => {
     switch (level) {
       case 1:
@@ -79,30 +93,41 @@ export function HeatmapBlock({ block, data }: HeatmapBlockProps) {
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div className="inline-flex gap-1.5 items-start">
-          {/* Day of week labels */}
-          <div className="flex flex-col gap-1.5 pr-2 pt-0.5 text-[9px] font-medium text-neutral-400 select-none">
-            {dayLabels.map((lbl, idx) => (
-              <div key={idx} className="h-3 flex items-center">
-                {idx % 2 === 1 ? lbl : ""}
+        <div className="inline-flex flex-col gap-1 items-start">
+          {/* Fila superior de meses */}
+          <div className="flex items-center gap-1.5 pl-6 text-[9px] font-semibold text-neutral-400 select-none">
+            {monthLabels.map((lbl, idx) => (
+              <div key={idx} className="w-3 text-left overflow-visible whitespace-nowrap">
+                {lbl}
               </div>
             ))}
           </div>
 
-          {/* Grid Columns */}
-          {columns.map((week, wIdx) => (
-            <div key={wIdx} className="flex flex-col gap-1.5">
-              {week.map((day) => (
-                <div
-                  key={day.date}
-                  title={`${day.date}: ${day.count} tareas`}
-                  className={`w-3 h-3 rounded-xs transition-colors hover:ring-2 hover:ring-indigo-400/50 cursor-pointer ${getCellColor(
-                    day.level
-                  )}`}
-                />
+          <div className="inline-flex gap-1.5 items-start">
+            {/* Day of week labels */}
+            <div className="flex flex-col gap-1.5 pr-2 pt-0.5 text-[9px] font-medium text-neutral-400 select-none">
+              {dayLabels.map((lbl, idx) => (
+                <div key={idx} className="h-3 flex items-center">
+                  {idx % 2 === 1 ? lbl : ""}
+                </div>
               ))}
             </div>
-          ))}
+
+            {/* Grid Columns */}
+            {columns.map((week, wIdx) => (
+              <div key={wIdx} className="flex flex-col gap-1.5">
+                {week.map((day) => (
+                  <div
+                    key={day.date}
+                    title={`${day.date}: ${day.count} tareas`}
+                    className={`w-3 h-3 rounded-xs transition-colors hover:ring-2 hover:ring-indigo-400/50 cursor-pointer ${getCellColor(
+                      day.level
+                    )}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

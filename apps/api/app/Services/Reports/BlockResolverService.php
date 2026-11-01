@@ -15,14 +15,18 @@ use App\Services\Reports\Resolvers\HeatmapResolver;
 use App\Services\Reports\Resolvers\ImageResolver;
 use App\Services\Reports\Resolvers\KpiRowResolver;
 use App\Services\Reports\Resolvers\LineChartResolver;
+use App\Services\Reports\Resolvers\MemberWorkloadBreakdownResolver;
 use App\Services\Reports\Resolvers\MilestonesProgressResolver;
 use App\Services\Reports\Resolvers\NarrativeResolver;
+use App\Services\Reports\Resolvers\ProjectMembersResolver;
 use App\Services\Reports\Resolvers\ProjectSummaryResolver;
 use App\Services\Reports\Resolvers\RecentActivityResolver;
 use App\Services\Reports\Resolvers\ReleasesTimelineResolver;
 use App\Services\Reports\Resolvers\RisksBlockersResolver;
+use App\Services\Reports\Resolvers\SprintBurndownResolver;
 use App\Services\Reports\Resolvers\TableResolver;
 use App\Services\Reports\Resolvers\TeamWorkloadResolver;
+use App\Services\Reports\Resolvers\UserStoriesEvidencesResolver;
 use App\Services\Reports\Resolvers\WorkItemsListResolver;
 use Illuminate\Support\Facades\Cache;
 
@@ -51,6 +55,10 @@ class BlockResolverService
         BlockType::DIVIDER->value => DividerResolver::class,
         BlockType::IMAGE->value => ImageResolver::class,
         BlockType::CALLOUT->value => CalloutResolver::class,
+        BlockType::PROJECT_MEMBERS->value => ProjectMembersResolver::class,
+        BlockType::MEMBER_WORKLOAD_BREAKDOWN->value => MemberWorkloadBreakdownResolver::class,
+        BlockType::SPRINT_BURNDOWN->value => SprintBurndownResolver::class,
+        BlockType::USER_STORIES_EVIDENCES->value => UserStoriesEvidencesResolver::class,
     ];
 
     /**

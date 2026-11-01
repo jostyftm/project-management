@@ -186,19 +186,26 @@ export const workspaceReportService = {
   getBlockData: async (
     workspaceId: string | number,
     reportId: string | number,
-    blockId: string | number
+    blockId: string | number,
+    filters?: import("@/types/workspace-report-types").GlobalReportFilters
   ) => {
     const res = await httpRequestService<{ data: any }>({
       url: `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/blocks/${blockId}/data`,
       method: "GET",
+      params: filters,
     });
     return res.data;
   },
 
-  getAllData: async (workspaceId: string | number, reportId: string | number) => {
+  getAllData: async (
+    workspaceId: string | number,
+    reportId: string | number,
+    filters?: import("@/types/workspace-report-types").GlobalReportFilters
+  ) => {
     const res = await httpRequestService<{ data: Record<string, any> }>({
       url: `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/data`,
       method: "GET",
+      params: filters,
     });
     return res.data;
   },
