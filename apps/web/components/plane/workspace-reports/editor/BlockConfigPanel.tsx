@@ -151,7 +151,7 @@ export function BlockConfigPanel({
         </div>
 
         {tab === "config" && (
-          <div>
+          <div className="space-y-4">
             {ConfigComponent ? (
               <ConfigComponent
                 config={block.config || {}}
@@ -161,9 +161,47 @@ export function BlockConfigPanel({
               />
             ) : (
               <p className="text-xs text-neutral-400 italic">
-                Este tipo de bloque no tiene parámetros de datos adicionales en esta fase.
+                Configuración general de visualización.
               </p>
             )}
+
+            {/* Local Block Filters */}
+            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3">
+              <span className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
+                Filtros Locales del Bloque
+              </span>
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Sobrescribe los filtros globales únicamente para este widget (deja en blanco para heredar los filtros globales).
+              </p>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                  Rango de Fechas Específico
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={block.config?.start_date || ""}
+                    onChange={(e) =>
+                      onUpdateBlock(block.id, {
+                        config: { ...block.config, start_date: e.target.value || undefined },
+                      })
+                    }
+                    className="text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-neutral-800 dark:text-neutral-200"
+                  />
+                  <input
+                    type="date"
+                    value={block.config?.end_date || ""}
+                    onChange={(e) =>
+                      onUpdateBlock(block.id, {
+                        config: { ...block.config, end_date: e.target.value || undefined },
+                      })
+                    }
+                    className="text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-neutral-800 dark:text-neutral-200"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

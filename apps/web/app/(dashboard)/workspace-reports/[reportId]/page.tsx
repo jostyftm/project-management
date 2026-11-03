@@ -5,8 +5,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store";
 import { workspaceReportService } from "@/services/plane/workspace-report-service";
-import { WorkspaceReport } from "@/types/workspace-report-types";
+import { GlobalReportFilters, WorkspaceReport } from "@/types/workspace-report-types";
 import { blockRegistry } from "@/registry/block-registry";
+import { ReportGlobalFilterBar } from "@/components/plane/workspace-reports/ReportGlobalFilterBar";
 import { ArrowLeft, Edit3, Share2, Loader2, Maximize2, Minimize2, Download, Image as ImageIcon, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -23,25 +24,37 @@ export default function ReportViewPage({
 
   useDocumentTitle(report?.title ? `${report.title} - Reportes` : "Reporte Dinámico");
   const [blocksData, setBlocksData] = useState<Record<string, any>>({});
+  const [globalFilters, setGlobalFilters] = useState<GlobalReportFilters>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState(false);
   const [isExporting, setIsExporting] = useState<"pdf" | "png" | null>(null);
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
+  // Initial load
   useEffect(() => {
     if (!currentWorkspace?.id || !resolvedParams.reportId) return;
 
     let isMounted = true;
     setIsLoading(true);
 
-    Promise.all([
-      workspaceReportService.get(currentWorkspace.id, resolvedParams.reportId),
-      workspaceReportService.getAllData(currentWorkspace.id, resolvedParams.reportId),
-    ])
-      .then(([reportData, allData]) => {
-        if (isMounted) {
-          setReport(reportData);
-          setBlocksData(allData || {});
+    workspaceReportService
+      .get(currentWorkspace.id, resolvedParams.reportId)
+      .then((reportData) => {
+        if (!isMounted) return;
+        setReport(reportData);
+        const initialFilters = (reportData.layout_config as any)?.global_filters || {};
+        setGlobalFilters(initialFilters);
+
+        return workspaceReportService.getAllData(
+          currentWorkspace.id,
+          resolvedParams.reportId,
+          initialFilters
+        );
+      })
+      .then((allData) => {
+        if (isMounted && allData) {
+          setBlocksData(allData);
         }
       })
       .catch((err) => {
@@ -56,6 +69,45 @@ export default function ReportViewPage({
       isMounted = false;
     };
   }, [currentWorkspace?.id, resolvedParams.reportId]);
+
+  // Refetch data when global filters change
+  const handleFiltersChange = async (newFilters: GlobalReportFilters) => {
+    setGlobalFilters(newFilters);
+    if (!currentWorkspace?.id || !resolvedParams.reportId) return;
+
+    try {
+      const allData = await workspaceReportService.getAllData(
+        currentWorkspace.id,
+        resolvedParams.reportId,
+        newFilters
+      );
+      setBlocksData(allData || {});
+    } catch (err) {
+      console.error("Error refreshing report data with filters:", err);
+      toast.error("Error al actualizar datos con los filtros seleccionados");
+    }
+  };
+
+  const handleSaveDefaultFilters = async () => {
+    if (!currentWorkspace?.id || !report) return;
+    setIsSavingDefaults(true);
+    try {
+      const updatedLayout = {
+        ...(report.layout_config || {}),
+        global_filters: globalFilters,
+      };
+      await workspaceReportService.update(currentWorkspace.id, report.id, {
+        layout_config: updatedLayout,
+      });
+      setReport({ ...report, layout_config: updatedLayout });
+      toast.success("Filtros guardados como predeterminados del reporte");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar filtros predeterminados");
+    } finally {
+      setIsSavingDefaults(false);
+    }
+  };
 
   if (error) {
     notFound();
@@ -214,7 +266,16 @@ export default function ReportViewPage({
       </header>
 
       {/* Main Document View */}
-      <main className="flex-1 p-6 sm:p-10 flex justify-center">
+      <main className="flex-1 p-6 sm:p-10 flex flex-col items-center">
+        <div className="w-full max-w-5xl">
+          <ReportGlobalFilterBar
+            filters={globalFilters}
+            onChange={handleFiltersChange}
+            onSaveDefaults={handleSaveDefaultFilters}
+            isSavingDefaults={isSavingDefaults}
+          />
+        </div>
+
         <div
           style={{
             backgroundColor: report.theme?.backgroundColor || undefined,

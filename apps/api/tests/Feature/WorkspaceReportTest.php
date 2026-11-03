@@ -2,6 +2,7 @@
 
 use App\Enums\BlockType;
 use App\Enums\ReportVisibility;
+use App\Models\Project;
 use App\Models\ReportBlock;
 use App\Models\ReportSnapshot;
 use App\Models\User;
@@ -409,6 +410,98 @@ it('los resolvers de formato estetico retornan sus configuraciones', function ()
 
     $respDivider = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$dividerBlock->id}/data");
     $respDivider->assertStatus(200)->assertJsonPath('data.style', 'dashed');
+});
+
+it('el resolver project_members retorna los integrantes del proyecto y roles', function () {
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::PROJECT_MEMBERS->value,
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$block->id}/data");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data' => ['members', 'total_members', 'total_capacity_points', 'role_distribution']]);
+});
+
+it('el resolver member_workload_breakdown calcula tareas, historias, puntos y estados', function () {
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::MEMBER_WORKLOAD_BREAKDOWN->value,
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$block->id}/data");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data' => ['members', 'summary' => ['total_members', 'total_points', 'total_tasks', 'total_user_stories']]]);
+});
+
+it('el resolver sprint_burndown genera curvas de burndown y burnup', function () {
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::SPRINT_BURNDOWN->value,
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$block->id}/data");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data' => ['selected_cycle', 'available_cycles', 'timeline', 'metrics', 'chart_type', 'filter_by']]);
+});
+
+it('el resolver user_stories_evidences retorna historias anidadas y separa evidencias', function () {
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::USER_STORIES_EVIDENCES->value,
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$block->id}/data");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data' => ['stories', 'total_stories', 'summary' => ['total_deliverables', 'total_images', 'total_pdfs']]]);
+});
+
+it('allData aplica filtros de query parameters al scope de los bloques', function () {
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::MEMBER_WORKLOAD_BREAKDOWN->value,
+    ]);
+
+    $project = Project::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Demo Project',
+        'identifier' => 'DEMO',
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/data?project_ids={$project->id}&start_date=2026-01-01&end_date=2026-12-31");
+
+    $response->assertStatus(200)
+        ->assertJsonStructure(['data' => [$block->id => ['members', 'summary', 'filters_applied']]]);
+    expect($response->json("data.{$block->id}.filters_applied.start_date"))->toBe('2026-01-01');
 });
 
 // === PLANTILLAS ===

@@ -41,6 +41,11 @@ class ExportReportPdfAction
             return self::FALLBACK_PDF;
         }
 
+        $footerTemplate = '<div style="font-size: 8px; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #94a3b8; width: 100%; display: flex; justify-content: space-between; padding: 0 14mm; box-sizing: border-box;">'
+            .'<span>Generado con Plane Reports &bull; Reporte Ejecutivo</span>'
+            .'<span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>'
+            .'</div>';
+
         try {
             return Browsershot::html($html)
                 ->setChromePath($chromePath)
@@ -56,7 +61,10 @@ class ExportReportPdfAction
                 ->showBackground()
                 ->emulateMedia('screen')
                 ->format('A4')
-                ->margins(10, 12, 12, 12, 'mm')
+                ->margins(12, 14, 18, 14, 'mm')
+                ->showBrowserHeaderAndFooter()
+                ->hideHeader()
+                ->footerHtml($footerTemplate)
                 ->pdf();
         } catch (\Throwable $e) {
             Log::warning('Browsershot PDF export failed: '.$e->getMessage());

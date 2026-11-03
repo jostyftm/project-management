@@ -11,7 +11,7 @@ class ReportHtmlRenderer
     /**
      * Renderiza un documento HTML autosuficiente y optimizado para exportación visual 1:1.
      */
-    public function render(WorkspaceReport $report, array $resolvedData = []): string
+    public function render(WorkspaceReport $report, array $resolvedData = [], bool $includeInflowFooter = false): string
     {
         $theme = $report->theme ?? [];
         $primaryColor = $theme['primaryColor'] ?? '#6366f1';
@@ -35,6 +35,12 @@ class ReportHtmlRenderer
         $reportTitle = htmlspecialchars($report->title);
         $reportDesc = $report->description ? htmlspecialchars($report->description) : '';
 
+        $footerHtml = $includeInflowFooter ? <<<'HTML'
+        <footer class="footer">
+            <span>Generado con Plane Reports &bull; Reporte Ejecutivo</span>
+        </footer>
+HTML : '';
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="es">
@@ -45,7 +51,7 @@ class ReportHtmlRenderer
     <style>
         @page {
             size: A4;
-            margin: 12mm 14mm 14mm 14mm;
+            margin: 12mm 14mm 16mm 14mm;
         }
         * {
             box-sizing: border-box;
@@ -100,11 +106,12 @@ class ReportHtmlRenderer
             display: flex;
             flex-wrap: wrap;
             margin: -8px;
+            margin-bottom: 16px;
         }
-        .col-12 { width: 100%; padding: 8px; }
-        .col-8  { width: 66.6666%; padding: 8px; }
-        .col-6  { width: 50%; padding: 8px; }
-        .col-4  { width: 33.3333%; padding: 8px; }
+        .col-12 { width: 100%; padding: 8px; display: flex; flex-direction: column; }
+        .col-8  { width: 66.6666%; padding: 8px; display: flex; flex-direction: column; }
+        .col-6  { width: 50%; padding: 8px; display: flex; flex-direction: column; }
+        .col-4  { width: 33.3333%; padding: 8px; display: flex; flex-direction: column; }
 
         .card {
             background: {$surfaceColor};
@@ -113,7 +120,13 @@ class ReportHtmlRenderer
             padding: 16px 18px;
             page-break-inside: avoid;
             break-inside: avoid;
-            height: calc(100% - 32px);
+            width: 100%;
+            height: auto;
+            min-height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
         }
         .card-header {
             display: flex;
@@ -122,6 +135,12 @@ class ReportHtmlRenderer
             margin-bottom: 12px;
             padding-bottom: 8px;
             border-bottom: 1px solid rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .card-body {
+            flex: 1 1 auto;
+            width: 100%;
+            overflow: visible;
         }
         .card-title {
             margin: 0;
@@ -263,10 +282,7 @@ class ReportHtmlRenderer
             {$blocksHtml}
         </main>
 
-        <footer class="footer">
-            <span>Generado con Plane Reports &bull; Reporte Ejecutivo</span>
-            <span>Página 1</span>
-        </footer>
+        {$footerHtml}
     </div>
 </body>
 </html>
@@ -335,6 +351,10 @@ HTML;
             BlockType::RECENT_ACTIVITY => $this->renderRecentActivity($data),
             BlockType::RISKS_BLOCKERS => $this->renderRisksBlockers($data),
             BlockType::IMAGE => $this->renderImage($block, $data),
+            BlockType::PROJECT_MEMBERS => $this->renderProjectMembers($data),
+            BlockType::MEMBER_WORKLOAD_BREAKDOWN => $this->renderMemberWorkloadBreakdown($data, $primaryColor),
+            BlockType::SPRINT_BURNDOWN => $this->renderSprintBurndown($block, $data, $primaryColor),
+            BlockType::USER_STORIES_EVIDENCES => $this->renderUserStoriesEvidences($data),
             default => '<div style="font-size:11px;color:#64748b;">Visualización de bloque generada correctamente.</div>',
         };
     }
@@ -650,27 +670,28 @@ HTML;
     }
 
     // =========================================================================
-    // 9. AREA_CHART (Burn-Up / Creadas vs Completadas)
+    // 9. AREA_CHART (Flujo de Trabajo: Creadas vs Completadas)
     // =========================================================================
-    private function renderAreaChart(ReportBlock $block, array $data, string $primaryColor): string
+    private function renderAreaChart(ReportBlock $block, array $data, string $primaryColor = '#6366f1'): string
     {
         $series = $data['series'] ?? [];
         if (empty($series)) {
-            return '<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">Sin datos de velocidad / burn-up</div>';
+            return '<div style="height:140px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">Sin datos de velocidad / flujo de trabajo</div>';
         }
 
         // Muestrear últimos 14 puntos
         $points = array_slice($series, -14);
         $createdVals = array_map(fn ($p) => (int) ($p['created'] ?? 0), $points);
         $completedVals = array_map(fn ($p) => (int) ($p['completed'] ?? 0), $points);
-        $maxVal = max(max($createdVals ?: [1]), max($completedVals ?: [1])) ?: 1;
+        $rawMax = max(max($createdVals ?: [1]), max($completedVals ?: [1])) ?: 1;
+        $maxVal = $rawMax <= 5 ? 5 : ($rawMax <= 10 ? 10 : ceil($rawMax / 5) * 5);
 
-        $w = 540;
-        $h = 135;
-        $padLeft = 28;
-        $padRight = 14;
-        $padTop = 14;
-        $padBottom = 24;
+        $w = 760;
+        $h = 240;
+        $padLeft = 45;
+        $padRight = 20;
+        $padTop = 20;
+        $padBottom = 35;
         $plotW = $w - $padLeft - $padRight;
         $plotH = $h - $padTop - $padBottom;
         $bottomY = $padTop + $plotH;
@@ -679,12 +700,20 @@ HTML;
 
         $cPoints = [];
         $compPoints = [];
+        $xTicksHtml = '';
+        $dotsHtml = '';
+
         foreach ($points as $i => $pt) {
             $x = round($padLeft + ($i * $step), 1);
             $yC = round($padTop + $plotH - (($pt['created'] / $maxVal) * $plotH), 1);
             $yComp = round($padTop + $plotH - (($pt['completed'] / $maxVal) * $plotH), 1);
             $cPoints[] = "{$x},{$yC}";
             $compPoints[] = "{$x},{$yComp}";
+
+            $dateLabel = htmlspecialchars($pt['date'] ?? '');
+            $xTicksHtml .= "<text x=\"{$x}\" y=\"".($bottomY + 18)."\" text-anchor=\"middle\" font-size=\"11px\" fill=\"#9ca3af\" font-family=\"sans-serif\">{$dateLabel}</text>";
+            $dotsHtml .= "<circle cx=\"{$x}\" cy=\"{$yC}\" r=\"3\" fill=\"#ffffff\" stroke=\"#6366f1\" stroke-width=\"2\" />";
+            $dotsHtml .= "<circle cx=\"{$x}\" cy=\"{$yComp}\" r=\"3\" fill=\"#ffffff\" stroke=\"#10b981\" stroke-width=\"2\" />";
         }
 
         $cPolyStr = implode(' ', $cPoints);
@@ -695,28 +724,50 @@ HTML;
         $cAreaStr = "{$firstX},{$bottomY} {$cPolyStr} {$lastX},{$bottomY}";
         $compAreaStr = "{$firstX},{$bottomY} {$compPolyStr} {$lastX},{$bottomY}";
 
+        // Ticks del eje Y
+        $yTicks = [0, round($maxVal * 0.25), round($maxVal * 0.5), round($maxVal * 0.75), $maxVal];
+        $yTicksHtml = '';
+        foreach ($yTicks as $tick) {
+            $y = round($padTop + $plotH - (($tick / $maxVal) * $plotH), 1);
+            $yTicksHtml .= "<line x1=\"{$padLeft}\" y1=\"{$y}\" x2=\"".($w - $padRight)."\" y2=\"{$y}\" stroke=\"#e5e7eb\" stroke-dasharray=\"3 3\" stroke-width=\"1\" />";
+            $yTicksHtml .= '<text x="'.($padLeft - 10).'" y="'.($y + 4)."\" text-anchor=\"end\" font-size=\"11px\" fill=\"#9ca3af\" font-family=\"sans-serif\">{$tick}</text>";
+        }
+
         $totalCreated = array_sum(array_column($series, 'created'));
         $totalCompleted = array_sum(array_column($series, 'completed'));
 
         return "
         <div>
-            <div style=\"display:flex;gap:14px;justify-content:flex-end;font-size:10px;margin-bottom:6px;\">
-                <span style=\"display:flex;align-items:center;gap:4px;\">
-                    <span style=\"width:8px;height:8px;border-radius:2px;background:#3b82f6;display:inline-block;\"></span>
-                    Creadas: <strong>{$totalCreated}</strong>
+            <div style=\"display:flex;gap:18px;justify-content:flex-end;font-size:11px;margin-bottom:10px;font-family:sans-serif;\">
+                <span style=\"display:flex;align-items:center;gap:6px;\">
+                    <span style=\"width:10px;height:10px;border-radius:2px;background:#6366f1;display:inline-block;\"></span>
+                    Creadas: <strong style=\"color:#1e293b;\">{$totalCreated}</strong>
                 </span>
-                <span style=\"display:flex;align-items:center;gap:4px;\">
-                    <span style=\"width:8px;height:8px;border-radius:2px;background:#10b981;display:inline-block;\"></span>
-                    Completadas: <strong>{$totalCompleted}</strong>
+                <span style=\"display:flex;align-items:center;gap:6px;\">
+                    <span style=\"width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block;\"></span>
+                    Completadas: <strong style=\"color:#1e293b;\">{$totalCompleted}</strong>
                 </span>
             </div>
-            <div style=\"width:100%;height:140px;\">
-                <svg width=\"100%\" height=\"{$h}\" viewBox=\"0 0 {$w} {$h}\" style=\"overflow:visible;\">
-                    <line x1=\"{$padLeft}\" y1=\"{$bottomY}\" x2=\"{$w}\" y2=\"{$bottomY}\" stroke=\"#cbd5e1\" stroke-width=\"1\" />
-                    <polygon fill=\"#3b82f6\" fill-opacity=\"0.18\" points=\"{$cAreaStr}\" />
-                    <polyline fill=\"none\" stroke=\"#3b82f6\" stroke-width=\"2\" points=\"{$cPolyStr}\" stroke-linejoin=\"round\" />
-                    <polygon fill=\"#10b981\" fill-opacity=\"0.28\" points=\"{$compAreaStr}\" />
-                    <polyline fill=\"none\" stroke=\"#10b981\" stroke-width=\"2\" points=\"{$compPolyStr}\" stroke-linejoin=\"round\" />
+            <div style=\"width:100%;height:auto;\">
+                <svg width=\"100%\" height=\"{$h}\" viewBox=\"0 0 {$w} {$h}\" style=\"overflow:visible;display:block;\">
+                    <defs>
+                        <linearGradient id=\"colorCreatedPdf\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                            <stop offset=\"5%\" stop-color=\"#6366f1\" stop-opacity=\"0.35\" />
+                            <stop offset=\"95%\" stop-color=\"#6366f1\" stop-opacity=\"0.0\" />
+                        </linearGradient>
+                        <linearGradient id=\"colorCompletedPdf\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                            <stop offset=\"5%\" stop-color=\"#10b981\" stop-opacity=\"0.35\" />
+                            <stop offset=\"95%\" stop-color=\"#10b981\" stop-opacity=\"0.0\" />
+                        </linearGradient>
+                    </defs>
+                    {$yTicksHtml}
+                    <line x1=\"{$padLeft}\" y1=\"{$bottomY}\" x2=\"".($w - $padRight)."\" y2=\"{$bottomY}\" stroke=\"#cbd5e1\" stroke-width=\"1.5\" />
+                    <polygon fill=\"url(#colorCreatedPdf)\" points=\"{$cAreaStr}\" />
+                    <polyline fill=\"none\" stroke=\"#6366f1\" stroke-width=\"2.5\" points=\"{$cPolyStr}\" stroke-linejoin=\"round\" />
+                    <polygon fill=\"url(#colorCompletedPdf)\" points=\"{$compAreaStr}\" />
+                    <polyline fill=\"none\" stroke=\"#10b981\" stroke-width=\"2.5\" points=\"{$compPolyStr}\" stroke-linejoin=\"round\" />
+                    {$dotsHtml}
+                    {$xTicksHtml}
                 </svg>
             </div>
         </div>";
@@ -832,7 +883,12 @@ HTML;
             return '<p style="font-size:11px;color:#94a3b8;">Sin actividad registrada en el período</p>';
         }
 
-        $totalEvents = $data['total_events'] ?? 0;
+        $totalEvents = (int) ($data['total_events'] ?? 0);
+        $period = $data['period'] ?? [];
+        $from = $period['from'] ?? '';
+        $to = $period['to'] ?? '';
+        $periodLabel = ($from && $to) ? "{$from} al {$to}" : 'Último trimestre';
+
         $levelColors = [
             0 => '#ebedf0',
             1 => '#9be9a8',
@@ -843,38 +899,85 @@ HTML;
 
         // Agrupar matriz en semanas (columnas de 7 días)
         $weeks = array_chunk($matrix, 7);
+        $dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        $monthNames = [
+            'Jan' => 'Ene', 'Feb' => 'Feb', 'Mar' => 'Mar', 'Apr' => 'Abr',
+            'May' => 'May', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Ago',
+            'Sep' => 'Sep', 'Oct' => 'Oct', 'Nov' => 'Nov', 'Dec' => 'Dic',
+        ];
 
-        $html = "
-        <div>
-            <div style=\"display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#64748b;margin-bottom:8px;\">
-                <span>Total de eventos: <strong>{$totalEvents}</strong></span>
-                <span style=\"display:flex;align-items:center;gap:4px;\">
-                    Menos
-                    <span style=\"width:9px;height:9px;background:{$levelColors[0]};border-radius:2px;display:inline-block;\"></span>
-                    <span style=\"width:9px;height:9px;background:{$levelColors[1]};border-radius:2px;display:inline-block;\"></span>
-                    <span style=\"width:9px;height:9px;background:{$levelColors[2]};border-radius:2px;display:inline-block;\"></span>
-                    <span style=\"width:9px;height:9px;background:{$levelColors[3]};border-radius:2px;display:inline-block;\"></span>
-                    <span style=\"width:9px;height:9px;background:{$levelColors[4]};border-radius:2px;display:inline-block;\"></span>
-                    Más
-                </span>
-            </div>
-            <div style=\"display:flex;gap:3px;overflow-x:auto;padding:6px 0;\">";
-
+        // Fila superior de meses
+        $monthHeaderHtml = '';
+        $lastMonth = '';
         foreach ($weeks as $w) {
-            $html .= '<div style="display:flex;flex-direction:column;gap:3px;">';
+            $firstDay = $w[0] ?? null;
+            $monthText = '';
+            if ($firstDay && ! empty($firstDay['date'])) {
+                $rawMonth = date('M', strtotime($firstDay['date']));
+                $esMonth = $monthNames[$rawMonth] ?? $rawMonth;
+                if ($esMonth !== $lastMonth) {
+                    $monthText = $esMonth;
+                    $lastMonth = $esMonth;
+                }
+            }
+            $monthHeaderHtml .= "<div style=\"width:10px;font-size:8px;font-weight:600;color:#64748b;overflow:visible;white-space:nowrap;\">{$monthText}</div>";
+        }
+
+        // Columna lateral izquierda con los días de la semana
+        $daysColumnHtml = '<div style="display:flex;flex-direction:column;gap:3px;margin-right:6px;font-size:8px;font-weight:600;color:#94a3b8;line-height:10px;">';
+        foreach ($dayNames as $idx => $d) {
+            $label = ($idx % 2 === 1) ? $d : ''; // Muestra Lun, Mié, Vie
+            $daysColumnHtml .= "<div style=\"height:10px;display:flex;align-items:center;\">{$label}</div>";
+        }
+        $daysColumnHtml .= '</div>';
+
+        // Columnas de casillas por semana
+        $weeksHtml = '';
+        foreach ($weeks as $w) {
+            $weeksHtml .= '<div style="display:flex;flex-direction:column;gap:3px;">';
             foreach ($w as $day) {
                 $lvl = $day['level'] ?? 0;
                 $col = $levelColors[$lvl] ?? $levelColors[0];
                 $cnt = $day['count'] ?? 0;
                 $dt = $day['date'] ?? '';
-                $html .= "<div style=\"width:10px;height:10px;border-radius:2px;background:{$col};\" title=\"{$dt}: {$cnt} eventos\"></div>";
+                $weeksHtml .= "<div style=\"width:10px;height:10px;border-radius:2px;background:{$col};\" title=\"{$dt}: {$cnt} tareas\"></div>";
             }
-            $html .= '</div>';
+            $weeksHtml .= '</div>';
         }
 
-        $html .= '</div></div>';
+        return "
+        <div>
+            <!-- Encabezado con meses, días y cuadrícula de calor -->
+            <div style=\"overflow-x:auto;padding:6px 0;\">
+                <div style=\"display:inline-flex;flex-direction:column;gap:4px;\">
+                    <!-- Fila de meses -->
+                    <div style=\"display:flex;gap:3px;margin-left:26px;\">
+                        {$monthHeaderHtml}
+                    </div>
+                    <!-- Cuerpo: Días a la izquierda + Semanas -->
+                    <div style=\"display:flex;align-items:flex-start;\">
+                        {$daysColumnHtml}
+                        <div style=\"display:flex;gap:3px;\">
+                            {$weeksHtml}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        return $html;
+            <!-- Pie con período y escala de actividad -->
+            <div style=\"display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#64748b;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;\">
+                <span>{$periodLabel} &bull; <strong>{$totalEvents}</strong> tareas</span>
+                <div style=\"display:flex;align-items:center;gap:4px;\">
+                    <span>Menos</span>
+                    <span style=\"width:9px;height:9px;background:{$levelColors[0]};border-radius:2px;display:inline-block;border:1px solid #e2e8f0;\"></span>
+                    <span style=\"width:9px;height:9px;background:{$levelColors[1]};border-radius:2px;display:inline-block;\"></span>
+                    <span style=\"width:9px;height:9px;background:{$levelColors[2]};border-radius:2px;display:inline-block;\"></span>
+                    <span style=\"width:9px;height:9px;background:{$levelColors[3]};border-radius:2px;display:inline-block;\"></span>
+                    <span style=\"width:9px;height:9px;background:{$levelColors[4]};border-radius:2px;display:inline-block;\"></span>
+                    <span>Más</span>
+                </div>
+            </div>
+        </div>";
     }
 
     // =========================================================================
@@ -1088,6 +1191,572 @@ HTML;
             <img src=\"{$url}\" alt=\"{$alt}\" style=\"max-width:100%;border-radius:6px;max-height:260px;object-fit:contain;\" />
             {$captionHtml}
         </figure>";
+    }
+
+    // =========================================================================
+    // 19. PROJECT_MEMBERS
+    // =========================================================================
+    private function renderProjectMembers(array $data): string
+    {
+        $members = $data['members'] ?? [];
+        if (empty($members)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin integrantes registrados en este proyecto</p>';
+        }
+
+        $rows = '';
+        foreach ($members as $m) {
+            $name = htmlspecialchars($m['name'] ?? 'Miembro');
+            $email = htmlspecialchars($m['email'] ?? '');
+            $role = htmlspecialchars($m['role'] ?? 'MEMBER');
+            $capacity = (float) ($m['capacity_points'] ?? 0);
+            $active = (int) ($m['active_assigned'] ?? 0);
+            $completed = (int) ($m['completed_assigned'] ?? 0);
+            $initial = strtoupper(substr($name, 0, 1));
+
+            $rows .= "
+            <tr style=\"border-bottom:1px solid #f1f5f9;\">
+                <td style=\"padding:8px;font-size:11px;\">
+                    <div style=\"display:flex;align-items:center;gap:8px;\">
+                        <div style=\"width:24px;height:24px;border-radius:50%;background:#e0e7ff;color:#4338ca;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:10px;\">{$initial}</div>
+                        <div>
+                            <div style=\"font-weight:600;color:#1e293b;\">{$name}</div>
+                            <div style=\"font-size:10px;color:#64748b;\">{$email}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;\">
+                    <span style=\"display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;background:#f8fafc;color:#475569;border:1px solid #e2e8f0;\">{$role}</span>
+                </td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;font-weight:600;\">{$capacity} pts</td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;color:#f59e0b;font-weight:600;\">{$active}</td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;color:#10b981;font-weight:600;\">{$completed}</td>
+            </tr>";
+        }
+
+        return "
+        <table style=\"width:100%;border-collapse:collapse;\">
+            <thead>
+                <tr style=\"background:#f8fafc;border-bottom:1.5px solid #e2e8f0;font-size:10px;color:#64748b;text-transform:uppercase;\">
+                    <th style=\"padding:8px;text-align:left;\">Miembro</th>
+                    <th style=\"padding:8px;text-align:center;\">Rol</th>
+                    <th style=\"padding:8px;text-align:center;\">Capacidad</th>
+                    <th style=\"padding:8px;text-align:center;\">Activas</th>
+                    <th style=\"padding:8px;text-align:center;\">Completadas</th>
+                </tr>
+            </thead>
+            <tbody>{$rows}</tbody>
+        </table>";
+    }
+
+    // =========================================================================
+    // 20. MEMBER_WORKLOAD_BREAKDOWN
+    // =========================================================================
+    private function renderMemberWorkloadBreakdown(array $data, string $primaryColor): string
+    {
+        $members = $data['members'] ?? [];
+        if (empty($members)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin datos de trabajo por miembro</p>';
+        }
+
+        $rows = '';
+        foreach ($members as $m) {
+            $name = htmlspecialchars($m['name'] ?? 'Miembro');
+            $tasks = (int) ($m['tasks_count'] ?? 0);
+            $stories = (int) ($m['user_stories_count'] ?? 0);
+            $points = (float) ($m['total_points'] ?? 0);
+            $completedPoints = (float) ($m['completed_points'] ?? 0);
+            $pct = (float) ($m['completion_percentage'] ?? 0);
+
+            $rows .= "
+            <tr style=\"border-bottom:1px solid #f1f5f9;\">
+                <td style=\"padding:8px;font-size:11px;font-weight:600;color:#1e293b;\">{$name}</td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;\"><span style=\"background:#eff6ff;color:#1d4ed8;padding:2px 6px;border-radius:4px;font-weight:600;\">{$tasks}</span></td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;\"><span style=\"background:#faf5ff;color:#7e22ce;padding:2px 6px;border-radius:4px;font-weight:600;\">{$stories}</span></td>
+                <td style=\"padding:8px;font-size:11px;text-align:center;font-weight:700;\">{$points} pts</td>
+                <td style=\"padding:8px;font-size:11px;\">
+                    <div style=\"display:flex;align-items:center;gap:6px;\">
+                        <div style=\"flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;\">
+                            <div style=\"width:{$pct}%;height:100%;background:{$primaryColor};border-radius:3px;\"></div>
+                        </div>
+                        <span style=\"font-size:10px;font-weight:600;color:#64748b;min-width:32px;\">{$pct}%</span>
+                    </div>
+                </td>
+            </tr>";
+        }
+
+        return "
+        <table style=\"width:100%;border-collapse:collapse;\">
+            <thead>
+                <tr style=\"background:#f8fafc;border-bottom:1.5px solid #e2e8f0;font-size:10px;color:#64748b;text-transform:uppercase;\">
+                    <th style=\"padding:8px;text-align:left;\">Miembro</th>
+                    <th style=\"padding:8px;text-align:center;\">Tareas</th>
+                    <th style=\"padding:8px;text-align:center;\">Historias</th>
+                    <th style=\"padding:8px;text-align:center;\">Puntos</th>
+                    <th style=\"padding:8px;text-align:left;\">Avance</th>
+                </tr>
+            </thead>
+            <tbody>{$rows}</tbody>
+        </table>";
+    }
+
+    // =========================================================================
+    // 21. SPRINT_BURNDOWN
+    // =========================================================================
+    private function renderSprintBurndown(ReportBlock $block, array $data, string $primaryColor): string
+    {
+        $cycle = $data['selected_cycle'] ?? null;
+        if (! $cycle) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin ciclo seleccionado para burndown</p>';
+        }
+
+        $cycleName = htmlspecialchars($cycle['name'] ?? 'Sprint');
+        $status = htmlspecialchars($cycle['status'] ?? 'CURRENT');
+        $startDate = $cycle['start_date'] ?? '';
+        $endDate = $cycle['end_date'] ?? '';
+        $datesText = ($startDate && $endDate) ? "{$startDate} al {$endDate}" : '';
+        $metrics = $data['metrics'] ?? [];
+        $scope = (int) ($metrics['scope'] ?? 0);
+        $completed = (int) ($metrics['completed'] ?? 0);
+        $pending = (int) ($metrics['pending'] ?? 0);
+        $rate = (float) ($metrics['completion_rate'] ?? 0);
+
+        $filterBy = $data['filter_by'] ?? ($block->config['filter_by'] ?? 'work_items');
+        $chartType = strtolower($data['chart_type'] ?? ($block->config['chart_type'] ?? 'burndown'));
+        $chartTypeLabel = $chartType === 'burnup' ? 'BURN-UP' : 'BURN-DOWN';
+        $filterByLabel = $filterBy === 'estimates' ? 'ESTIMATES' : 'WORK ITEMS';
+
+        $timeline = $data['timeline'] ?? [];
+        $dates = $timeline['dates'] ?? [];
+        $rawSeries = ($filterBy === 'estimates') ? ($timeline['estimates'] ?? []) : ($timeline['work_items'] ?? []);
+
+        // Fallback si no hay serie cronológica
+        if (empty($rawSeries) || empty($dates)) {
+            return "
+            <div>
+                <div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f1f5f9;\">
+                    <div>
+                        <span style=\"font-weight:700;font-size:12px;color:#0f172a;\">{$cycleName}</span>
+                        <span style=\"font-size:10px;color:#64748b;margin-left:6px;\">({$datesText})</span>
+                    </div>
+                    <div>
+                        <span style=\"background:#ecfdf5;color:#047857;font-size:10px;padding:2px 8px;border-radius:12px;font-weight:600;border:1px solid #a7f3d0;\">{$status} • {$chartTypeLabel}</span>
+                    </div>
+                </div>
+                <div style=\"display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:12px;\">
+                    <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                        <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Alcance</div>
+                        <div style=\"font-size:14px;font-weight:700;color:#0f172a;\">{$scope}</div>
+                    </div>
+                    <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                        <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Completadas</div>
+                        <div style=\"font-size:14px;font-weight:700;color:#10b981;\">{$completed}</div>
+                    </div>
+                    <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                        <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Pendientes</div>
+                        <div style=\"font-size:14px;font-weight:700;color:#f59e0b;\">{$pending}</div>
+                    </div>
+                    <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                        <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">% Avance</div>
+                        <div style=\"font-size:14px;font-weight:700;color:{$primaryColor};\">{$rate}%</div>
+                    </div>
+                </div>
+                <p style=\"font-size:11px;color:#94a3b8;text-align:center;padding:16px 0;\">Sin datos de serie cronológica para el sprint seleccionado</p>
+            </div>";
+        }
+
+        // SVG parameters matching CycleBurndownChart.tsx
+        $viewBoxWidth = 840;
+        $viewBoxHeight = 340;
+        $padLeft = 65;
+        $padRight = 35;
+        $padTop = 35;
+        $padBottom = 45;
+        $chartWidth = $viewBoxWidth - $padLeft - $padRight;
+        $chartHeight = $viewBoxHeight - $padTop - $padBottom;
+
+        $totalPoints = count($dates);
+        $totalIntervals = max(1, $totalPoints - 1);
+
+        $todayIndex = (int) ($data['today_index'] ?? 0);
+        $todayIndex = max(0, min($totalIntervals, $todayIndex));
+
+        // Max Y calculation
+        $rawMax = 1.0;
+        foreach ($rawSeries as $pt) {
+            $rawMax = max(
+                $rawMax,
+                (float) ($pt['scope'] ?? 0),
+                (float) ($pt['pending'] ?? 0),
+                (float) ($pt['completed'] ?? 0),
+                (float) ($pt['started'] ?? 0),
+                (float) ($pt['ideal_pending'] ?? 0),
+                (float) ($pt['ideal_completed'] ?? 0)
+            );
+        }
+        if ($rawMax <= 5) {
+            $maxVal = 5;
+        } elseif ($rawMax <= 10) {
+            $maxVal = 10;
+        } else {
+            $maxVal = (int) (ceil($rawMax / 5) * 5);
+        }
+        $yTicks = [0, (int) round($maxVal * 0.25), (int) round($maxVal * 0.5), (int) round($maxVal * 0.75), $maxVal];
+
+        $getX = fn (int $idx) => round($padLeft + ($idx / $totalIntervals) * $chartWidth, 2);
+        $getY = function (float $val) use ($padTop, $chartHeight, $maxVal) {
+            $ratio = max(0.0, min(1.0, $val / $maxVal));
+
+            return round($padTop + $chartHeight - ($ratio * $chartHeight), 2);
+        };
+
+        // 1. Scope line
+        $scopeVal = (float) ($rawSeries[0]['scope'] ?? 0);
+        $hasVaryingScope = false;
+        foreach ($rawSeries as $pt) {
+            if ((float) ($pt['scope'] ?? 0) !== $scopeVal) {
+                $hasVaryingScope = true;
+                break;
+            }
+        }
+        if ($hasVaryingScope) {
+            $scopeParts = [];
+            foreach ($rawSeries as $i => $pt) {
+                $cmd = ($i === 0) ? 'M' : 'L';
+                $scopeParts[] = "{$cmd} {$getX($i)} {$getY((float) ($pt['scope'] ?? 0))}";
+            }
+            $scopePath = implode(' ', $scopeParts);
+        } else {
+            $scopePath = "M {$getX(0)} {$getY($scopeVal)} L {$getX($totalIntervals)} {$getY($scopeVal)}";
+        }
+
+        // 2. Ideal line
+        $idealParts = [];
+        foreach ($rawSeries as $i => $pt) {
+            $val = ($chartType === 'burndown') ? (float) ($pt['ideal_pending'] ?? 0) : (float) ($pt['ideal_completed'] ?? 0);
+            $cmd = ($i === 0) ? 'M' : 'L';
+            $idealParts[] = "{$cmd} {$getX($i)} {$getY($val)}";
+        }
+        $idealPath = implode(' ', $idealParts);
+
+        // 3. Primary & Started lines up to todayIndex
+        $activePoints = array_slice($rawSeries, 0, $todayIndex + 1);
+        $primaryParts = [];
+        $startedParts = [];
+        $dots = '';
+        foreach ($activePoints as $i => $pt) {
+            $val = ($chartType === 'burndown') ? (float) ($pt['pending'] ?? 0) : (float) ($pt['completed'] ?? 0);
+            $stVal = (float) ($pt['started'] ?? 0);
+            $cmd = ($i === 0) ? 'M' : 'L';
+            $primaryParts[] = "{$cmd} {$getX($i)} {$getY($val)}";
+            $startedParts[] = "{$cmd} {$getX($i)} {$getY($stVal)}";
+            $dots .= "<circle cx=\"{$getX($i)}\" cy=\"{$getY($val)}\" r=\"3.5\" fill=\"#10b981\" stroke=\"#ffffff\" stroke-width=\"1.5\" />";
+        }
+        $primaryPath = implode(' ', $primaryParts);
+        $startedPath = implode(' ', $startedParts);
+
+        // 4. Light green area under primary curve
+        $primaryAreaPath = '';
+        if (! empty($activePoints)) {
+            $startX = $getX(0);
+            $endX = $getX($todayIndex);
+            $bottomY = $getY(0);
+            $linePoints = '';
+            foreach ($activePoints as $i => $pt) {
+                $val = ($chartType === 'burndown') ? (float) ($pt['pending'] ?? 0) : (float) ($pt['completed'] ?? 0);
+                $linePoints .= " L {$getX($i)} {$getY($val)}";
+            }
+            $primaryAreaPath = "M {$startX} {$bottomY}{$linePoints} L {$endX} {$bottomY} Z";
+        }
+
+        // 5. Red lag area between pending and ideal in burndown
+        $redLagAreaPath = '';
+        if ($chartType === 'burndown' && ! empty($activePoints)) {
+            $lagStartIndex = -1;
+            foreach ($activePoints as $i => $pt) {
+                if ((float) ($pt['pending'] ?? 0) > (float) ($pt['ideal_pending'] ?? 0)) {
+                    $lagStartIndex = $i;
+                    break;
+                }
+            }
+            if ($lagStartIndex !== -1 && $lagStartIndex <= $todayIndex) {
+                $startX = $getX($lagStartIndex);
+                $startIdeal = (float) ($rawSeries[$lagStartIndex]['ideal_pending'] ?? 0);
+                $path = "M {$startX} {$getY($startIdeal)}";
+                for ($i = $lagStartIndex; $i <= $todayIndex; $i++) {
+                    $pt = $rawSeries[$i] ?? [];
+                    $path .= " L {$getX($i)} {$getY((float) ($pt['pending'] ?? 0))}";
+                }
+                for ($i = $todayIndex; $i >= $lagStartIndex; $i--) {
+                    $pt = $rawSeries[$i] ?? [];
+                    $path .= " L {$getX($i)} {$getY((float) ($pt['ideal_pending'] ?? 0))}";
+                }
+                $path .= ' Z';
+                $redLagAreaPath = $path;
+            }
+        }
+
+        // 6. Future zone rectangle from todayIndex to end
+        $futureZoneX = $getX($todayIndex);
+        $futureZoneWidth = max(0, $getX($totalIntervals) - $futureZoneX);
+        $futureZoneY = $padTop;
+        $futureZoneHeight = $chartHeight;
+
+        // Unique IDs for SVG gradients
+        $uid = 'sb_'.substr(md5((string) ($block->id ?? mt_rand())), 0, 8);
+
+        // Y Grid & Axis Labels
+        $yAxisHtml = '';
+        foreach ($yTicks as $tickVal) {
+            $y = $getY((float) $tickVal);
+            $yAxisHtml .= "
+            <line x1=\"{$padLeft}\" y1=\"{$y}\" x2=\"".($viewBoxWidth - $padRight)."\" y2=\"{$y}\" stroke=\"#e2e8f0\" stroke-dasharray=\"3 3\" stroke-width=\"1\" />
+            <text x=\"".($padLeft - 10).'" y="'.($y + 4)."\" text-anchor=\"end\" font-size=\"10px\" font-weight=\"500\" fill=\"#94a3b8\">{$tickVal}</text>";
+        }
+
+        // X Axis Labels
+        $xAxisHtml = '';
+        $skip = count($dates) > 14 ? 2 : 1;
+        foreach ($dates as $i => $dStr) {
+            if ($i % $skip !== 0 && $i !== $todayIndex && $i !== $totalIntervals) {
+                continue;
+            }
+            $x = $getX($i);
+            $isToday = ($i === $todayIndex);
+            $color = $isToday ? '#0f172a' : '#94a3b8';
+            $weight = $isToday ? 'bold' : 'normal';
+            $label = htmlspecialchars(strtolower($dStr));
+            $xAxisHtml .= "<text x=\"{$x}\" y=\"".($padTop + $chartHeight + 18)."\" text-anchor=\"middle\" font-size=\"9px\" font-weight=\"{$weight}\" fill=\"{$color}\">{$label}</text>";
+        }
+
+        // Vertical today marker
+        $todayX = $getX($todayIndex);
+        $todayLabel = htmlspecialchars(strtolower($dates[$todayIndex] ?? 'hoy'));
+        $todayMarkerHtml = "
+        <g>
+            <line x1=\"{$todayX}\" y1=\"".($padTop - 8)."\" x2=\"{$todayX}\" y2=\"".($padTop + $chartHeight)."\" stroke=\"#0f172a\" stroke-width=\"1.5\" stroke-dasharray=\"3 3\" />
+            <g transform=\"translate({$todayX}, ".($padTop - 12).")\">
+                <rect x=\"-24\" y=\"-14\" width=\"48\" height=\"16\" rx=\"4\" fill=\"#0f172a\" />
+                <text x=\"0\" y=\"-3\" text-anchor=\"middle\" font-size=\"9px\" font-weight=\"bold\" fill=\"#ffffff\">{$todayLabel}</text>
+            </g>
+        </g>";
+
+        $primaryLegendLabel = $chartType === 'burndown' ? 'Pendientes' : 'Completadas';
+
+        return "
+        <div>
+            <!-- Header con información de ciclo -->
+            <div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f1f5f9;\">
+                <div>
+                    <span style=\"font-weight:700;font-size:12px;color:#0f172a;\">{$cycleName}</span>
+                    <span style=\"font-size:10px;color:#64748b;margin-left:6px;\">({$datesText})</span>
+                </div>
+                <div>
+                    <span style=\"background:#ecfdf5;color:#047857;font-size:10px;padding:2px 8px;border-radius:12px;font-weight:600;border:1px solid #a7f3d0;\">{$status} • {$chartTypeLabel}</span>
+                </div>
+            </div>
+
+            <!-- KPIs Summary -->
+            <div style=\"display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:12px;\">
+                <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                    <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Alcance</div>
+                    <div style=\"font-size:14px;font-weight:700;color:#0f172a;\">{$scope}</div>
+                </div>
+                <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                    <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Completadas</div>
+                    <div style=\"font-size:14px;font-weight:700;color:#10b981;\">{$completed}</div>
+                </div>
+                <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                    <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">Pendientes</div>
+                    <div style=\"font-size:14px;font-weight:700;color:#f59e0b;\">{$pending}</div>
+                </div>
+                <div style=\"background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;\">
+                    <div style=\"font-size:9px;color:#64748b;text-transform:uppercase;\">% Avance</div>
+                    <div style=\"font-size:14px;font-weight:700;color:{$primaryColor};\">{$rate}%</div>
+                </div>
+            </div>
+
+            <!-- Leyenda de líneas idéntica al detalle de ciclo -->
+            <div style=\"display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-bottom:8px;font-size:10px;font-weight:500;color:#64748b;\">
+                <div style=\"display:flex;align-items:center;gap:5px;\">
+                    <span style=\"display:inline-block;width:12px;height:2px;background:#0f172a;border-radius:2px;\"></span>
+                    <span>Alcance</span>
+                </div>
+                <div style=\"display:flex;align-items:center;gap:5px;\">
+                    <span style=\"display:inline-block;width:12px;height:2px;background:#10b981;border-radius:2px;\"></span>
+                    <span>{$primaryLegendLabel}</span>
+                </div>
+                <div style=\"display:flex;align-items:center;gap:5px;\">
+                    <span style=\"display:inline-block;width:12px;height:2px;background:#f97316;border-radius:2px;\"></span>
+                    <span>Iniciadas</span>
+                </div>
+                <div style=\"display:flex;align-items:center;gap:5px;\">
+                    <span style=\"display:inline-block;width:14px;height:0;border-top:2px dashed #3b82f6;\"></span>
+                    <span>Ideal</span>
+                </div>
+            </div>
+
+            <!-- Gráfico SVG idéntico al detalle del ciclo -->
+            <div style=\"width:100%;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;\">
+                <svg viewBox=\"0 0 {$viewBoxWidth} {$viewBoxHeight}\" style=\"width:100%;height:auto;display:block;\">
+                    <defs>
+                        <linearGradient id=\"greenAreaGrad_{$uid}\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                            <stop offset=\"0%\" stop-color=\"#10b981\" stop-opacity=\"0.22\" />
+                            <stop offset=\"100%\" stop-color=\"#10b981\" stop-opacity=\"0.02\" />
+                        </linearGradient>
+                        <linearGradient id=\"redLagGrad_{$uid}\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">
+                            <stop offset=\"0%\" stop-color=\"#ef4444\" stop-opacity=\"0.25\" />
+                            <stop offset=\"100%\" stop-color=\"#ef4444\" stop-opacity=\"0.08\" />
+                        </linearGradient>
+                        <linearGradient id=\"futureZoneGrad_{$uid}\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">
+                            <stop offset=\"0%\" stop-color=\"#3b82f6\" stop-opacity=\"0.08\" />
+                            <stop offset=\"100%\" stop-color=\"#3b82f6\" stop-opacity=\"0.02\" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Zona Futura -->
+                    <rect x=\"{$futureZoneX}\" y=\"{$futureZoneY}\" width=\"{$futureZoneWidth}\" height=\"{$futureZoneHeight}\" fill=\"url(#futureZoneGrad_{$uid})\" />
+
+                    <!-- Área sombreada verde -->
+                    <path d=\"{$primaryAreaPath}\" fill=\"url(#greenAreaGrad_{$uid})\" />
+
+                    <!-- Área de retraso roja (si aplica) -->
+                    ".($redLagAreaPath ? "<path d=\"{$redLagAreaPath}\" fill=\"url(#redLagGrad_{$uid})\" />" : '')."
+
+                    <!-- Cuadrícula horizontal e indicadores numéricos del eje Y -->
+                    {$yAxisHtml}
+
+                    <!-- Título eje Y -->
+                    <text x=\"{$padLeft}\" y=\"".($padTop - 14)."\" text-anchor=\"start\" font-size=\"9px\" font-weight=\"bold\" fill=\"#64748b\" letter-spacing=\"0.05em\">{$filterByLabel}</text>
+
+                    <!-- Eje X: Etiquetas de fechas -->
+                    {$xAxisHtml}
+
+                    <!-- Marcador vertical de hoy -->
+                    {$todayMarkerHtml}
+
+                    <!-- Línea Ideal punteada azul -->
+                    <path d=\"{$idealPath}\" stroke=\"#3b82f6\" stroke-width=\"2\" stroke-dasharray=\"4 4\" fill=\"none\" />
+
+                    <!-- Línea de Alcance (Scope) -->
+                    <path d=\"{$scopePath}\" stroke=\"#0f172a\" stroke-width=\"2\" fill=\"none\" />
+
+                    <!-- Línea de Iniciadas (Started) -->
+                    <path d=\"{$startedPath}\" stroke=\"#f97316\" stroke-width=\"2\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />
+
+                    <!-- Línea Principal (Pending/Completed) -->
+                    <path d=\"{$primaryPath}\" stroke=\"#10b981\" stroke-width=\"2.5\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />
+
+                    <!-- Puntos sobre línea principal -->
+                    {$dots}
+                </svg>
+            </div>
+        </div>";
+    }
+
+    // =========================================================================
+    // 22. USER_STORIES_EVIDENCES
+    // =========================================================================
+    private function renderUserStoriesEvidences(array $data): string
+    {
+        $stories = $data['stories'] ?? [];
+        if (empty($stories)) {
+            return '<p style="font-size:11px;color:#94a3b8;">Sin historias de usuario para mostrar</p>';
+        }
+
+        $html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+
+        foreach ($stories as $story) {
+            $id = htmlspecialchars($story['identifier'] ?? 'STORY');
+            $title = htmlspecialchars($story['title'] ?? '');
+            $state = htmlspecialchars($story['state']['name'] ?? 'Sin estado');
+            $stateColor = htmlspecialchars($story['state']['color'] ?? '#94a3b8');
+            $points = (float) ($story['estimate_points'] ?? 0);
+
+            $html .= "
+            <div style=\"border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#ffffff;\">
+                <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;\">
+                    <div style=\"display:flex;align-items:center;gap:6px;\">
+                        <span style=\"font-weight:700;font-size:11px;color:#4f46e5;\">{$id}</span>
+                        <span style=\"font-weight:600;font-size:11px;color:#1e293b;\">{$title}</span>
+                    </div>
+                    <div style=\"display:flex;align-items:center;gap:6px;\">
+                        <span style=\"font-size:9px;padding:2px 6px;border-radius:10px;background:{$stateColor}20;color:{$stateColor};font-weight:600;\">{$state}</span>
+                        <span style=\"font-size:10px;font-weight:600;color:#64748b;\">{$points} pts</span>
+                    </div>
+                </div>";
+
+            // Render de evidencias de la historia raíz
+            $evidences = $story['evidences'] ?? [];
+            $images = $evidences['images'] ?? [];
+            $pdfs = $evidences['pdfs'] ?? [];
+
+            if (! empty($images)) {
+                $html .= '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:6px;">';
+                foreach ($images as $img) {
+                    $imgUrl = htmlspecialchars($img['url'] ?? '');
+                    $html .= "<img src=\"{$imgUrl}\" style=\"height:60px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;\" />";
+                }
+                $html .= '</div>';
+            }
+
+            if (! empty($pdfs)) {
+                $html .= '<div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">';
+                foreach ($pdfs as $pdf) {
+                    $pdfName = htmlspecialchars($pdf['file_name'] ?? 'Evidencia PDF');
+                    $pdfUrl = htmlspecialchars($pdf['url'] ?? '#');
+                    $html .= "<a href=\"{$pdfUrl}\" target=\"_blank\" style=\"font-size:10px;color:#ef4444;text-decoration:none;font-weight:600;display:inline-block;\">📄 {$pdfName} (Descargar PDF)</a>";
+                }
+                $html .= '</div>';
+            }
+
+            // Sub-historias (formato anidado)
+            $subStories = $story['sub_stories'] ?? [];
+            if (! empty($subStories)) {
+                $html .= '<div style="margin-left:16px;border-left:2px dashed #cbd5e1;padding-left:10px;margin-top:8px;display:flex;flex-direction:column;gap:6px;">';
+                foreach ($subStories as $sub) {
+                    $subId = htmlspecialchars($sub['identifier'] ?? 'SUB');
+                    $subTitle = htmlspecialchars($sub['title'] ?? '');
+                    $subState = htmlspecialchars($sub['state']['name'] ?? '');
+                    $subColor = htmlspecialchars($sub['state']['color'] ?? '#94a3b8');
+
+                    $html .= "
+                    <div style=\"background:#f8fafc;padding:6px 8px;border-radius:6px;border:1px solid #e2e8f0;\">
+                        <div style=\"display:flex;justify-content:space-between;align-items:center;\">
+                            <span style=\"font-size:10px;font-weight:600;color:#334155;\">↳ {$subId}: {$subTitle}</span>
+                            <span style=\"font-size:9px;color:{$subColor};font-weight:600;\">{$subState}</span>
+                        </div>";
+
+                    $subImages = $sub['evidences']['images'] ?? [];
+                    $subPdfs = $sub['evidences']['pdfs'] ?? [];
+
+                    if (! empty($subImages)) {
+                        $html .= '<div style="display:flex;gap:4px;margin-top:4px;">';
+                        foreach ($subImages as $sImg) {
+                            $sUrl = htmlspecialchars($sImg['url'] ?? '');
+                            $html .= "<img src=\"{$sUrl}\" style=\"height:40px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;\" />";
+                        }
+                        $html .= '</div>';
+                    }
+
+                    if (! empty($subPdfs)) {
+                        foreach ($subPdfs as $sPdf) {
+                            $sName = htmlspecialchars($sPdf['file_name'] ?? 'PDF');
+                            $sUrl = htmlspecialchars($sPdf['url'] ?? '#');
+                            $html .= "<div style=\"margin-top:3px;\"><a href=\"{$sUrl}\" target=\"_blank\" style=\"font-size:9px;color:#ef4444;text-decoration:none;font-weight:600;\">📄 {$sName}</a></div>";
+                        }
+                    }
+
+                    $html .= '</div>';
+                }
+                $html .= '</div>';
+            }
+
+            $html .= '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
     }
 
     // =========================================================================

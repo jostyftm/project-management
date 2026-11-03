@@ -501,7 +501,7 @@ export default function ProjectWorkItemsPage() {
   const [detailViewMode, setDetailViewMode] = useState<WorkItemViewMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("plane_work_item_detail_view_mode") as WorkItemViewMode;
-      if (saved === "sheet" || saved === "modal" || saved === "page") return saved;
+      if (saved === "sheet" || saved === "modal") return saved;
     }
     return "sheet";
   });
@@ -793,7 +793,8 @@ export default function ProjectWorkItemsPage() {
       return;
     }
 
-    setDetailViewMode(preferredMode);
+    const overlayMode = preferredMode === "page" ? "sheet" : preferredMode;
+    setDetailViewMode(overlayMode);
     setSelectedItemId(item.id);
     setDetailSheetOpen(true);
   };
@@ -1207,20 +1208,22 @@ export default function ProjectWorkItemsPage() {
       )}
 
       {/* Modal Crear Work Item */}
-      <WorkItemCreateModal
-        open={openCreateModal}
-        onOpenChange={setOpenCreateModal}
-        project={project}
-        states={states}
-        types={types}
-        availableItems={workItems}
-        viewMode={createViewMode}
-        onViewModeChange={setCreateViewMode}
-        onCreated={(created) => {
-          setWorkItems((prev) => [created, ...prev]);
-          loadData(true);
-        }}
-      />
+      {openCreateModal && (
+        <WorkItemCreateModal
+          open={openCreateModal}
+          onOpenChange={setOpenCreateModal}
+          project={project}
+          states={states}
+          types={types}
+          availableItems={workItems}
+          viewMode={createViewMode}
+          onViewModeChange={setCreateViewMode}
+          onCreated={(created) => {
+            setWorkItems((prev) => [created, ...prev]);
+            loadData(true);
+          }}
+        />
+      )}
 
       {/* Modal Importar CSV */}
       <WorkItemCsvImportModal
@@ -1231,24 +1234,29 @@ export default function ProjectWorkItemsPage() {
       />
 
       {/* Work Item Detail Sheet / Modal */}
-      <WorkItemDetailSheet
-        workItemId={selectedItemId}
-        project={project}
-        states={states}
-        availableItems={workItems}
-        open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
-        viewMode={detailViewMode}
-        onViewModeChange={setDetailViewMode}
-        onUpdated={(updatedItem?: WorkItem) => {
-          if (updatedItem) {
-            setWorkItems((prev) =>
-              prev.map((item) => (String(item.id) === String(updatedItem.id) ? updatedItem : item))
-            );
-          }
-          loadData(true);
-        }}
-      />
+      {selectedItemId && detailSheetOpen && (
+        <WorkItemDetailSheet
+          workItemId={selectedItemId}
+          project={project}
+          states={states}
+          availableItems={workItems}
+          open={detailSheetOpen}
+          onOpenChange={(isOpen) => {
+            setDetailSheetOpen(isOpen);
+            if (!isOpen) setSelectedItemId(null);
+          }}
+          viewMode={detailViewMode}
+          onViewModeChange={setDetailViewMode}
+          onUpdated={(updatedItem?: WorkItem) => {
+            if (updatedItem) {
+              setWorkItems((prev) =>
+                prev.map((item) => (String(item.id) === String(updatedItem.id) ? { ...item, ...updatedItem } : item))
+              );
+            }
+            loadData(true);
+          }}
+        />
+      )}
 
       {/* Modal para Gestión de Bloqueos e Impedimentos */}
       <BlockerDialog

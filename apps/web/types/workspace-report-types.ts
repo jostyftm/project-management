@@ -17,7 +17,18 @@ export type BlockType =
   | 'risks_blockers'
   | 'divider'
   | 'image'
-  | 'callout';
+  | 'callout'
+  | 'project_members'
+  | 'member_workload_breakdown'
+  | 'sprint_burndown'
+  | 'user_stories_evidences';
+
+export interface GlobalReportFilters {
+  project_ids?: string[];
+  cycle_ids?: string[];
+  start_date?: string;
+  end_date?: string;
+}
 
 export type ReportVisibility = 'draft' | 'private' | 'workspace' | 'public';
 

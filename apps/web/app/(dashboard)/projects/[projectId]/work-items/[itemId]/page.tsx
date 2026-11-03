@@ -87,8 +87,12 @@ export default function WorkItemDetailPage() {
         availableItems={workItems}
         open={true}
         viewMode="page"
-        onUpdated={() => {
-          // Re-fetch items in background
+        onUpdated={(updatedItem?: WorkItem) => {
+          if (updatedItem) {
+            setWorkItems((prev) =>
+              prev.map((item) => (String(item.id) === String(updatedItem.id) ? { ...item, ...updatedItem } : item))
+            );
+          }
           if (projectId) {
             workItemService.list(projectId).then(setWorkItems).catch(() => {});
           }

@@ -90,8 +90,8 @@ export default function CycleDetailPage() {
 
   useDocumentTitle(`${cycle?.name || "Detalle del Ciclo"} - ${project?.name || "Proyecto"}`);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const [projData, cycleData, analyticsData, statesData] = await Promise.all([
         projectService.get(projectId),
@@ -107,7 +107,7 @@ export default function CycleDetailPage() {
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Error al cargar los datos del ciclo");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [projectId, cycleId]);
 
@@ -180,7 +180,7 @@ export default function CycleDetailPage() {
     try {
       await workItemService.update(itemId, { state_id: newStateId });
       toast.success("Estado de la tarea actualizado");
-      loadData();
+      loadData(true);
     } catch {
       toast.error("Error al actualizar estado");
     }
@@ -919,7 +919,20 @@ export default function CycleDetailPage() {
           onOpenChange={(open) => {
             if (!open) setSelectedWorkItemId(null);
           }}
-          onUpdated={() => loadData()}
+          onUpdated={(updatedItem?: WorkItem) => {
+            if (updatedItem) {
+              setCycle((prev: any) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  work_items: prev.work_items?.map((w: any) =>
+                    String(w.id) === String(updatedItem.id) ? { ...w, ...updatedItem } : w
+                  ),
+                };
+              });
+            }
+            loadData(true);
+          }}
         />
       )}
     </div>

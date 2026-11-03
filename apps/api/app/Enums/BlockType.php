@@ -23,6 +23,10 @@ enum BlockType: string
     case DIVIDER = 'divider';
     case IMAGE = 'image';
     case CALLOUT = 'callout';
+    case PROJECT_MEMBERS = 'project_members';
+    case MEMBER_WORKLOAD_BREAKDOWN = 'member_workload_breakdown';
+    case SPRINT_BURNDOWN = 'sprint_burndown';
+    case USER_STORIES_EVIDENCES = 'user_stories_evidences';
 
     /** Retorna todos los valores como array */
     public static function values(): array
@@ -53,6 +57,10 @@ enum BlockType: string
             self::DIVIDER => 'Separador',
             self::IMAGE => 'Imagen',
             self::CALLOUT => 'Callout',
+            self::PROJECT_MEMBERS => 'Integrantes del Proyecto',
+            self::MEMBER_WORKLOAD_BREAKDOWN => 'Métricas por Miembro (Tareas, Historias y Estados)',
+            self::SPRINT_BURNDOWN => 'Sprint Burndown / Burnup',
+            self::USER_STORIES_EVIDENCES => 'Historias de Usuario y Evidencias',
         };
     }
 }

@@ -125,7 +125,9 @@ export function WorkItemCreateModal({
     return "modal";
   });
 
-  const activeMode = propViewMode || internalMode;
+  const isOverlay = Boolean(onOpenChange);
+  const requestedMode = propViewMode || internalMode;
+  const activeMode = isOverlay && requestedMode === "page" ? "modal" : requestedMode;
 
   const handleModeSwitch = (newMode: WorkItemViewMode) => {
     setInternalMode(newMode);
@@ -1086,7 +1088,12 @@ export function WorkItemCreateModal({
     </div>
   );
 
+  if (isOverlay && !open) {
+    return null;
+  }
+
   if (activeMode === "page") {
+    if (!open) return null;
     return (
       <div className="w-full p-4 sm:p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         {formContent}

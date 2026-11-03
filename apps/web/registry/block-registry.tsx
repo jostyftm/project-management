@@ -20,6 +20,8 @@ import {
   Table as TableIcon,
   TrendingUp,
   Users,
+  UserCheck,
+  BookOpen,
 } from "lucide-react";
 import { KpiRowBlock, KpiRowConfigPanel } from "@/components/plane/workspace-reports/blocks/KpiRowBlock";
 import { NarrativeBlock, NarrativeConfigPanel } from "@/components/plane/workspace-reports/blocks/NarrativeBlock";
@@ -40,6 +42,10 @@ import { HeatmapBlock, HeatmapConfigPanel } from "@/components/plane/workspace-r
 import { DividerBlock, DividerConfigPanel } from "@/components/plane/workspace-reports/blocks/DividerBlock";
 import { ImageBlock, ImageConfigPanel } from "@/components/plane/workspace-reports/blocks/ImageBlock";
 import { CalloutBlock, CalloutConfigPanel } from "@/components/plane/workspace-reports/blocks/CalloutBlock";
+import { ProjectMembersBlock, ProjectMembersConfigPanel } from "@/components/plane/workspace-reports/blocks/ProjectMembersBlock";
+import { MemberWorkloadBreakdownBlock, MemberWorkloadBreakdownConfigPanel } from "@/components/plane/workspace-reports/blocks/MemberWorkloadBreakdownBlock";
+import { SprintBurndownBlock, SprintBurndownConfigPanel } from "@/components/plane/workspace-reports/blocks/SprintBurndownBlock";
+import { UserStoriesEvidencesBlock, UserStoriesEvidencesConfigPanel } from "@/components/plane/workspace-reports/blocks/UserStoriesEvidencesBlock";
 
 export type BlockCategory = "metrics" | "projects" | "work" | "context";
 
@@ -346,5 +352,59 @@ export const blockRegistry: Record<BlockType, BlockDefinition> = {
     },
     renderComponent: CalloutBlock as any,
     configPanelComponent: CalloutConfigPanel,
+  },
+  project_members: {
+    type: "project_members",
+    label: "Integrantes del Proyecto",
+    description: "Miembros, roles, capacidad en puntos y resumen de carga operativa",
+    category: "projects",
+    icon: Users,
+    defaultWidth: 12,
+    defaultConfig: {
+      view_mode: "cards",
+      role: "all",
+    },
+    renderComponent: ProjectMembersBlock as any,
+    configPanelComponent: ProjectMembersConfigPanel,
+  },
+  member_workload_breakdown: {
+    type: "member_workload_breakdown",
+    label: "Métricas por Miembro (Tareas, Historias y Puntos)",
+    description: "Conteo de tareas, historias de usuario, puntos y desglose por estados",
+    category: "work",
+    icon: UserCheck,
+    defaultWidth: 12,
+    defaultConfig: {
+      limit: 50,
+    },
+    renderComponent: MemberWorkloadBreakdownBlock as any,
+    configPanelComponent: MemberWorkloadBreakdownConfigPanel,
+  },
+  sprint_burndown: {
+    type: "sprint_burndown",
+    label: "Sprint Burndown & Burnup",
+    description: "Selector de sprint, gráfica de velocidad (burndown o burnup) con filtros por puntos o tareas",
+    category: "metrics",
+    icon: Flame,
+    defaultWidth: 12,
+    defaultConfig: {
+      chart_type: "burndown",
+      filter_by: "estimates",
+    },
+    renderComponent: SprintBurndownBlock as any,
+    configPanelComponent: SprintBurndownConfigPanel,
+  },
+  user_stories_evidences: {
+    type: "user_stories_evidences",
+    label: "Historias de Usuario y Evidencias",
+    description: "Listado anidado de historias y subtareas, galería de imágenes y descargas PDF",
+    category: "work",
+    icon: BookOpen,
+    defaultWidth: 12,
+    defaultConfig: {
+      limit: 20,
+    },
+    renderComponent: UserStoriesEvidencesBlock as any,
+    configPanelComponent: UserStoriesEvidencesConfigPanel,
   },
 };

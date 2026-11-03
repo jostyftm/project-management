@@ -71,16 +71,16 @@ export function CycleWorkItemsSection({
   const [isLinking, setIsLinking] = useState(false);
   const isAdmin = project?.current_user_role === "ADMIN";
 
-  const loadCycleWorkItems = useCallback(async () => {
+  const loadCycleWorkItems = useCallback(async (silent = false) => {
     if (!cycle?.id) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     try {
       const items = await workItemService.list(projectId, { cycle_id: cycle.id });
       setWorkItems(items);
     } catch {
       toast.error("Error al cargar los work items del ciclo");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [cycle?.id, projectId]);
 
@@ -105,7 +105,7 @@ export function CycleWorkItemsSection({
       onStatsChanged();
     } catch {
       toast.error("Error al actualizar el estado");
-      loadCycleWorkItems();
+      loadCycleWorkItems(true);
     }
   };
 
@@ -472,18 +472,25 @@ export function CycleWorkItemsSection({
       </Dialog>
 
       {/* Sheet de Detalle del Work Item para edición completa */}
-      <WorkItemDetailSheet
-        workItemId={selectedWorkItemId}
-        project={project}
-        states={states}
-        availableItems={workItems}
-        open={!!selectedWorkItemId}
-        onOpenChange={(open) => !open && setSelectedWorkItemId(null)}
-        onUpdated={() => {
-          loadCycleWorkItems();
-          onStatsChanged();
-        }}
-      />
+      {selectedWorkItemId && (
+        <WorkItemDetailSheet
+          workItemId={selectedWorkItemId}
+          project={project}
+          states={states}
+          availableItems={workItems}
+          open={!!selectedWorkItemId}
+          onOpenChange={(open) => !open && setSelectedWorkItemId(null)}
+          onUpdated={(updatedItem?: WorkItem) => {
+            if (updatedItem) {
+              setWorkItems((prev) =>
+                prev.map((i) => (String(i.id) === String(updatedItem.id) ? { ...i, ...updatedItem } : i))
+              );
+            }
+            loadCycleWorkItems(true);
+            onStatsChanged();
+          }}
+        />
+      )}
     </div>
   );
 }
