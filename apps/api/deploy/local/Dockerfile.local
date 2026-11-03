@@ -15,6 +15,11 @@ ENV LANG=C.UTF-8
 ENV SUPERVISOR_PHP_COMMAND="/usr/local/bin/php -d variables_order=EGPCS /var/www/html/artisan serve --host=0.0.0.0 --port=80"
 ENV SUPERVISOR_PHP_USER="sail"
 ENV PLAYWRIGHT_BROWSERS_PATH=0
+ENV HOME=/tmp
+ENV XDG_CONFIG_HOME=/tmp/.chromium
+ENV XDG_CACHE_HOME=/tmp/.chromium
+
+RUN mkdir -p /tmp/.chromium /tmp/.chromium/user-data && chmod -R 777 /tmp/.chromium
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 

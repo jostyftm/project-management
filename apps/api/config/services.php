@@ -54,6 +54,7 @@ return [
         'chrome_path' => env('CHROME_PATH', '/usr/bin/chromium'),
         'node_path' => env('NODE_PATH', '/usr/bin/node'),
         'npm_path' => env('NPM_PATH', '/usr/lib/node_modules'),
+        'user_data_dir' => env('BROWSERSHOT_USER_DATA_DIR', '/tmp/.chromium/user-data'),
     ],
 
 ];

@@ -20,6 +20,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chmod +x /usr/local/bin/install-php-extensions \
     && rm -rf /var/lib/apt/lists/*
 
+# Variables de entorno y directorios para Chromium / Puppeteer headless (evita fallo de Crashpad)
+ENV HOME=/tmp \
+    XDG_CONFIG_HOME=/tmp/.chromium \
+    XDG_CACHE_HOME=/tmp/.chromium
+
+RUN mkdir -p /tmp/.chromium /tmp/.chromium/user-data && chmod -R 777 /tmp/.chromium
+
 # Instalar extensiones (mlocati descarga e instala Oracle Instant Client automáticamente)
 RUN install-php-extensions \
     pdo_pgsql \

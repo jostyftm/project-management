@@ -73,6 +73,10 @@ services:
       dockerfile: ./deploy/prod/Dockerfile.prod
     container_name: plane_api_prod
     restart: always
+    environment:
+      - XDG_CONFIG_HOME=/tmp/.chromium
+      - XDG_CACHE_HOME=/tmp/.chromium
+      - HOME=/tmp
     env_file:
       - .env
     networks:

@@ -77,6 +77,10 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "${APP_PORT:-8000}:80"
+    environment:
+      - XDG_CONFIG_HOME=/tmp/.chromium
+      - XDG_CACHE_HOME=/tmp/.chromium
+      - HOME=/tmp
     env_file:
       - .env
     volumes:
