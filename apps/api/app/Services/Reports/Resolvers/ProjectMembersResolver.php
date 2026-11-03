@@ -14,9 +14,10 @@ class ProjectMembersResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
         $roleFilter = $config['role'] ?? 'all';
-        $limit = min(max((int) ($config['limit'] ?? 50), 1), 100);
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
 
         $query = ProjectMember::query()
             ->with(['user', 'project'])
@@ -32,7 +33,13 @@ class ProjectMembersResolver
             $query->where('role', strtoupper($roleFilter));
         }
 
-        $records = $query->take($limit)->get();
+        if ($limit !== null) {
+            $query->take($limit);
+        } else {
+            $query->take(300);
+        }
+
+        $records = $query->get();
 
         // Agrupar por usuario para consolidar roles y proyectos si pertenece a más de uno
         $membersGrouped = $records->groupBy('user_id');

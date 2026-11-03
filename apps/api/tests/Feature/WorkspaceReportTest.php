@@ -2,6 +2,7 @@
 
 use App\Enums\BlockType;
 use App\Enums\ReportVisibility;
+use App\Jobs\GenerateReportExportJob;
 use App\Models\Project;
 use App\Models\ReportBlock;
 use App\Models\ReportSnapshot;
@@ -10,6 +11,8 @@ use App\Models\Workspace;
 use App\Models\WorkspaceReport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -750,4 +753,45 @@ it('puede exportar un reporte público a PNG sin auth', function () {
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'image/png');
     expect(strlen($response->getContent()))->toBeGreaterThan(100);
+});
+
+it('puede encolar la exportación de un reporte a PDF', function () {
+    Queue::fake();
+
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+        'title' => 'Reporte para Encolar',
+    ]);
+
+    $response = $this->postJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/export/queue", [
+        'format' => 'pdf',
+    ]);
+
+    $response->assertStatus(202)
+        ->assertJsonPath('status', 'queued')
+        ->assertJsonPath('format', 'pdf');
+
+    Queue::assertPushed(GenerateReportExportJob::class, function ($job) use ($report) {
+        return $job->report->id === $report->id && $job->format === 'pdf';
+    });
+});
+
+it('el job GenerateReportExportJob guarda el archivo y crea la notificación para el usuario', function () {
+    Storage::fake('public');
+
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+        'title' => 'Reporte Job Test',
+    ]);
+
+    $job = new GenerateReportExportJob($report, $this->user, 'pdf');
+    app()->call([$job, 'handle']);
+
+    $this->assertDatabaseHas('notifications', [
+        'workspace_id' => $this->workspace->id,
+        'recipient_id' => $this->user->id,
+        'type' => 'REPORT_EXPORT_READY',
+    ]);
 });

@@ -15,9 +15,14 @@ class RisksBlockersResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
+
         $daysStagnant = max((int) ($config['days_stagnant'] ?? 7), 1);
-        $limit = min(max((int) ($config['limit'] ?? 10), 1), 30);
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
 
         $baseQuery = WorkItem::query()->whereNull('completed_at');
 
@@ -25,6 +30,17 @@ class RisksBlockersResolver
             $baseQuery->whereIn('project_id', $projectIds);
         } elseif (! empty($scope['workspace_id'])) {
             $baseQuery->where('workspace_id', $scope['workspace_id']);
+        }
+
+        if (! empty($cycleIds)) {
+            $baseQuery->whereHas('cycles', fn ($q) => $q->whereIn('cycles.id', $cycleIds));
+        }
+
+        if (! empty($startDate)) {
+            $baseQuery->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if (! empty($endDate)) {
+            $baseQuery->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         // 1. Tareas vencidas
@@ -44,7 +60,7 @@ class RisksBlockersResolver
         $urgentCount = (clone $urgentQuery)->count();
 
         // Obtener los riesgos más críticos combinados
-        $riskyItems = (clone $baseQuery)
+        $riskyItemsQuery = (clone $baseQuery)
             ->where(function ($q) use ($daysStagnant) {
                 $q->where(function ($sq) {
                     $sq->whereNotNull('target_date')->where('target_date', '<', now());
@@ -57,9 +73,15 @@ class RisksBlockersResolver
                 WHEN target_date < CURRENT_DATE THEN 1 
                 WHEN priority = 'URGENT' THEN 2 
                 ELSE 3 END")
-            ->orderBy('target_date', 'asc')
-            ->limit($limit)
-            ->get();
+            ->orderBy('target_date', 'asc');
+
+        if ($limit !== null) {
+            $riskyItemsQuery->take($limit);
+        } else {
+            $riskyItemsQuery->take(300);
+        }
+
+        $riskyItems = $riskyItemsQuery->get();
 
         $items = $riskyItems->map(function ($item) use ($daysStagnant) {
             $isOverdue = $item->target_date && Carbon::parse($item->target_date)->isPast();

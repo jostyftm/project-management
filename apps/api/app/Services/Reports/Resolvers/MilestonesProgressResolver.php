@@ -4,19 +4,23 @@ namespace App\Services\Reports\Resolvers;
 
 use App\Models\Milestone;
 use App\Models\ReportBlock;
+use Carbon\Carbon;
 
 class MilestonesProgressResolver
 {
     /**
      * Resuelve el progreso de hitos/milestones.
-     * Config esperada: { project_ids: [], status: string, limit: int }
+     * Config esperada: { project_ids: [], start_date: string, end_date: string, status: string, limit: int|null }
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
         $status = $config['status'] ?? 'all';
-        $limit = min(max((int) ($config['limit'] ?? 5), 1), 20);
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
 
         $query = Milestone::query();
 
@@ -30,15 +34,28 @@ class MilestonesProgressResolver
             $query->where('status', $status);
         }
 
-        $milestones = $query->withCount([
+        if (! empty($startDate)) {
+            $query->where('target_date', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if (! empty($endDate)) {
+            $query->where('target_date', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        $query->withCount([
             'workItems as total_items',
             'workItems as completed_items' => function ($q) {
                 $q->whereNotNull('completed_at');
             },
         ])
-            ->orderBy('target_date', 'asc')
-            ->limit($limit)
-            ->get();
+            ->orderBy('target_date', 'asc');
+
+        if ($limit !== null) {
+            $query->take($limit);
+        } else {
+            $query->take(200);
+        }
+
+        $milestones = $query->get();
 
         $items = $milestones->map(function ($m) {
             $total = (int) $m->total_items;

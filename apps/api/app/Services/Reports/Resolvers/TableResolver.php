@@ -4,18 +4,24 @@ namespace App\Services\Reports\Resolvers;
 
 use App\Models\ReportBlock;
 use App\Models\WorkItem;
+use Carbon\Carbon;
 
 class TableResolver
 {
     /**
      * Resuelve una tabla configurable de work items.
-     * Config: { project_ids: [], limit: int, sort_by: string, sort_dir: string, columns: [] }
+     * Config: { project_ids: [], cycle_ids: [], start_date: string, end_date: string, limit: int|null, sort_by: string, sort_dir: string, columns: [] }
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
-        $limit = min(max((int) ($config['limit'] ?? 10), 1), 50);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
+
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
         $sortBy = in_array($config['sort_by'] ?? '', ['created_at', 'updated_at', 'target_date', 'priority'])
             ? $config['sort_by']
             : 'created_at';
@@ -29,7 +35,25 @@ class TableResolver
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
         }
 
-        $items = $query->orderBy($sortBy, $sortDir)->take($limit)->get();
+        if (! empty($cycleIds)) {
+            $query->whereHas('cycles', fn ($q) => $q->whereIn('cycles.id', $cycleIds));
+        }
+
+        if (! empty($startDate)) {
+            $query->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if (! empty($endDate)) {
+            $query->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+
+        $query->orderBy($sortBy, $sortDir);
+        if ($limit !== null) {
+            $query->take($limit);
+        } else {
+            $query->take(500);
+        }
+
+        $items = $query->get();
 
         $rows = $items->map(function ($item) {
             return [

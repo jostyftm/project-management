@@ -19,8 +19,8 @@ class SprintBurndownResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []);
-        $cycleId = $config['cycle_id'] ?? (! empty($scope['cycle_ids']) ? $scope['cycle_ids'][0] : null);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleId = $config['cycle_id'] ?? (! empty($config['cycle_ids']) ? (is_array($config['cycle_ids']) ? reset($config['cycle_ids']) : $config['cycle_ids']) : (! empty($scope['cycle_ids']) ? reset($scope['cycle_ids']) : null));
         $chartType = $config['chart_type'] ?? 'burndown';
         $filterBy = $config['filter_by'] ?? 'work_items';
 

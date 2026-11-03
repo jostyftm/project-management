@@ -17,11 +17,14 @@ class LineChartResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
         $metric = $config['metric'] ?? 'work_items_completed';
         $grouping = $config['grouping'] ?? 'week';
-        $dateFrom = Carbon::parse($config['date_from'] ?? now()->subDays(30)->toDateString());
-        $dateTo = Carbon::parse($config['date_to'] ?? now()->toDateString());
+        $dateFromRaw = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? now()->subDays(30)->toDateString();
+        $dateToRaw = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? now()->toDateString();
+        $dateFrom = Carbon::parse($dateFromRaw)->startOfDay();
+        $dateTo = Carbon::parse($dateToRaw)->endOfDay();
         $color = $config['color'] ?? '#6366f1';
 
         $query = WorkItem::query();
@@ -29,6 +32,10 @@ class LineChartResolver
             $query->whereIn('project_id', $projectIds);
         } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
+        }
+
+        if (! empty($cycleIds)) {
+            $query->whereHas('cycles', fn ($q) => $q->whereIn('cycles.id', $cycleIds));
         }
 
         $series = match ($metric) {

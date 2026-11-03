@@ -103,15 +103,16 @@ HTML : '';
             margin-bottom: 8px;
         }
         .grid {
-            display: flex;
-            flex-wrap: wrap;
-            margin: -8px;
-            margin-bottom: 16px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+            width: 100%;
         }
-        .col-12 { width: 100%; padding: 8px; display: flex; flex-direction: column; }
-        .col-8  { width: 66.6666%; padding: 8px; display: flex; flex-direction: column; }
-        .col-6  { width: 50%; padding: 8px; display: flex; flex-direction: column; }
-        .col-4  { width: 33.3333%; padding: 8px; display: flex; flex-direction: column; }
+        .col-12 { grid-column: span 12; width: 100%; }
+        .col-8  { grid-column: span 8; width: 100%; }
+        .col-6  { grid-column: span 6; width: 100%; }
+        .col-4  { grid-column: span 4; width: 100%; }
 
         .card {
             background: {$surfaceColor};
@@ -122,11 +123,25 @@ HTML : '';
             break-inside: avoid;
             width: 100%;
             height: auto;
-            min-height: 100%;
+            min-height: auto;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             overflow: visible;
+        }
+
+        .card.card-large {
+            page-break-inside: auto;
+            break-inside: auto;
+        }
+        .card.card-large .card-header {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .story-card, .table-row, .work-item-row, .member-card, .activity-item, .risk-card {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-bottom: 12px;
         }
         .card-header {
             display: flex;
@@ -313,12 +328,22 @@ HTML;
             default => 'col-12',
         };
 
+        $isLargeBlock = in_array($block->type, [
+            BlockType::USER_STORIES_EVIDENCES,
+            BlockType::WORK_ITEMS_LIST,
+            BlockType::TABLE,
+            BlockType::PROJECT_MEMBERS,
+            BlockType::MEMBER_WORKLOAD_BREAKDOWN,
+            BlockType::RECENT_ACTIVITY,
+        ], true);
+
+        $cardClass = $isLargeBlock ? 'card card-large' : 'card';
         $title = htmlspecialchars($block->title ?? $block->type->label());
         $body = $this->renderBlockBody($block, $data, $primaryColor);
 
         return <<<HTML
         <div class="{$widthClass}">
-            <div class="card">
+            <div class="{$cardClass}">
                 <div class="card-header">
                     <h3 class="card-title">{$title}</h3>
                 </div>
@@ -1673,8 +1698,8 @@ HTML;
             $points = (float) ($story['estimate_points'] ?? 0);
 
             $html .= "
-            <div style=\"border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#ffffff;\">
-                <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;\">
+            <div class=\"story-card\" style=\"border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;page-break-inside:avoid;break-inside:avoid;margin-bottom:12px;\">
+                <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;\">
                     <div style=\"display:flex;align-items:center;gap:6px;\">
                         <span style=\"font-weight:700;font-size:11px;color:#4f46e5;\">{$id}</span>
                         <span style=\"font-weight:600;font-size:11px;color:#1e293b;\">{$title}</span>
@@ -1691,12 +1716,25 @@ HTML;
             $pdfs = $evidences['pdfs'] ?? [];
 
             if (! empty($images)) {
-                $html .= '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:6px;">';
+                $html .= '<div style="margin-top:10px;margin-bottom:10px;">';
+                $html .= '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">📸 Evidencias Fotográficas ('.count($images).')</div>';
+                $html .= '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:10px;">';
                 foreach ($images as $img) {
-                    $imgUrl = htmlspecialchars($img['url'] ?? '');
-                    $html .= "<img src=\"{$imgUrl}\" style=\"height:60px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;\" />";
+                    $imgUrl = ! empty($img['data_url']) ? $img['data_url'] : htmlspecialchars($img['url'] ?? '');
+                    $imgTitle = htmlspecialchars($img['title'] ?? $img['file_name'] ?? 'Evidencia');
+                    $creator = htmlspecialchars($img['creator']['name'] ?? 'Usuario');
+                    $html .= "
+                    <div style=\"border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;page-break-inside:avoid;break-inside:avoid;\">
+                        <div style=\"width:100%;height:220px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
+                            <img src=\"{$imgUrl}\" alt=\"{$imgTitle}\" style=\"width:100%;height:100%;object-fit:contain;display:block;\" />
+                        </div>
+                        <div style=\"padding:8px 10px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;\">
+                            <span style=\"font-size:10px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;\">{$imgTitle}</span>
+                            <span style=\"font-size:9px;color:#94a3b8;\">{$creator}</span>
+                        </div>
+                    </div>";
                 }
-                $html .= '</div>';
+                $html .= '</div></div>';
             }
 
             if (! empty($pdfs)) {
@@ -1730,12 +1768,22 @@ HTML;
                     $subPdfs = $sub['evidences']['pdfs'] ?? [];
 
                     if (! empty($subImages)) {
-                        $html .= '<div style="display:flex;gap:4px;margin-top:4px;">';
+                        $html .= '<div style="margin-top:6px;margin-bottom:6px;">';
+                        $html .= '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;">';
                         foreach ($subImages as $sImg) {
-                            $sUrl = htmlspecialchars($sImg['url'] ?? '');
-                            $html .= "<img src=\"{$sUrl}\" style=\"height:40px;border-radius:4px;border:1px solid #e2e8f0;object-fit:cover;\" />";
+                            $sUrl = ! empty($sImg['data_url']) ? $sImg['data_url'] : htmlspecialchars($sImg['url'] ?? '');
+                            $sTitle = htmlspecialchars($sImg['title'] ?? $sImg['file_name'] ?? 'Sub-evidencia');
+                            $html .= "
+                            <div style=\"border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;background:#ffffff;page-break-inside:avoid;break-inside:avoid;\">
+                                <div style=\"width:100%;height:160px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
+                                    <img src=\"{$sUrl}\" alt=\"{$sTitle}\" style=\"width:100%;height:100%;object-fit:contain;display:block;\" />
+                                </div>
+                                <div style=\"padding:6px 8px;font-size:9px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">
+                                    {$sTitle}
+                                </div>
+                            </div>";
                         }
-                        $html .= '</div>';
+                        $html .= '</div></div>';
                     }
 
                     if (! empty($subPdfs)) {

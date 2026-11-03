@@ -13,6 +13,7 @@ use App\Http\Requests\Report\CreateReportRequest;
 use App\Http\Requests\Report\UpdateReportRequest;
 use App\Http\Resources\Report\WorkspaceReportCollection;
 use App\Http\Resources\Report\WorkspaceReportResource;
+use App\Jobs\GenerateReportExportJob;
 use App\Models\Workspace;
 use App\Models\WorkspaceReport;
 use App\Services\Reports\BlockResolverService;
@@ -20,6 +21,7 @@ use App\Services\Reports\ReportTemplateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class WorkspaceReportController extends Controller
@@ -210,6 +212,58 @@ class WorkspaceReportController extends Controller
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * Encolar la generación asíncrona del reporte y notificar al usuario.
+     */
+    public function queueExport(Request $request, Workspace $workspace, WorkspaceReport $workspaceReport): JsonResponse
+    {
+        abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
+
+        $format = strtolower($request->input('format', 'pdf'));
+        if (! in_array($format, ['pdf', 'png'], true)) {
+            $format = 'pdf';
+        }
+
+        $user = $request->user() ?: auth()->user();
+        if (! $user) {
+            abort(401, 'Usuario no autenticado');
+        }
+
+        GenerateReportExportJob::dispatch($workspaceReport, $user, $format);
+
+        return response()->json([
+            'message' => 'Generación de reporte encolada con éxito. Recibirás una notificación cuando esté listo para descargar.',
+            'status' => 'queued',
+            'format' => $format,
+        ], 202);
+    }
+
+    /**
+     * Descargar archivo generado por el proceso encolado.
+     */
+    public function downloadExport(Request $request, Workspace $workspace, WorkspaceReport $workspaceReport)
+    {
+        abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
+
+        $filename = basename($request->query('file', ''));
+        if (empty($filename)) {
+            abort(400, 'Archivo no especificado');
+        }
+
+        $path = "exports/{$workspace->id}/{$filename}";
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($path)) {
+            abort(404, 'El archivo solicitado ya no está disponible o aún se está generando.');
+        }
+
+        $mimeType = str_ends_with($filename, '.pdf') ? 'application/pdf' : 'image/png';
+
+        return $disk->download($path, $filename, [
+            'Content-Type' => $mimeType,
         ]);
     }
 

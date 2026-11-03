@@ -16,11 +16,12 @@ class MemberWorkloadBreakdownResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []);
-        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []);
-        $startDate = $config['start_date'] ?? $scope['start_date'] ?? null;
-        $endDate = $config['end_date'] ?? $scope['end_date'] ?? null;
-        $limit = min(max((int) ($config['limit'] ?? 50), 1), 100);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
 
         // Obtener usuarios involucrados en los proyectos o asignados a ítems
         $usersQuery = User::query();
@@ -37,7 +38,13 @@ class MemberWorkloadBreakdownResolver
             });
         }
 
-        $users = $usersQuery->take($limit)->get();
+        if ($limit !== null) {
+            $usersQuery->take($limit);
+        } else {
+            $usersQuery->take(200);
+        }
+
+        $users = $usersQuery->get();
 
         $membersData = [];
         $totalWorkspacePoints = 0.0;
