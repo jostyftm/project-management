@@ -36,6 +36,11 @@ class ExportReportPdfAction
         $chromePath = config('services.browsershot.chrome_path', '/usr/bin/chromium');
         $nodePath = config('services.browsershot.node_path', '/usr/bin/node');
         $npmPath = config('services.browsershot.npm_path', '/usr/lib/node_modules');
+        $userDataDir = config('services.browsershot.user_data_dir', '/tmp/.chromium/user-data');
+
+        if (! is_dir($userDataDir)) {
+            @mkdir($userDataDir, 0777, true);
+        }
 
         if (app()->environment('testing') || ! file_exists($chromePath) || ! file_exists($nodePath) || ! file_exists($npmPath.'/puppeteer')) {
             return self::FALLBACK_PDF;
@@ -52,11 +57,20 @@ class ExportReportPdfAction
                 ->setNodeBinary($nodePath)
                 ->setNpmBinary('/usr/bin/npm')
                 ->setNodeModulePath($npmPath)
+                ->setNodeEnv([
+                    'HOME' => '/tmp',
+                    'XDG_CONFIG_HOME' => '/tmp/.chromium',
+                    'XDG_CACHE_HOME' => '/tmp/.chromium',
+                ])
+                ->setUserDataDir($userDataDir)
                 ->addChromiumArguments([
                     'no-sandbox',
                     'disable-setuid-sandbox',
                     'disable-dev-shm-usage',
                     'disable-gpu',
+                    'disable-crashpad',
+                    'disable-crash-reporter',
+                    'no-crashpad',
                 ])
                 ->showBackground()
                 ->emulateMedia('screen')

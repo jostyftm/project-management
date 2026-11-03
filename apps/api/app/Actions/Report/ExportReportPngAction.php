@@ -36,6 +36,11 @@ class ExportReportPngAction
         $chromePath = config('services.browsershot.chrome_path', '/usr/bin/chromium');
         $nodePath = config('services.browsershot.node_path', '/usr/bin/node');
         $npmPath = config('services.browsershot.npm_path', '/usr/lib/node_modules');
+        $userDataDir = config('services.browsershot.user_data_dir', '/tmp/.chromium/user-data');
+
+        if (! is_dir($userDataDir)) {
+            @mkdir($userDataDir, 0777, true);
+        }
 
         if (app()->environment('testing') || ! file_exists($chromePath) || ! file_exists($nodePath) || ! file_exists($npmPath.'/puppeteer')) {
             return base64_decode(self::FALLBACK_PNG_B64).str_repeat('A', 150);
@@ -47,11 +52,20 @@ class ExportReportPngAction
                 ->setNodeBinary($nodePath)
                 ->setNpmBinary('/usr/bin/npm')
                 ->setNodeModulePath($npmPath)
+                ->setNodeEnv([
+                    'HOME' => '/tmp',
+                    'XDG_CONFIG_HOME' => '/tmp/.chromium',
+                    'XDG_CACHE_HOME' => '/tmp/.chromium',
+                ])
+                ->setUserDataDir($userDataDir)
                 ->addChromiumArguments([
                     'no-sandbox',
                     'disable-setuid-sandbox',
                     'disable-dev-shm-usage',
                     'disable-gpu',
+                    'disable-crashpad',
+                    'disable-crash-reporter',
+                    'no-crashpad',
                 ])
                 ->windowSize(1200, 800)
                 ->deviceScaleFactor(2)
