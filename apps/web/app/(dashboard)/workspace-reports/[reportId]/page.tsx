@@ -7,7 +7,7 @@ import { useWorkspaceStore } from "@/hooks/use-workspace-store";
 import { workspaceReportService } from "@/services/plane/workspace-report-service";
 import { GlobalReportFilters, WorkspaceReport } from "@/types/workspace-report-types";
 import { blockRegistry } from "@/registry/block-registry";
-import { ReportGlobalFilterBar } from "@/components/plane/workspace-reports/ReportGlobalFilterBar";
+import { BlockFilterPopover } from "@/components/plane/workspace-reports/BlockFilterPopover";
 import { ArrowLeft, Edit3, Share2, Loader2, Maximize2, Minimize2, Download, Image as ImageIcon, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -24,12 +24,10 @@ export default function ReportViewPage({
 
   useDocumentTitle(report?.title ? `${report.title} - Reportes` : "Reporte Dinámico");
   const [blocksData, setBlocksData] = useState<Record<string, any>>({});
-  const [globalFilters, setGlobalFilters] = useState<GlobalReportFilters>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState(false);
   const [isExporting, setIsExporting] = useState<"pdf" | "png" | null>(null);
-  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -43,13 +41,10 @@ export default function ReportViewPage({
       .then((reportData) => {
         if (!isMounted) return;
         setReport(reportData);
-        const initialFilters = (reportData.layout_config as any)?.global_filters || {};
-        setGlobalFilters(initialFilters);
 
         return workspaceReportService.getAllData(
           currentWorkspace.id,
-          resolvedParams.reportId,
-          initialFilters
+          resolvedParams.reportId
         );
       })
       .then((allData) => {
@@ -70,42 +65,39 @@ export default function ReportViewPage({
     };
   }, [currentWorkspace?.id, resolvedParams.reportId]);
 
-  // Refetch data when global filters change
-  const handleFiltersChange = async (newFilters: GlobalReportFilters) => {
-    setGlobalFilters(newFilters);
-    if (!currentWorkspace?.id || !resolvedParams.reportId) return;
-
-    try {
-      const allData = await workspaceReportService.getAllData(
-        currentWorkspace.id,
-        resolvedParams.reportId,
-        newFilters
-      );
-      setBlocksData(allData || {});
-    } catch (err) {
-      console.error("Error refreshing report data with filters:", err);
-      toast.error("Error al actualizar datos con los filtros seleccionados");
-    }
-  };
-
-  const handleSaveDefaultFilters = async () => {
+  // Actualizar configuración y datos de un widget específico
+  const handleBlockFilterChange = async (blockId: string, updatedConfig: Record<string, any>) => {
     if (!currentWorkspace?.id || !report) return;
-    setIsSavingDefaults(true);
+
+    // Actualizar bloque en memoria para reflejar estado
+    const updatedBlocks = (report.blocks || []).map((b) =>
+      b.id === blockId ? { ...b, config: updatedConfig } : b
+    );
+    setReport({ ...report, blocks: updatedBlocks });
+
     try {
-      const updatedLayout = {
-        ...(report.layout_config || {}),
-        global_filters: globalFilters,
-      };
-      await workspaceReportService.update(currentWorkspace.id, report.id, {
-        layout_config: updatedLayout,
+      // 1. Guardar configuración en la base de datos
+      await workspaceReportService.updateBlock(currentWorkspace.id, report.id, blockId, {
+        config: updatedConfig,
       });
-      setReport({ ...report, layout_config: updatedLayout });
-      toast.success("Filtros guardados como predeterminados del reporte");
+
+      // 2. Refrescar datos solo de este widget
+      const refreshedData = await workspaceReportService.getBlockData(
+        currentWorkspace.id,
+        report.id,
+        blockId,
+        updatedConfig
+      );
+
+      setBlocksData((prev) => ({
+        ...prev,
+        [blockId]: refreshedData,
+      }));
+
+      toast.success("Filtros del widget aplicados correctamente");
     } catch (err) {
-      console.error(err);
-      toast.error("Error al guardar filtros predeterminados");
-    } finally {
-      setIsSavingDefaults(false);
+      console.error("Error al actualizar filtros del widget:", err);
+      toast.error("Error al aplicar los filtros del widget");
     }
   };
 
@@ -149,10 +141,13 @@ export default function ReportViewPage({
     if (!currentWorkspace?.id || !report) return;
     setIsExporting("pdf");
     try {
-      await workspaceReportService.downloadPdf(currentWorkspace.id, report.id, report.title);
-      toast.success("PDF generado y descargado correctamente");
+      await workspaceReportService.queueExport(currentWorkspace.id, report.id, "pdf");
+      toast.success(
+        "Generación de PDF iniciada en segundo plano. Recibirás una notificación en la campana cuando esté listo para descargar.",
+        { duration: 7000 }
+      );
     } catch (e) {
-      toast.error("Error al exportar PDF");
+      toast.error("Error al encolar la exportación del PDF");
     } finally {
       setIsExporting(null);
     }
@@ -162,10 +157,13 @@ export default function ReportViewPage({
     if (!currentWorkspace?.id || !report) return;
     setIsExporting("png");
     try {
-      await workspaceReportService.downloadPng(currentWorkspace.id, report.id, report.title);
-      toast.success("PNG generado y descargado correctamente");
+      await workspaceReportService.queueExport(currentWorkspace.id, report.id, "png");
+      toast.success(
+        "Generación de PNG iniciada en segundo plano. Recibirás una notificación en la campana cuando esté listo para descargar.",
+        { duration: 7000 }
+      );
     } catch (e) {
-      toast.error("Error al exportar PNG");
+      toast.error("Error al encolar la exportación del PNG");
     } finally {
       setIsExporting(null);
     }
@@ -267,15 +265,6 @@ export default function ReportViewPage({
 
       {/* Main Document View */}
       <main className="flex-1 p-6 sm:p-10 flex flex-col items-center">
-        <div className="w-full max-w-5xl">
-          <ReportGlobalFilterBar
-            filters={globalFilters}
-            onChange={handleFiltersChange}
-            onSaveDefaults={handleSaveDefaultFilters}
-            isSavingDefaults={isSavingDefaults}
-          />
-        </div>
-
         <div
           style={{
             backgroundColor: report.theme?.backgroundColor || undefined,
@@ -325,7 +314,13 @@ export default function ReportViewPage({
                   : "col-span-12";
 
               return (
-                <div key={block.id} className={colSpanClass}>
+                <div key={block.id} className={`${colSpanClass} relative group`}>
+                  <div className="absolute top-3.5 right-3.5 z-10 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <BlockFilterPopover
+                      block={block}
+                      onApplyFilter={handleBlockFilterChange}
+                    />
+                  </div>
                   {Component ? (
                     <Component
                       block={block}

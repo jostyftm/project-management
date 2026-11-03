@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, ExternalLink, Inbox, MessageSquare, AtSign, CheckCircle2, Loader2, Users, UserCheck, ArrowRightLeft, Flag } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Inbox, MessageSquare, AtSign, CheckCircle2, Loader2, Users, UserCheck, ArrowRightLeft, Flag, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -77,7 +77,15 @@ export function NotificationBell() {
 
     setOpen(false);
     if (notif.target_url) {
-      router.push(notif.target_url);
+      if (notif.type === "REPORT_EXPORT_READY" || notif.target_url.includes("/export/download")) {
+        const rawToken = storage.get(ACCESS_TOKEN);
+        const tokenStr = typeof rawToken === "string" ? rawToken : rawToken ? String(rawToken) : null;
+        const sep = notif.target_url.includes("?") ? "&" : "?";
+        const downloadUrl = tokenStr ? `${notif.target_url}${sep}token=${encodeURIComponent(tokenStr)}` : notif.target_url;
+        window.open(downloadUrl, "_blank");
+      } else {
+        router.push(notif.target_url);
+      }
     }
   };
 
@@ -176,6 +184,10 @@ export function NotificationBell() {
                   ) : n.type === "CYCLE_COMPLETED" ? (
                     <div className="flex size-7 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                       <Flag className="size-3.5" />
+                    </div>
+                  ) : n.type === "REPORT_EXPORT_READY" ? (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
+                      <FileDown className="size-3.5" />
                     </div>
                   ) : n.type === "PROJECT_INVITATION" || n.type === "PROJECT_MEMBER_ADDED" ? (
                     <div className="flex size-7 items-center justify-center rounded-full bg-teal-100 text-teal-700">

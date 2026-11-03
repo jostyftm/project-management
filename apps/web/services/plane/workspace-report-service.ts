@@ -299,6 +299,39 @@ export const workspaceReportService = {
   },
 
   // Exportación Server-Side (Fase 5)
+  queueExport: async (
+    workspaceId: string | number,
+    reportId: string | number,
+    format: "pdf" | "png"
+  ) => {
+    return httpRequestService<{ message: string; format: string }>({
+      url: `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/export/queue`,
+      method: "POST",
+      data: { format },
+    });
+  },
+
+  downloadExport: async (
+    workspaceId: string | number,
+    reportId: string | number,
+    filename: string
+  ) => {
+    const url = `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/export/download?file=${encodeURIComponent(filename)}`;
+    const blob = await httpRequestService<Blob>({
+      url,
+      method: "GET",
+      responseType: "blob",
+    });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
   getExportPdfUrl: (workspaceId: string | number, reportId: string | number) => {
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     const rawToken = token ? JSON.parse(token) : null;

@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ReportBlock, WorkspaceReport } from "@/types/workspace-report-types";
 import { blockRegistry } from "@/registry/block-registry";
-import { Sliders, Layout, Trash2, X, Globe, Lock, Shield } from "lucide-react";
+import { Sliders, Layout, Trash2, X, Globe, Lock, Shield, Filter, Folder, Repeat, Calendar, Hash } from "lucide-react";
+import { projectService } from "@/services/plane/projectService";
+import { cycleService } from "@/services/plane/cycleService";
+import { Project, Cycle } from "@/types/plane-types";
 
 interface BlockConfigPanelProps {
   block: ReportBlock | null;
@@ -23,6 +26,31 @@ export function BlockConfigPanel({
   onClose,
 }: BlockConfigPanelProps) {
   const [tab, setTab] = useState<"config" | "layout">("config");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [cycles, setCycles] = useState<Cycle[]>([]);
+  const [isLoadingCycles, setIsLoadingCycles] = useState(false);
+
+  const blockProjectId = block?.config?.project_ids?.[0] || block?.config?.project_id || "";
+
+  useEffect(() => {
+    projectService
+      .list()
+      .then((data: any) => setProjects(data || []))
+      .catch((err) => console.error("Error loading projects for config panel:", err));
+  }, []);
+
+  useEffect(() => {
+    if (!blockProjectId) {
+      setCycles([]);
+      return;
+    }
+    setIsLoadingCycles(true);
+    cycleService
+      .list(blockProjectId)
+      .then((data: any) => setCycles(data || []))
+      .catch((err) => console.error("Error loading cycles:", err))
+      .finally(() => setIsLoadingCycles(false));
+  }, [blockProjectId]);
 
   if (!block) {
     // Panel de propiedades del reporte general
@@ -166,39 +194,176 @@ export function BlockConfigPanel({
             )}
 
             {/* Local Block Filters */}
-            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3">
-              <span className="text-[11px] font-bold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider block">
-                Filtros Locales del Bloque
-              </span>
+            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+                <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>Filtros Específicos del Widget</span>
+              </div>
               <p className="text-[11px] text-neutral-400 leading-relaxed">
-                Sobrescribe los filtros globales únicamente para este widget (deja en blanco para heredar los filtros globales).
+                Personaliza los datos que muestra este bloque (proyecto, ciclo, fechas y límite de registros).
               </p>
 
+              {/* Proyecto */}
               <div>
-                <label className="block text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-                  Rango de Fechas Específico
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                  <Folder className="w-3 h-3 text-neutral-400" />
+                  <span>Proyecto</span>
+                </label>
+                <select
+                  value={block.config?.project_ids?.[0] || block.config?.project_id || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const updated = { ...block.config };
+                    if (val) {
+                      updated.project_ids = [val];
+                      updated.project_id = val;
+                    } else {
+                      delete updated.project_ids;
+                      delete updated.project_id;
+                    }
+                    delete updated.cycle_ids;
+                    delete updated.cycle_id;
+                    onUpdateBlock(block.id, { config: updated });
+                  }}
+                  className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-neutral-800 dark:text-neutral-200"
+                >
+                  <option value="">Todos los proyectos del workspace</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.identifier ? `(${p.identifier})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Ciclo */}
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                  <Repeat className="w-3 h-3 text-neutral-400" />
+                  <span>Ciclo / Sprint</span>
+                </label>
+                <select
+                  value={block.config?.cycle_ids?.[0] || block.config?.cycle_id || ""}
+                  disabled={!blockProjectId || isLoadingCycles}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const updated = { ...block.config };
+                    if (val) {
+                      updated.cycle_ids = [val];
+                      updated.cycle_id = val;
+                    } else {
+                      delete updated.cycle_ids;
+                      delete updated.cycle_id;
+                    }
+                    onUpdateBlock(block.id, { config: updated });
+                  }}
+                  className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-neutral-800 dark:text-neutral-200 disabled:opacity-50"
+                >
+                  <option value="">
+                    {!blockProjectId
+                      ? "Selecciona un proyecto primero"
+                      : isLoadingCycles
+                      ? "Cargando ciclos..."
+                      : "Todos los ciclos"}
+                  </option>
+                  {cycles.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fechas */}
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                  <Calendar className="w-3 h-3 text-neutral-400" />
+                  <span>Rango de Fechas</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="date"
-                    value={block.config?.start_date || ""}
+                    value={block.config?.start_date || block.config?.date_from || ""}
                     onChange={(e) =>
                       onUpdateBlock(block.id, {
-                        config: { ...block.config, start_date: e.target.value || undefined },
+                        config: {
+                          ...block.config,
+                          start_date: e.target.value || undefined,
+                          date_from: e.target.value || undefined,
+                        },
                       })
                     }
                     className="text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-neutral-800 dark:text-neutral-200"
                   />
                   <input
                     type="date"
-                    value={block.config?.end_date || ""}
+                    value={block.config?.end_date || block.config?.date_to || ""}
                     onChange={(e) =>
                       onUpdateBlock(block.id, {
-                        config: { ...block.config, end_date: e.target.value || undefined },
+                        config: {
+                          ...block.config,
+                          end_date: e.target.value || undefined,
+                          date_to: e.target.value || undefined,
+                        },
                       })
                     }
                     className="text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-neutral-800 dark:text-neutral-200"
                   />
+                </div>
+              </div>
+
+              {/* Límite de registros */}
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                  <Hash className="w-3 h-3 text-neutral-400" />
+                  <span>Límite de Registros</span>
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-neutral-700 dark:text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={
+                        block.config?.limit === null ||
+                        block.config?.limit === undefined ||
+                        block.config?.limit === 0 ||
+                        block.config?.limit === "all"
+                      }
+                      onChange={(e) => {
+                        const updated = { ...block.config };
+                        if (e.target.checked) {
+                          updated.limit = null;
+                        } else {
+                          updated.limit = 20;
+                        }
+                        onUpdateBlock(block.id, { config: updated });
+                      }}
+                      className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Mostrar todos los registros (sin límite)</span>
+                  </label>
+
+                  {block.config?.limit !== null &&
+                    block.config?.limit !== undefined &&
+                    block.config?.limit !== 0 &&
+                    block.config?.limit !== "all" && (
+                      <input
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={block.config.limit}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          onUpdateBlock(block.id, {
+                            config: {
+                              ...block.config,
+                              limit: isNaN(val) ? 20 : val,
+                            },
+                          });
+                        }}
+                        className="w-full text-xs rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-neutral-800 dark:text-neutral-200"
+                        placeholder="Cantidad de registros (ej. 25)"
+                      />
+                    )}
                 </div>
               </div>
             </div>
