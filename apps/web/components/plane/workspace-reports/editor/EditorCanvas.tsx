@@ -19,8 +19,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CanvasBlock } from "./CanvasBlock";
 import { PlusCircle } from "lucide-react";
-import { ReportGlobalFilterBar } from "../ReportGlobalFilterBar";
-import { GlobalReportFilters } from "@/types/workspace-report-types";
 
 interface EditorCanvasProps {
   report: WorkspaceReport;
@@ -28,10 +26,6 @@ interface EditorCanvasProps {
   selectedBlockId: string | null;
   blocksData?: Record<string, any>;
   zoom?: number;
-  globalFilters?: GlobalReportFilters;
-  onGlobalFiltersChange?: (filters: GlobalReportFilters) => void;
-  onSaveDefaultFilters?: () => void;
-  isSavingDefaults?: boolean;
   onSelectBlock: (id: string | null) => void;
   onReorderBlocks: (newBlocks: ReportBlock[]) => void;
   onDeleteBlock: (blockId: string) => void;
@@ -47,10 +41,6 @@ export function EditorCanvas({
   selectedBlockId,
   blocksData,
   zoom = 100,
-  globalFilters,
-  onGlobalFiltersChange,
-  onSaveDefaultFilters,
-  isSavingDefaults,
   onSelectBlock,
   onReorderBlocks,
   onDeleteBlock,
@@ -98,15 +88,6 @@ export function EditorCanvas({
         }}
         className="w-full max-w-5xl"
       >
-        {globalFilters && onGlobalFiltersChange && (
-          <ReportGlobalFilterBar
-            filters={globalFilters}
-            onChange={onGlobalFiltersChange}
-            onSaveDefaults={onSaveDefaultFilters}
-            isSavingDefaults={isSavingDefaults}
-          />
-        )}
-
         {/* Report Document Sheet */}
         <div
           style={{

@@ -4,6 +4,7 @@ namespace App\Services\Reports\Resolvers;
 
 use App\Models\ReportBlock;
 use App\Models\User;
+use Carbon\Carbon;
 
 class TeamWorkloadResolver
 {
@@ -14,44 +15,51 @@ class TeamWorkloadResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
-        $limit = min(max((int) ($config['limit'] ?? 10), 1), 30);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
+
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
+
+        $applyWorkItemFilter = function ($q) use ($projectIds, $cycleIds, $startDate, $endDate, $scope) {
+            if (! empty($projectIds)) {
+                $q->whereIn('project_id', $projectIds);
+            } elseif (! empty($scope['workspace_id'])) {
+                $q->where('workspace_id', $scope['workspace_id']);
+            }
+            if (! empty($cycleIds)) {
+                $q->whereHas('cycles', fn ($cq) => $cq->whereIn('cycles.id', $cycleIds));
+            }
+            if (! empty($startDate)) {
+                $q->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+            }
+            if (! empty($endDate)) {
+                $q->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
+            }
+        };
 
         $query = User::query()
-            ->whereHas('assignedWorkItems', function ($q) use ($projectIds, $scope) {
-                if (! empty($projectIds)) {
-                    $q->whereIn('project_id', $projectIds);
-                } elseif (! empty($scope['workspace_id'])) {
-                    $q->where('workspace_id', $scope['workspace_id']);
-                }
-            })
+            ->whereHas('assignedWorkItems', $applyWorkItemFilter)
             ->withCount([
-                'assignedWorkItems as total_assigned' => function ($q) use ($projectIds, $scope) {
-                    if (! empty($projectIds)) {
-                        $q->whereIn('project_id', $projectIds);
-                    } elseif (! empty($scope['workspace_id'])) {
-                        $q->where('workspace_id', $scope['workspace_id']);
-                    }
-                },
-                'assignedWorkItems as active_items' => function ($q) use ($projectIds, $scope) {
+                'assignedWorkItems as total_assigned' => $applyWorkItemFilter,
+                'assignedWorkItems as active_items' => function ($q) use ($applyWorkItemFilter) {
                     $q->whereNull('completed_at');
-                    if (! empty($projectIds)) {
-                        $q->whereIn('project_id', $projectIds);
-                    } elseif (! empty($scope['workspace_id'])) {
-                        $q->where('workspace_id', $scope['workspace_id']);
-                    }
+                    $applyWorkItemFilter($q);
                 },
-                'assignedWorkItems as completed_items' => function ($q) use ($projectIds, $scope) {
+                'assignedWorkItems as completed_items' => function ($q) use ($applyWorkItemFilter) {
                     $q->whereNotNull('completed_at');
-                    if (! empty($projectIds)) {
-                        $q->whereIn('project_id', $projectIds);
-                    } elseif (! empty($scope['workspace_id'])) {
-                        $q->where('workspace_id', $scope['workspace_id']);
-                    }
+                    $applyWorkItemFilter($q);
                 },
             ])
-            ->orderByDesc('active_items')
-            ->limit($limit);
+            ->orderByDesc('active_items');
+
+        if ($limit !== null) {
+            $query->take($limit);
+        } else {
+            $query->take(200);
+        }
 
         $users = $query->get();
 

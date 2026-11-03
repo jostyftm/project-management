@@ -16,13 +16,14 @@ class HeatmapResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = $config['project_ids'] ?? [];
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
         $metric = $config['metric'] ?? 'completed';
-        $weeks = min(max((int) ($config['weeks'] ?? 12), 4), 24);
+        $weeks = max((int) ($config['weeks'] ?? 12), 4);
 
         $daysCount = $weeks * 7;
-        $endDate = Carbon::now()->endOfDay();
-        $startDate = Carbon::now()->subDays($daysCount - 1)->startOfDay();
+        $endDate = ! empty($config['end_date']) ? Carbon::parse($config['end_date'])->endOfDay() : Carbon::now()->endOfDay();
+        $startDate = ! empty($config['start_date']) ? Carbon::parse($config['start_date'])->startOfDay() : (clone $endDate)->subDays($daysCount - 1)->startOfDay();
 
         $dateField = $metric === 'created' ? 'created_at' : 'completed_at';
 
@@ -34,6 +35,10 @@ class HeatmapResolver
             $query->whereIn('project_id', $projectIds);
         } elseif (! empty($scope['workspace_id'])) {
             $query->where('workspace_id', $scope['workspace_id']);
+        }
+
+        if (! empty($cycleIds)) {
+            $query->whereHas('cycles', fn ($q) => $q->whereIn('cycles.id', $cycleIds));
         }
 
         $results = (clone $query)

@@ -14,7 +14,7 @@ class ProjectSummaryResolver
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectId = $config['project_id'] ?? null;
+        $projectId = ! empty($config['project_id']) ? $config['project_id'] : (! empty($config['project_ids']) ? (is_array($config['project_ids']) ? reset($config['project_ids']) : $config['project_ids']) : (! empty($scope['project_ids']) ? reset($scope['project_ids']) : null));
 
         $project = null;
         if ($projectId) {

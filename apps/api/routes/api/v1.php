@@ -189,6 +189,8 @@ Route::middleware(['auth.sdi'])->group(function () {
             // Exportación PDF y PNG
             Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/pdf', [WorkspaceReportController::class, 'exportPdf']);
             Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/png', [WorkspaceReportController::class, 'exportPng']);
+            Route::post('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/queue', [WorkspaceReportController::class, 'queueExport']);
+            Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/download', [WorkspaceReportController::class, 'downloadExport']);
         });
 
         // Importador Masivo CSV (Plantilla global)

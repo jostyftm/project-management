@@ -5,21 +5,25 @@ namespace App\Services\Reports\Resolvers;
 use App\Models\ReportBlock;
 use App\Models\WorkItem;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class UserStoriesEvidencesResolver
 {
     /**
      * Resuelve historias de usuario con estructura nested (sub-historias/subtareas) y evidencias.
-     * Config: { project_ids: [], cycle_ids: [], start_date: string, end_date: string, limit: int }
+     * Config: { project_ids: [], cycle_ids: [], start_date: string, end_date: string, limit: int|null }
      */
     public function resolve(ReportBlock $block, array $scope): array
     {
         $config = $block->config ?? [];
-        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []);
-        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []);
-        $startDate = $config['start_date'] ?? $scope['start_date'] ?? null;
-        $endDate = $config['end_date'] ?? $scope['end_date'] ?? null;
-        $limit = min(max((int) ($config['limit'] ?? 20), 1), 50);
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
+
+        $limitRaw = $config['limit'] ?? null;
+        $limit = ($limitRaw === 'all' || $limitRaw === 0 || $limitRaw === '0' || $limitRaw === null) ? null : max((int) $limitRaw, 1);
 
         $query = WorkItem::query()
             ->with([
@@ -76,7 +80,14 @@ class UserStoriesEvidencesResolver
             });
         }
 
-        $items = $query->orderBy('sort_order', 'asc')->latest()->take($limit)->get();
+        $query->orderBy('sort_order', 'asc')->latest();
+        if ($limit !== null) {
+            $query->take($limit);
+        } else {
+            $query->take(500); // Límite de seguridad
+        }
+
+        $items = $query->get();
 
         $formattedStories = $items->map(function ($item) {
             return $this->formatStory($item);
@@ -224,6 +235,26 @@ class UserStoriesEvidencesResolver
             ];
 
             if ($isImage) {
+                // Generar data_url en base64 para evitar el error 401 por falta de encabezado auth
+                if (! empty($d->file_path) && $d->file_path !== '0') {
+                    $diskName = $d->disk ?? config('filesystems.default');
+                    $disk = Storage::disk($diskName);
+                    try {
+                        if ($disk->exists($d->file_path)) {
+                            $binary = $disk->get($d->file_path);
+                            if ($binary && strlen($binary) <= 12 * 1024 * 1024) {
+                                $deliverableData['data_url'] = 'data:'.($d->file_mime ?: 'image/jpeg').';base64,'.base64_encode($binary);
+                            }
+                        } elseif (Storage::disk('public')->exists($d->file_path)) {
+                            $binary = Storage::disk('public')->get($d->file_path);
+                            if ($binary && strlen($binary) <= 12 * 1024 * 1024) {
+                                $deliverableData['data_url'] = 'data:'.($d->file_mime ?: 'image/jpeg').';base64,'.base64_encode($binary);
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('Error resolving deliverable image data uri: '.$e->getMessage());
+                    }
+                }
                 $images[] = $deliverableData;
             } elseif ($isPdf) {
                 $pdfs[] = $deliverableData;

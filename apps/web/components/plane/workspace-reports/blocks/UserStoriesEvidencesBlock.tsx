@@ -24,6 +24,7 @@ interface DeliverableItem {
   file_size?: number | null;
   file_mime?: string | null;
   url: string;
+  data_url?: string | null;
   status?: string;
   created_at?: string;
 }
@@ -320,29 +321,31 @@ export function UserStoriesEvidencesBlock({
                 <div className="p-4 bg-white dark:bg-neutral-900">
                   {/* Images Gallery */}
                   {story.evidences.images.length > 0 && (
-                    <div className="mb-3.5">
-                      <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                    <div className="mb-4">
+                      <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
                         <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
                         Evidencias Fotográficas ({story.evidences.images.length})
                       </span>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                         {story.evidences.images.map((img) => (
                           <div
                             key={img.id}
-                            onClick={() => setLightboxImage({ url: img.url, title: img.title || img.file_name })}
-                            className="group relative cursor-pointer overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 aspect-video flex items-center justify-center shadow-2xs hover:border-indigo-400 transition-colors"
+                            onClick={() => setLightboxImage({ url: img.data_url || img.url, title: img.title || img.file_name })}
+                            className="group relative cursor-pointer overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-950 aspect-[16/10] flex items-center justify-center shadow-xs hover:border-indigo-500 hover:shadow-md transition-all"
                           >
                             <img
-                              src={img.url}
+                              src={img.data_url || img.url}
                               alt={img.title || img.file_name}
-                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-neutral-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                              <Maximize2 className="w-4 h-4" />
+                            <div className="absolute inset-0 bg-neutral-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2.5 text-white">
+                              <span className="self-end p-1.5 rounded-full bg-neutral-900/60 backdrop-blur-xs">
+                                <Maximize2 className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="text-[11px] font-medium bg-neutral-950/70 backdrop-blur-xs text-white px-2 py-1 rounded truncate">
+                                {img.title || img.file_name}
+                              </span>
                             </div>
-                            <span className="absolute bottom-1 left-1 right-1 text-[9px] bg-neutral-900/70 text-white px-1.5 py-0.5 rounded truncate">
-                              {img.title || img.file_name}
-                            </span>
                           </div>
                         ))}
                       </div>
@@ -438,13 +441,17 @@ export function UserStoriesEvidencesBlock({
                           {(sub.evidences.images.length > 0 || sub.evidences.pdfs.length > 0) && (
                             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                               {sub.evidences.images.map((sImg) => (
-                                <img
+                                <div
                                   key={sImg.id}
-                                  src={sImg.url}
-                                  alt={sImg.title}
-                                  onClick={() => setLightboxImage({ url: sImg.url, title: sImg.title })}
-                                  className="w-10 h-10 object-cover rounded cursor-pointer border border-neutral-200 hover:opacity-80"
-                                />
+                                  onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
+                                  className="w-20 h-16 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-100 cursor-pointer hover:border-indigo-500 transition-all shadow-2xs group relative"
+                                >
+                                  <img
+                                    src={sImg.data_url || sImg.url}
+                                    alt={sImg.title || sImg.file_name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  />
+                                </div>
                               ))}
                               {sub.evidences.pdfs.map((sPdf) => (
                                 <a

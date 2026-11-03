@@ -4,6 +4,7 @@ namespace App\Services\Reports\Resolvers;
 
 use App\Models\ReportBlock;
 use App\Models\WorkItem;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DonutChartResolver
@@ -16,13 +17,27 @@ class DonutChartResolver
     {
         $config = $block->config ?? [];
         $dimension = $config['dimension'] ?? 'state';
-        $projectIds = $config['project_ids'] ?? [];
+        $projectIds = ! empty($config['project_ids']) ? (array) $config['project_ids'] : (! empty($config['project_id']) ? [$config['project_id']] : (! empty($scope['project_ids']) ? (array) $scope['project_ids'] : []));
+        $cycleIds = ! empty($config['cycle_ids']) ? (array) $config['cycle_ids'] : (! empty($config['cycle_id']) ? [$config['cycle_id']] : (! empty($scope['cycle_ids']) ? (array) $scope['cycle_ids'] : []));
+        $startDate = $config['start_date'] ?? $config['date_from'] ?? $scope['start_date'] ?? null;
+        $endDate = $config['end_date'] ?? $config['date_to'] ?? $scope['end_date'] ?? null;
 
         $query = WorkItem::query();
         if (! empty($projectIds)) {
             $query->whereIn('project_id', $projectIds);
         } elseif (! empty($scope['workspace_id'])) {
             $query->whereHas('project', fn ($q) => $q->where('workspace_id', $scope['workspace_id']));
+        }
+
+        if (! empty($cycleIds)) {
+            $query->whereHas('cycles', fn ($q) => $q->whereIn('cycles.id', $cycleIds));
+        }
+
+        if (! empty($startDate)) {
+            $query->where('created_at', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        if (! empty($endDate)) {
+            $query->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
         }
 
         $segments = [];
