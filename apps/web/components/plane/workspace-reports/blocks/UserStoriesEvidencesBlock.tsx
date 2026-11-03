@@ -326,25 +326,34 @@ export function UserStoriesEvidencesBlock({
                         <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
                         Evidencias Fotográficas ({story.evidences.images.length})
                       </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                      <div className="flex flex-col gap-4 w-full">
                         {story.evidences.images.map((img) => (
                           <div
                             key={img.id}
                             onClick={() => setLightboxImage({ url: img.data_url || img.url, title: img.title || img.file_name })}
-                            className="group relative cursor-pointer overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-950 aspect-[16/10] flex items-center justify-center shadow-xs hover:border-indigo-500 hover:shadow-md transition-all"
+                            className="group relative cursor-pointer overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 shadow-xs hover:border-indigo-500 hover:shadow-md transition-all w-full flex flex-col"
                           >
-                            <img
-                              src={img.data_url || img.url}
-                              alt={img.title || img.file_name}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 bg-neutral-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2.5 text-white">
-                              <span className="self-end p-1.5 rounded-full bg-neutral-900/60 backdrop-blur-xs">
+                            <div className="w-full bg-neutral-950 flex items-center justify-center max-h-[520px] overflow-hidden">
+                              <img
+                                src={img.data_url || img.url}
+                                alt={img.title || img.file_name}
+                                className="w-full h-auto max-h-[520px] object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+                              />
+                            </div>
+                            <div className="p-3 bg-white dark:bg-neutral-900 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <ImageIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                                  {img.title || img.file_name}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline shrink-0"
+                              >
                                 <Maximize2 className="w-3.5 h-3.5" />
-                              </span>
-                              <span className="text-[11px] font-medium bg-neutral-950/70 backdrop-blur-xs text-white px-2 py-1 rounded truncate">
-                                {img.title || img.file_name}
-                              </span>
+                                <span>Ver completa</span>
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -439,32 +448,56 @@ export function UserStoriesEvidencesBlock({
 
                           {/* Sub-story Evidences */}
                           {(sub.evidences.images.length > 0 || sub.evidences.pdfs.length > 0) && (
-                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                              {sub.evidences.images.map((sImg) => (
-                                <div
-                                  key={sImg.id}
-                                  onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
-                                  className="w-20 h-16 rounded-lg overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-100 cursor-pointer hover:border-indigo-500 transition-all shadow-2xs group relative"
-                                >
-                                  <img
-                                    src={sImg.data_url || sImg.url}
-                                    alt={sImg.title || sImg.file_name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                  />
+                            <div className="flex flex-col gap-3 w-full pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                              {sub.evidences.images.length > 0 && (
+                                <div className="space-y-2 w-full">
+                                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                                    <ImageIcon className="w-3 h-3 text-blue-500" />
+                                    <span>Evidencias ({sub.evidences.images.length})</span>
+                                  </span>
+                                  <div className="flex flex-col gap-2.5 w-full">
+                                    {sub.evidences.images.map((sImg) => (
+                                      <div
+                                        key={sImg.id}
+                                        onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
+                                        className="group relative cursor-pointer overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 shadow-xs hover:border-indigo-500 transition-all w-full flex flex-col"
+                                      >
+                                        <div className="w-full bg-neutral-950 flex items-center justify-center max-h-[380px] overflow-hidden">
+                                          <img
+                                            src={sImg.data_url || sImg.url}
+                                            alt={sImg.title || sImg.file_name}
+                                            className="w-full h-auto max-h-[380px] object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+                                          />
+                                        </div>
+                                        <div className="p-2.5 bg-white dark:bg-neutral-900 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+                                          <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate text-[11px]">
+                                            {sImg.title || sImg.file_name}
+                                          </span>
+                                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 shrink-0">
+                                            <Maximize2 className="w-3 h-3" /> Ver completa
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ))}
-                              {sub.evidences.pdfs.map((sPdf) => (
-                                <a
-                                  key={sPdf.id}
-                                  href={sPdf.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded border border-rose-100 dark:border-rose-900"
-                                >
-                                  <FileText className="w-3 h-3" />
-                                  <span>{sPdf.file_name}</span>
-                                </a>
-                              ))}
+                              )}
+                              {sub.evidences.pdfs.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {sub.evidences.pdfs.map((sPdf) => (
+                                    <a
+                                      key={sPdf.id}
+                                      href={sPdf.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded border border-rose-100 dark:border-rose-900"
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                      <span>{sPdf.file_name}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

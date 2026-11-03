@@ -1698,7 +1698,7 @@ HTML;
             $points = (float) ($story['estimate_points'] ?? 0);
 
             $html .= "
-            <div class=\"story-card\" style=\"border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;page-break-inside:avoid;break-inside:avoid;margin-bottom:12px;\">
+            <div class=\"story-card\" style=\"border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#ffffff;page-break-inside:auto;break-inside:auto;margin-bottom:12px;\">
                 <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;\">
                     <div style=\"display:flex;align-items:center;gap:6px;\">
                         <span style=\"font-weight:700;font-size:11px;color:#4f46e5;\">{$id}</span>
@@ -1716,21 +1716,21 @@ HTML;
             $pdfs = $evidences['pdfs'] ?? [];
 
             if (! empty($images)) {
-                $html .= '<div style="margin-top:10px;margin-bottom:10px;">';
-                $html .= '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">📸 Evidencias Fotográficas ('.count($images).')</div>';
-                $html .= '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:10px;">';
+                $html .= '<div style="margin-top:10px;margin-bottom:12px;width:100%;">';
+                $html .= '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">📸 Evidencias Fotográficas ('.count($images).')</div>';
+                $html .= '<div style="display:flex;flex-direction:column;gap:14px;width:100%;">';
                 foreach ($images as $img) {
                     $imgUrl = ! empty($img['data_url']) ? $img['data_url'] : htmlspecialchars($img['url'] ?? '');
                     $imgTitle = htmlspecialchars($img['title'] ?? $img['file_name'] ?? 'Evidencia');
                     $creator = htmlspecialchars($img['creator']['name'] ?? 'Usuario');
                     $html .= "
-                    <div style=\"border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;page-break-inside:avoid;break-inside:avoid;\">
-                        <div style=\"width:100%;height:220px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
-                            <img src=\"{$imgUrl}\" alt=\"{$imgTitle}\" style=\"width:100%;height:100%;object-fit:contain;display:block;\" />
+                    <div class=\"evidence-image-card\" style=\"width:100%;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#f8fafc;page-break-inside:avoid;break-inside:avoid;box-sizing:border-box;\">
+                        <div style=\"width:100%;max-height:480px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
+                            <img src=\"{$imgUrl}\" alt=\"{$imgTitle}\" style=\"width:100%;max-height:480px;object-fit:contain;display:block;\" />
                         </div>
-                        <div style=\"padding:8px 10px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;\">
-                            <span style=\"font-size:10px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;\">{$imgTitle}</span>
-                            <span style=\"font-size:9px;color:#94a3b8;\">{$creator}</span>
+                        <div style=\"padding:8px 12px;background:#ffffff;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;\">
+                            <span style=\"font-size:11px;font-weight:700;color:#1e293b;\">{$imgTitle}</span>
+                            <span style=\"font-size:10px;color:#94a3b8;\">{$creator}</span>
                         </div>
                     </div>";
                 }
@@ -1768,17 +1768,17 @@ HTML;
                     $subPdfs = $sub['evidences']['pdfs'] ?? [];
 
                     if (! empty($subImages)) {
-                        $html .= '<div style="margin-top:6px;margin-bottom:6px;">';
-                        $html .= '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;">';
+                        $html .= '<div style="margin-top:8px;margin-bottom:8px;width:100%;">';
+                        $html .= '<div style="display:flex;flex-direction:column;gap:10px;width:100%;">';
                         foreach ($subImages as $sImg) {
                             $sUrl = ! empty($sImg['data_url']) ? $sImg['data_url'] : htmlspecialchars($sImg['url'] ?? '');
                             $sTitle = htmlspecialchars($sImg['title'] ?? $sImg['file_name'] ?? 'Sub-evidencia');
                             $html .= "
-                            <div style=\"border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;background:#ffffff;page-break-inside:avoid;break-inside:avoid;\">
-                                <div style=\"width:100%;height:160px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
-                                    <img src=\"{$sUrl}\" alt=\"{$sTitle}\" style=\"width:100%;height:100%;object-fit:contain;display:block;\" />
+                            <div class=\"evidence-image-card\" style=\"width:100%;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;background:#ffffff;page-break-inside:avoid;break-inside:avoid;box-sizing:border-box;\">
+                                <div style=\"width:100%;max-height:380px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden;\">
+                                    <img src=\"{$sUrl}\" alt=\"{$sTitle}\" style=\"width:100%;max-height:380px;object-fit:contain;display:block;\" />
                                 </div>
-                                <div style=\"padding:6px 8px;font-size:9px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;\">
+                                <div style=\"padding:6px 10px;font-size:10px;font-weight:600;color:#334155;\">
                                     {$sTitle}
                                 </div>
                             </div>";
