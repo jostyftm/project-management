@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ReportBlock } from "@/types/workspace-report-types";
 import {
   BookOpen,
@@ -15,10 +15,17 @@ import {
   Paperclip,
   X,
   Maximize2,
+  Upload,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { workItemDeliverableService } from "@/services/plane/workItemDeliverableService";
 
 interface DeliverableItem {
   id: string;
+  project_id?: string;
+  work_item_id?: string;
   title: string;
   file_name: string;
   file_size?: number | null;
@@ -125,8 +132,17 @@ export function UserStoriesEvidencesBlock({
 }: UserStoriesEvidencesBlockProps) {
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
   const [collapsedStories, setCollapsedStories] = useState<Record<string, boolean>>({});
+  const [localStories, setLocalStories] = useState<UserStoryItem[]>(data?.stories || []);
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
 
-  const stories: UserStoryItem[] = data?.stories || [
+  useEffect(() => {
+    if (data?.stories) {
+      setLocalStories(data.stories);
+    }
+  }, [data?.stories]);
+
+  const defaultStories: UserStoryItem[] = [
     {
       id: "1",
       identifier: "ENG-101",
@@ -188,11 +204,164 @@ export function UserStoriesEvidencesBlock({
     },
   ];
 
-  const summary = data?.summary || {
-    total_deliverables: 3,
-    total_images: 1,
-    total_pdfs: 2,
+  const stories: UserStoryItem[] = localStories.length > 0 || data?.stories ? localStories : defaultStories;
+
+  const handleUploadImages = async (
+    projectId: string,
+    workItemId: string,
+    files: FileList | null
+  ) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (fileArray.length === 0) {
+      toast.error("Por favor selecciona archivos de imagen válidos (PNG, JPG, WEBP, SVG)");
+      return;
+    }
+
+    setUploadingItemId(workItemId);
+    try {
+      const createdDeliverables = await workItemDeliverableService.createBatch(
+        projectId,
+        workItemId,
+        fileArray,
+        "QA_EVIDENCE"
+      );
+
+      const newImages: DeliverableItem[] = createdDeliverables.map((d, index) => {
+        let previewDataUrl: string | null = null;
+        if (fileArray[index]) {
+          try {
+            previewDataUrl = URL.createObjectURL(fileArray[index]);
+          } catch {
+            previewDataUrl = null;
+          }
+        }
+
+        return {
+          id: String(d.id),
+          project_id: String(projectId),
+          work_item_id: String(workItemId),
+          title: d.title,
+          file_name: d.file_name || d.title,
+          file_size: d.file_size,
+          file_mime: d.file_mime,
+          url: d.file_url || d.url || "",
+          data_url: previewDataUrl,
+          status: d.status,
+          created_at: d.created_at,
+        };
+      });
+
+      setLocalStories((prevStories) =>
+        prevStories.map((story) => {
+          if (story.id === workItemId) {
+            return {
+              ...story,
+              evidences: {
+                ...story.evidences,
+                images: [...newImages, ...story.evidences.images],
+                count: story.evidences.count + newImages.length,
+              },
+            };
+          }
+
+          if (story.sub_stories && story.sub_stories.some((sub) => sub.id === workItemId)) {
+            return {
+              ...story,
+              sub_stories: story.sub_stories.map((sub) => {
+                if (sub.id === workItemId) {
+                  return {
+                    ...sub,
+                    evidences: {
+                      ...sub.evidences,
+                      images: [...newImages, ...sub.evidences.images],
+                      count: sub.evidences.count + newImages.length,
+                    },
+                  };
+                }
+                return sub;
+              }),
+            };
+          }
+
+          return story;
+        })
+      );
+
+      toast.success(
+        `${newImages.length} ${newImages.length === 1 ? "imagen subida" : "imágenes subidas"} exitosamente a S3`
+      );
+    } catch (err: any) {
+      console.error("Error al subir evidencias a S3:", err);
+      toast.error(err?.response?.data?.message || "Error al subir las imágenes a S3");
+    } finally {
+      setUploadingItemId(null);
+    }
   };
+
+  const handleDeleteImage = async (
+    projectId: string,
+    workItemId: string,
+    image: DeliverableItem
+  ) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la evidencia "${image.title || image.file_name}" de S3?`)) {
+      return;
+    }
+
+    setDeletingImageId(image.id);
+    try {
+      await workItemDeliverableService.delete(
+        image.project_id || projectId,
+        image.work_item_id || workItemId,
+        image.id
+      );
+
+      setLocalStories((prevStories) =>
+        prevStories.map((story) => {
+          const updatedImages = story.evidences.images.filter((img) => img.id !== image.id);
+          const wasInRoot = updatedImages.length !== story.evidences.images.length;
+
+          const updatedSubStories = (story.sub_stories || []).map((sub) => {
+            const updatedSubImages = sub.evidences.images.filter((img) => img.id !== image.id);
+            return {
+              ...sub,
+              evidences: {
+                ...sub.evidences,
+                images: updatedSubImages,
+                count: Math.max(0, sub.evidences.count - (sub.evidences.images.length - updatedSubImages.length)),
+              },
+            };
+          });
+
+          return {
+            ...story,
+            evidences: {
+              ...story.evidences,
+              images: updatedImages,
+              count: wasInRoot ? Math.max(0, story.evidences.count - 1) : story.evidences.count,
+            },
+            sub_stories: updatedSubStories,
+          };
+        })
+      );
+
+      toast.success("Evidencia eliminada correctamente de S3");
+    } catch (err: any) {
+      console.error("Error al eliminar evidencia de S3:", err);
+      toast.error(err?.response?.data?.message || "Error al eliminar la evidencia de S3");
+    } finally {
+      setDeletingImageId(null);
+    }
+  };
+
+  const currentTotalImages = stories.reduce(
+    (acc, s) => acc + s.evidences.images.length + (s.sub_stories || []).reduce((subAcc, sub) => subAcc + sub.evidences.images.length, 0),
+    0
+  );
+  const currentTotalPdfs = stories.reduce(
+    (acc, s) => acc + s.evidences.pdfs.length + (s.sub_stories || []).reduce((subAcc, sub) => subAcc + sub.evidences.pdfs.length, 0),
+    0
+  );
 
   const toggleCollapse = (storyId: string) => {
     setCollapsedStories((prev) => ({ ...prev, [storyId]: !prev[storyId] }));
@@ -224,11 +393,11 @@ export function UserStoriesEvidencesBlock({
           </span>
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-medium border border-rose-100 dark:border-rose-900">
             <FileText className="w-3 h-3" />
-            {summary.total_pdfs} PDFs
+            {currentTotalPdfs} PDFs
           </span>
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-medium border border-blue-100 dark:border-blue-900">
             <ImageIcon className="w-3 h-3" />
-            {summary.total_images} imágenes
+            {currentTotalImages} imágenes
           </span>
         </div>
       </div>
@@ -318,22 +487,85 @@ export function UserStoriesEvidencesBlock({
                 </div>
 
                 {/* Evidence Section (Images & PDFs) */}
-                <div className="p-4 bg-white dark:bg-neutral-900">
+                <div className="p-4 bg-white dark:bg-neutral-900 space-y-4">
                   {/* Images Gallery */}
-                  {story.evidences.images.length > 0 && (
-                    <div className="mb-4">
-                      <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
                         <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
                         Evidencias Fotográficas ({story.evidences.images.length})
                       </span>
+
+                      {/* Botón para subir imágenes */}
+                      {story.project?.id && (
+                        <label
+                          className={`cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/80 transition-colors border border-indigo-200/60 dark:border-indigo-800 shadow-2xs ${
+                            uploadingItemId === story.id ? "opacity-60 pointer-events-none" : ""
+                          }`}
+                        >
+                          {uploadingItemId === story.id ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Subiendo a S3...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Subir imágenes</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            disabled={uploadingItemId === story.id}
+                            onChange={(e) => {
+                              handleUploadImages(story.project!.id, story.id, e.target.files);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {story.evidences.images.length === 0 ? (
+                      <div className="border border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl p-5 text-center bg-neutral-50/50 dark:bg-neutral-950/50 flex flex-col items-center justify-center gap-1.5 mb-2">
+                        <ImageIcon className="w-6 h-6 text-neutral-300 dark:text-neutral-700" />
+                        <p className="text-xs text-neutral-500">Sin evidencias fotográficas registradas en esta historia.</p>
+                        {story.project?.id && (
+                          <label
+                            className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-white text-neutral-700 hover:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700 shadow-2xs mt-1 ${
+                              uploadingItemId === story.id ? "opacity-60 pointer-events-none" : ""
+                            }`}
+                          >
+                            <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>{uploadingItemId === story.id ? "Subiendo..." : "Cargar imágenes desde el equipo"}</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept="image/*"
+                              className="hidden"
+                              disabled={uploadingItemId === story.id}
+                              onChange={(e) => {
+                                handleUploadImages(story.project!.id, story.id, e.target.files);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    ) : (
                       <div className="flex flex-col gap-4 w-full">
                         {story.evidences.images.map((img) => (
                           <div
                             key={img.id}
-                            onClick={() => setLightboxImage({ url: img.data_url || img.url, title: img.title || img.file_name })}
-                            className="group relative cursor-pointer overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 shadow-xs hover:border-indigo-500 hover:shadow-md transition-all w-full flex flex-col"
+                            className="group relative overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 shadow-xs hover:border-indigo-500 hover:shadow-md transition-all w-full flex flex-col"
                           >
-                            <div className="w-full bg-neutral-950 flex items-center justify-center max-h-[520px] overflow-hidden">
+                            <div
+                              onClick={() => setLightboxImage({ url: img.data_url || img.url, title: img.title || img.file_name })}
+                              className="w-full bg-neutral-950 flex items-center justify-center max-h-[520px] overflow-hidden cursor-pointer"
+                            >
                               <img
                                 src={img.data_url || img.url}
                                 alt={img.title || img.file_name}
@@ -347,19 +579,36 @@ export function UserStoriesEvidencesBlock({
                                   {img.title || img.file_name}
                                 </span>
                               </div>
-                              <button
-                                type="button"
-                                className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline shrink-0"
-                              >
-                                <Maximize2 className="w-3.5 h-3.5" />
-                                <span>Ver completa</span>
-                              </button>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxImage({ url: img.data_url || img.url, title: img.title || img.file_name })}
+                                  className="flex items-center gap-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:text-indigo-600 hover:underline"
+                                >
+                                  <Maximize2 className="w-3.5 h-3.5" />
+                                  <span>Ver completa</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteImage(story.project?.id || "", story.id, img)}
+                                  disabled={deletingImageId === img.id}
+                                  className="flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700 hover:underline p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                  title="Eliminar evidencia de S3"
+                                >
+                                  {deletingImageId === img.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Eliminar</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* PDFs Download Cards */}
                   {story.evidences.pdfs.length > 0 && (
@@ -447,59 +696,111 @@ export function UserStoriesEvidencesBlock({
                           </div>
 
                           {/* Sub-story Evidences */}
-                          {(sub.evidences.images.length > 0 || sub.evidences.pdfs.length > 0) && (
-                            <div className="flex flex-col gap-3 w-full pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                              {sub.evidences.images.length > 0 && (
-                                <div className="space-y-2 w-full">
-                                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
-                                    <ImageIcon className="w-3 h-3 text-blue-500" />
-                                    <span>Evidencias ({sub.evidences.images.length})</span>
-                                  </span>
-                                  <div className="flex flex-col gap-2.5 w-full">
-                                    {sub.evidences.images.map((sImg) => (
-                                      <div
-                                        key={sImg.id}
-                                        onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
-                                        className="group relative cursor-pointer overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 shadow-xs hover:border-indigo-500 transition-all w-full flex flex-col"
-                                      >
-                                        <div className="w-full bg-neutral-950 flex items-center justify-center max-h-[380px] overflow-hidden">
-                                          <img
-                                            src={sImg.data_url || sImg.url}
-                                            alt={sImg.title || sImg.file_name}
-                                            className="w-full h-auto max-h-[380px] object-contain transition-transform duration-300 group-hover:scale-[1.01]"
-                                          />
-                                        </div>
-                                        <div className="p-2.5 bg-white dark:bg-neutral-900 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
-                                          <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate text-[11px]">
-                                            {sImg.title || sImg.file_name}
-                                          </span>
-                                          <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 shrink-0">
-                                            <Maximize2 className="w-3 h-3" /> Ver completa
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {sub.evidences.pdfs.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {sub.evidences.pdfs.map((sPdf) => (
-                                    <a
-                                      key={sPdf.id}
-                                      href={sPdf.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded border border-rose-100 dark:border-rose-900"
-                                    >
-                                      <FileText className="w-3 h-3" />
-                                      <span>{sPdf.file_name}</span>
-                                    </a>
-                                  ))}
-                                </div>
+                          <div className="flex flex-col gap-3 w-full pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3 text-blue-500" />
+                                <span>Evidencias ({sub.evidences.images.length})</span>
+                              </span>
+                              {story.project?.id && (
+                                <label
+                                  className={`cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/80 transition-colors border border-indigo-200/60 dark:border-indigo-800 shadow-2xs ${
+                                    uploadingItemId === sub.id ? "opacity-60 pointer-events-none" : ""
+                                  }`}
+                                >
+                                  {uploadingItemId === sub.id ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      <span>Subiendo a S3...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-3 h-3" />
+                                      <span>Subir a S3</span>
+                                    </>
+                                  )}
+                                  <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    disabled={uploadingItemId === sub.id}
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      handleUploadImages(story.project!.id, sub.id, e.target.files);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                </label>
                               )}
                             </div>
-                          )}
+
+                            {sub.evidences.images.length > 0 && (
+                              <div className="flex flex-col gap-2.5 w-full">
+                                {sub.evidences.images.map((sImg) => (
+                                  <div
+                                    key={sImg.id}
+                                    className="group relative overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 shadow-xs hover:border-indigo-500 transition-all w-full flex flex-col"
+                                  >
+                                    <div
+                                      onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
+                                      className="w-full bg-neutral-950 flex items-center justify-center max-h-[380px] overflow-hidden cursor-pointer"
+                                    >
+                                      <img
+                                        src={sImg.data_url || sImg.url}
+                                        alt={sImg.title || sImg.file_name}
+                                        className="w-full h-auto max-h-[380px] object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+                                      />
+                                    </div>
+                                    <div className="p-2.5 bg-white dark:bg-neutral-900 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs">
+                                      <span className="font-medium text-neutral-700 dark:text-neutral-300 truncate text-[11px] mr-2">
+                                        {sImg.title || sImg.file_name}
+                                      </span>
+                                      <div className="flex items-center gap-2.5 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => setLightboxImage({ url: sImg.data_url || sImg.url, title: sImg.title || sImg.file_name })}
+                                          className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1 hover:underline"
+                                        >
+                                          <Maximize2 className="w-3 h-3" /> Ver completa
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteImage(story.project?.id || "", sub.id, sImg)}
+                                          disabled={deletingImageId === sImg.id}
+                                          className="flex items-center gap-1 text-[10px] font-medium text-rose-600 hover:text-rose-700 hover:underline p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                                          title="Eliminar evidencia de S3"
+                                        >
+                                          {deletingImageId === sImg.id ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="w-3 h-3" />
+                                          )}
+                                          <span>Eliminar</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {sub.evidences.pdfs.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-2">
+                                {sub.evidences.pdfs.map((sPdf) => (
+                                  <a
+                                    key={sPdf.id}
+                                    href={sPdf.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-1 rounded border border-rose-100 dark:border-rose-900"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>{sPdf.file_name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

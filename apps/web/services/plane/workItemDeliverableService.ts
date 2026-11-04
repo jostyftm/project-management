@@ -120,6 +120,29 @@ export const workItemDeliverableService = {
     return formatDeliverable(res.data);
   },
 
+  createBatch: async (
+    projectId: string | number,
+    workItemId: string | number,
+    files: File[],
+    type: DeliverableType = "QA_EVIDENCE"
+  ): Promise<WorkItemDeliverable[]> => {
+    const formData = new FormData();
+    formData.append("type", type);
+    files.forEach((f) => formData.append("files[]", f));
+
+    const res = await httpRequestService<ApiResponse<any>>({
+      url: `${API_BASE_URL}/projects/${projectId}/work-items/${workItemId}/deliverables/batch`,
+      method: "POST",
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+    return list.map(formatDeliverable);
+  },
+
   delete: async (
     projectId: string | number,
     workItemId: string | number,
