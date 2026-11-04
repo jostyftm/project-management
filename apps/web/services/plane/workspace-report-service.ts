@@ -210,6 +210,55 @@ export const workspaceReportService = {
     return res.data;
   },
 
+  // Subida y gestión de imágenes en S3
+  uploadImage: async (
+    workspaceId: string | number,
+    reportId: string | number,
+    file: File
+  ): Promise<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    file_mime: string;
+    url: string;
+    data_url: string;
+  }> => {
+    const formData = new FormData();
+    formData.append("image", file);
+    const res = await httpRequestService<{
+      data: {
+        file_path: string;
+        file_name: string;
+        file_size: number;
+        file_mime: string;
+        url: string;
+        data_url: string;
+      };
+      message?: string;
+    }>({
+      url: `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/upload-image`,
+      method: "POST",
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  },
+
+  deleteImage: async (
+    workspaceId: string | number,
+    reportId: string | number,
+    filePath: string
+  ) => {
+    const res = await httpRequestService<{ message: string }>({
+      url: `${API_BASE_URL}/workspaces/${workspaceId}/workspace-reports/${reportId}/images`,
+      method: "DELETE",
+      data: { file_path: filePath },
+    });
+    return res;
+  },
+
   // Plantillas
   listTemplates: async (workspaceId: string | number) => {
     const res = await httpRequestService<{ data: ReportTemplate[] }>({

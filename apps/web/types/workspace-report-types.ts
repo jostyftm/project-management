@@ -100,6 +100,7 @@ export const REPORT_THEMES: Record<string, ReportTheme> = {
 
 export interface WorkspaceReport {
   id: string;
+  workspace_id?: string;
   title: string;
   description: string | null;
   visibility: ReportVisibility;

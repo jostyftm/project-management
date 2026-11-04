@@ -11,6 +11,8 @@ interface CanvasBlockProps {
   block: ReportBlock;
   isSelected: boolean;
   data?: any;
+  workspaceId?: string | number;
+  reportId?: string | number;
   onSelect: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -22,6 +24,8 @@ export function CanvasBlock({
   block,
   isSelected,
   data,
+  workspaceId,
+  reportId,
   onSelect,
   onDelete,
   onDuplicate,
@@ -132,6 +136,8 @@ export function CanvasBlock({
             block={block}
             data={data}
             isEditing={true}
+            workspaceId={workspaceId}
+            reportId={reportId || block.report_id}
             onUpdateConfig={onUpdateConfig}
           />
         ) : (

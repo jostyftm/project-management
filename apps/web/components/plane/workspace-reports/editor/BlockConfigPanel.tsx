@@ -183,9 +183,12 @@ export function BlockConfigPanel({
             {ConfigComponent ? (
               <ConfigComponent
                 config={block.config || {}}
-                onChange={(newConfig) =>
+                onChange={(newConfig: Record<string, any>) =>
                   onUpdateBlock(block.id, { config: newConfig })
                 }
+                workspaceId={report?.workspace_id}
+                reportId={report?.id}
+                block={block}
               />
             ) : (
               <p className="text-xs text-neutral-400 italic">

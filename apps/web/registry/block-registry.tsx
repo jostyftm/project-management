@@ -61,11 +61,16 @@ export interface BlockDefinition {
     block: ReportBlock;
     data?: any;
     isEditing?: boolean;
+    workspaceId?: string | number;
+    reportId?: string | number;
     onUpdateConfig?: (cfg: Record<string, any>) => void;
   }>;
   configPanelComponent?: React.ComponentType<{
     config: Record<string, any>;
     onChange: (cfg: Record<string, any>) => void;
+    workspaceId?: string | number;
+    reportId?: string | number;
+    block?: ReportBlock;
   }>;
 }
 

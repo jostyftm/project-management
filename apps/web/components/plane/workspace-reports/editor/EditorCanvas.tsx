@@ -143,6 +143,8 @@ export function EditorCanvas({
                     <CanvasBlock
                       key={block.id}
                       block={block}
+                      workspaceId={report.workspace_id}
+                      reportId={report.id}
                       isSelected={selectedBlockId === block.id}
                       data={blocksData?.[block.id]}
                       onSelect={() => onSelectBlock(block.id)}
