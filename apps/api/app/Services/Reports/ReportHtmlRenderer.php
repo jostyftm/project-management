@@ -1200,7 +1200,10 @@ HTML;
     // =========================================================================
     private function renderImage(ReportBlock $block, array $data): string
     {
-        $url = htmlspecialchars($data['url'] ?? ($block->config['url'] ?? ''));
+        $url = ! empty($data['data_url'])
+            ? $data['data_url']
+            : htmlspecialchars($data['url'] ?? ($block->config['data_url'] ?? ($block->config['url'] ?? '')));
+
         if (empty($url)) {
             return '<div style="height:100px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">Imagen sin configurar</div>';
         }
@@ -1208,12 +1211,13 @@ HTML;
         $alt = htmlspecialchars($data['alt'] ?? ($block->config['alt'] ?? 'Imagen del reporte'));
         $caption = htmlspecialchars($data['caption'] ?? ($block->config['caption'] ?? ''));
         $align = $data['alignment'] ?? ($block->config['alignment'] ?? 'center');
+        $maxWidth = htmlspecialchars($data['max_width'] ?? ($block->config['max_width'] ?? '100%'));
 
-        $captionHtml = $caption ? "<figcaption style=\"font-size:10px;color:#64748b;margin-top:4px;\">{$caption}</figcaption>" : '';
+        $captionHtml = $caption ? "<figcaption style=\"font-size:10px;color:#64748b;margin-top:6px;\">{$caption}</figcaption>" : '';
 
         return "
-        <figure style=\"margin:0;text-align:{$align};\">
-            <img src=\"{$url}\" alt=\"{$alt}\" style=\"max-width:100%;border-radius:6px;max-height:260px;object-fit:contain;\" />
+        <figure style=\"margin:0;text-align:{$align};page-break-inside:avoid;break-inside:avoid;width:100%;\">
+            <img src=\"{$url}\" alt=\"{$alt}\" style=\"max-width:{$maxWidth};border-radius:6px;max-height:420px;object-fit:contain;display:inline-block;\" />
             {$captionHtml}
         </figure>";
     }

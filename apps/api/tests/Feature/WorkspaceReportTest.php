@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceReport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -794,4 +795,80 @@ it('el job GenerateReportExportJob guarda el archivo y crea la notificación par
         'recipient_id' => $this->user->id,
         'type' => 'REPORT_EXPORT_READY',
     ]);
+});
+
+// === SUBIDA Y GESTIÓN DE IMÁGENES EN S3 ===
+
+it('puede subir una imagen desde el equipo a S3 para un reporte', function () {
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
+
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $file = UploadedFile::fake()->image('diagrama_arquitectura.png', 1200, 800);
+
+    $response = $this->postJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/upload-image", [
+        'image' => $file,
+    ]);
+
+    $response->assertStatus(201)
+        ->assertJsonStructure(['data' => ['file_path', 'file_name', 'file_size', 'file_mime', 'url', 'data_url']]);
+
+    $filePath = $response->json('data.file_path');
+    Storage::disk($disk)->assertExists($filePath);
+    expect($response->json('data.data_url'))->toStartWith('data:image/png;base64,');
+});
+
+it('el resolver image genera data_url en base64 desde archivo S3', function () {
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
+
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $path = "workspaces/{$this->workspace->id}/reports/{$report->id}/images/test_img.png";
+    Storage::disk($disk)->put($path, 'dummy image content');
+
+    $block = ReportBlock::factory()->create([
+        'report_id' => $report->id,
+        'type' => BlockType::IMAGE->value,
+        'config' => [
+            'file_path' => $path,
+            'file_mime' => 'image/png',
+            'caption' => 'Diagrama de prueba',
+        ],
+    ]);
+
+    $response = $this->getJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/blocks/{$block->id}/data");
+
+    $response->assertStatus(200)
+        ->assertJsonPath('data.file_path', $path)
+        ->assertJsonPath('data.caption', 'Diagrama de prueba');
+
+    expect($response->json('data.data_url'))->toStartWith('data:image/png;base64,');
+});
+
+it('puede eliminar una imagen de S3 de un reporte', function () {
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
+
+    $report = WorkspaceReport::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'owner_id' => $this->user->id,
+    ]);
+
+    $path = "workspaces/{$this->workspace->id}/reports/{$report->id}/images/to_delete.png";
+    Storage::disk($disk)->put($path, 'content');
+
+    $response = $this->deleteJson("/api/v1/workspaces/{$this->workspace->id}/workspace-reports/{$report->id}/images", [
+        'file_path' => $path,
+    ]);
+
+    $response->assertStatus(200);
+    Storage::disk($disk)->assertMissing($path);
 });

@@ -23,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WorkspaceReportController extends Controller
 {
@@ -316,6 +317,131 @@ class WorkspaceReportController extends Controller
         return response($png, 200, [
             'Content-Type' => 'image/png',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * Subir imagen para bloque o recurso del reporte a S3.
+     */
+    public function uploadImage(Request $request, Workspace $workspace, WorkspaceReport $workspaceReport): JsonResponse
+    {
+        abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
+        $this->authorizeOwner($workspaceReport);
+
+        $request->validate([
+            'image' => ['required', 'file', 'image', 'max:20480'], // máx 20MB
+        ]);
+
+        $file = $request->file('image');
+        $diskName = config('filesystems.default'); // s3
+        $disk = Storage::disk($diskName);
+
+        $filename = 'img_'.Str::random(16).'.'.($file->getClientOriginalExtension() ?: 'png');
+        $directory = "workspaces/{$workspace->id}/reports/{$workspaceReport->id}/images";
+        $filePath = $file->storeAs($directory, $filename, $diskName);
+
+        if (! $filePath) {
+            abort(500, 'Error al guardar la imagen en el almacenamiento S3.');
+        }
+
+        $binary = $disk->get($filePath);
+        $mime = $file->getClientMimeType() ?: 'image/jpeg';
+        $dataUrl = 'data:'.$mime.';base64,'.base64_encode($binary);
+
+        $serveUrl = url("/api/v1/workspaces/{$workspace->id}/workspace-reports/{$workspaceReport->id}/images/{$filename}");
+
+        return response()->json([
+            'data' => [
+                'file_path' => $filePath,
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
+                'file_mime' => $mime,
+                'url' => $serveUrl,
+                'data_url' => $dataUrl,
+            ],
+            'message' => 'Imagen subida exitosamente a S3.',
+        ], 201);
+    }
+
+    /**
+     * Servir imagen del reporte desde S3.
+     */
+    public function serveImage(Workspace $workspace, WorkspaceReport $workspaceReport, string $filename): Response|StreamedResponse
+    {
+        abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
+
+        $filePath = "workspaces/{$workspace->id}/reports/{$workspaceReport->id}/images/{$filename}";
+        $diskName = config('filesystems.default');
+        $disk = Storage::disk($diskName);
+
+        if (! $disk->exists($filePath)) {
+            if (Storage::disk('public')->exists($filePath)) {
+                $disk = Storage::disk('public');
+            } else {
+                abort(404, 'Imagen no encontrada.');
+            }
+        }
+
+        return $disk->response($filePath, $filename, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
+    /**
+     * Servir imagen de un reporte público por token.
+     */
+    public function servePublicImage(string $token, string $filename): Response|StreamedResponse
+    {
+        $report = WorkspaceReport::where('public_token', $token)
+            ->whereNotNull('published_at')
+            ->firstOrFail();
+
+        $filePath = "workspaces/{$report->workspace_id}/reports/{$report->id}/images/{$filename}";
+        $diskName = config('filesystems.default');
+        $disk = Storage::disk($diskName);
+
+        if (! $disk->exists($filePath)) {
+            if (Storage::disk('public')->exists($filePath)) {
+                $disk = Storage::disk('public');
+            } else {
+                abort(404, 'Imagen no encontrada.');
+            }
+        }
+
+        return $disk->response($filePath, $filename, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
+    /**
+     * Eliminar imagen del reporte en S3.
+     */
+    public function deleteImage(Request $request, Workspace $workspace, WorkspaceReport $workspaceReport): JsonResponse
+    {
+        abort_if($workspaceReport->workspace_id !== $workspace->id, 404);
+        $this->authorizeOwner($workspaceReport);
+
+        $filePath = $request->input('file_path');
+        if (empty($filePath)) {
+            $filename = $request->input('filename');
+            if ($filename) {
+                $filePath = "workspaces/{$workspace->id}/reports/{$workspaceReport->id}/images/{$filename}";
+            }
+        }
+
+        if ($filePath) {
+            $diskName = config('filesystems.default');
+            try {
+                if (Storage::disk($diskName)->exists($filePath)) {
+                    Storage::disk($diskName)->delete($filePath);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Error eliminando imagen de S3: '.$e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'message' => 'Imagen eliminada de S3 exitosamente.',
         ]);
     }
 

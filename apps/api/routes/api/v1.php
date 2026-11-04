@@ -191,6 +191,11 @@ Route::middleware(['auth.sdi'])->group(function () {
             Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/png', [WorkspaceReportController::class, 'exportPng']);
             Route::post('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/queue', [WorkspaceReportController::class, 'queueExport']);
             Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/export/download', [WorkspaceReportController::class, 'downloadExport']);
+
+            // Imágenes y recursos del reporte en S3
+            Route::post('workspaces/{workspace}/workspace-reports/{workspaceReport}/upload-image', [WorkspaceReportController::class, 'uploadImage']);
+            Route::delete('workspaces/{workspace}/workspace-reports/{workspaceReport}/images', [WorkspaceReportController::class, 'deleteImage']);
+            Route::get('workspaces/{workspace}/workspace-reports/{workspaceReport}/images/{filename}', [WorkspaceReportController::class, 'serveImage']);
         });
 
         // Importador Masivo CSV (Plantilla global)
@@ -365,3 +370,5 @@ Route::get('public/workspace-reports/{token}/export/pdf', [WorkspaceReportContro
     ->middleware('throttle:30,1');
 Route::get('public/workspace-reports/{token}/export/png', [WorkspaceReportController::class, 'exportPublicPng'])
     ->middleware('throttle:30,1');
+Route::get('public/workspace-reports/{token}/images/{filename}', [WorkspaceReportController::class, 'servePublicImage'])
+    ->middleware('throttle:120,1');
