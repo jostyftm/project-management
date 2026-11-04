@@ -64,7 +64,7 @@ class BlockResolverService
     /**
      * Resuelve la data de un bloque individual con caché en Redis (TTL 5 min).
      */
-    public function resolve(ReportBlock $block, array $scope = []): array
+    public function resolve(ReportBlock $block, array $scope = [], bool $forceFresh = false): array
     {
         // Para bloques de contenido estático no cacheamos en Redis
         if (in_array($block->type, [BlockType::NARRATIVE, BlockType::DIVIDER, BlockType::IMAGE, BlockType::CALLOUT], true)) {
@@ -72,6 +72,17 @@ class BlockResolverService
         }
 
         $cacheKey = 'report_block:'.$block->id.':'.md5(json_encode($scope).json_encode($block->config));
+
+        if ($forceFresh) {
+            $data = $this->runResolver($block, $scope);
+            try {
+                Cache::put($cacheKey, $data, 300);
+            } catch (\Throwable) {
+                // Silencioso
+            }
+
+            return $data;
+        }
 
         return Cache::remember($cacheKey, 300, function () use ($block, $scope) {
             return $this->runResolver($block, $scope);
@@ -81,13 +92,13 @@ class BlockResolverService
     /**
      * Resuelve la data de todos los bloques visibles del reporte.
      */
-    public function resolveAll(WorkspaceReport $report, array $scope = []): array
+    public function resolveAll(WorkspaceReport $report, array $scope = [], bool $forceFresh = false): array
     {
         $report->load('blocks');
         $result = [];
 
         foreach ($report->blocks->where('is_visible', true) as $block) {
-            $result[$block->id] = $this->resolve($block, $scope);
+            $result[$block->id] = $this->resolve($block, $scope, $forceFresh);
         }
 
         return $result;
@@ -115,6 +126,38 @@ class BlockResolverService
      */
     public function invalidateBlock(ReportBlock $block): void
     {
-        Cache::forget('report_block:'.$block->id.':*');
+        try {
+            if (config('cache.default') === 'redis') {
+                $redis = Cache::getRedis();
+                $prefix = config('database.redis.options.prefix', '');
+                $keys = $redis->keys($prefix.'report_block:'.$block->id.':*');
+                if (! empty($keys)) {
+                    foreach ($keys as $key) {
+                        $cleanKey = str_starts_with($key, $prefix) ? substr($key, strlen($prefix)) : $key;
+                        Cache::forget($cleanKey);
+                    }
+                }
+            }
+        } catch (\Throwable) {
+            // Silencioso
+        }
+    }
+
+    /**
+     * Invalida el caché de todos los bloques de un tipo determinado en un workspace.
+     */
+    public function invalidateBlocksByType(int $workspaceId, BlockType $type): void
+    {
+        try {
+            $blocks = ReportBlock::where('type', $type)
+                ->whereHas('report', fn ($q) => $q->where('workspace_id', $workspaceId))
+                ->get();
+
+            foreach ($blocks as $block) {
+                $this->invalidateBlock($block);
+            }
+        } catch (\Throwable) {
+            // Silencioso
+        }
     }
 }

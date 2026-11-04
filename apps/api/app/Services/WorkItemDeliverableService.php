@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\BlockType;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemDeliverable;
 use App\Models\WorkItemDodItem;
+use App\Services\Reports\BlockResolverService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -101,7 +103,77 @@ class WorkItemDeliverableService
             // Silencioso en caso de no poder registrar actividad secundaria
         }
 
+        $this->invalidateReportBlocksCache($project->workspace_id);
+
         return $deliverable->load(['creator', 'reviewer']);
+    }
+
+    /**
+     * Crear múltiples entregables a partir de un array de archivos (batch hacia S3).
+     *
+     * @param  array<int, UploadedFile>  $files
+     * @return Collection<int, WorkItemDeliverable>
+     */
+    public function createMultipleDeliverables(
+        WorkItem $workItem,
+        Project $project,
+        User $user,
+        array $files,
+        string $type = 'QA_EVIDENCE'
+    ): Collection {
+        $this->ensureBelongsToProject($project, $workItem);
+
+        $diskName = config('filesystems.default');
+        $created = new Collection;
+
+        foreach ($files as $file) {
+            $filePath = $file->store("projects/{$project->id}/deliverables", $diskName);
+            if (! $filePath) {
+                abort(500, "No fue posible almacenar el archivo de evidencia en el sistema de almacenamiento ({$diskName}).");
+            }
+            $fileName = $file->getClientOriginalName();
+            $title = pathinfo($fileName, PATHINFO_FILENAME);
+
+            $deliverable = WorkItemDeliverable::create([
+                'workspace_id' => $project->workspace_id,
+                'project_id' => $project->id,
+                'work_item_id' => $workItem->id,
+                'created_by' => $user->id,
+                'title' => $title ?: 'Evidencia',
+                'type' => $type,
+                'disk' => $diskName,
+                'file_path' => $filePath,
+                'file_name' => $fileName,
+                'file_size' => $file->getSize(),
+                'file_mime' => $file->getClientMimeType(),
+                'status' => 'PENDING_REVIEW',
+            ]);
+
+            try {
+                app(ActivityService::class)->logActivity(
+                    $project->workspace_id,
+                    $project->id,
+                    $user->id,
+                    'WORK_ITEM',
+                    $workItem->id,
+                    'DELIVERABLE_ADDED',
+                    [
+                        'deliverable_id' => $deliverable->id,
+                        'title' => $deliverable->title,
+                        'type' => $deliverable->type,
+                        'file_name' => $deliverable->file_name,
+                    ]
+                );
+            } catch (\Throwable) {
+                // Silencioso
+            }
+
+            $created->push($deliverable);
+        }
+
+        $this->invalidateReportBlocksCache($project->workspace_id);
+
+        return $created->load(['creator', 'reviewer']);
     }
 
     /**
@@ -120,7 +192,8 @@ class WorkItemDeliverableService
         }
 
         $isCreator = $deliverable->created_by === $user->id;
-        $isAdmin = $user->is_instance_admin || $project->members()
+        $isWorkspaceOwner = $project->workspace?->owner_id === $user->id;
+        $isAdmin = $user->is_instance_admin || $isWorkspaceOwner || $project->members()
             ->where('user_id', $user->id)
             ->where('role', 'ADMIN')
             ->exists();
@@ -142,6 +215,24 @@ class WorkItemDeliverableService
         }
 
         $deliverable->delete();
+
+        $this->invalidateReportBlocksCache($project->workspace_id);
+    }
+
+    /**
+     * Invalida la caché de bloques de evidencias en reportes del workspace.
+     */
+    protected function invalidateReportBlocksCache(?int $workspaceId): void
+    {
+        if (! $workspaceId) {
+            return;
+        }
+
+        try {
+            app(BlockResolverService::class)->invalidateBlocksByType($workspaceId, BlockType::USER_STORIES_EVIDENCES);
+        } catch (\Throwable) {
+            // Silencioso
+        }
     }
 
     /**

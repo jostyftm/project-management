@@ -5,6 +5,7 @@ namespace App\Services\Reports\Resolvers;
 use App\Models\ReportBlock;
 use App\Models\WorkItem;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -221,6 +222,8 @@ class UserStoriesEvidencesResolver
 
             $deliverableData = [
                 'id' => (string) $d->id,
+                'project_id' => (string) $d->project_id,
+                'work_item_id' => (string) $d->work_item_id,
                 'title' => $d->title,
                 'file_name' => $d->file_name ?? $d->title,
                 'file_size' => $d->file_size,
@@ -236,25 +239,49 @@ class UserStoriesEvidencesResolver
 
             if ($isImage) {
                 // Generar data_url en base64 para evitar el error 401 por falta de encabezado auth
+                $binary = null;
+                $mimeType = $d->file_mime ?: 'image/jpeg';
+
                 if (! empty($d->file_path) && $d->file_path !== '0') {
                     $diskName = $d->disk ?? config('filesystems.default');
-                    $disk = Storage::disk($diskName);
-                    try {
-                        if ($disk->exists($d->file_path)) {
-                            $binary = $disk->get($d->file_path);
-                            if ($binary && strlen($binary) <= 12 * 1024 * 1024) {
-                                $deliverableData['data_url'] = 'data:'.($d->file_mime ?: 'image/jpeg').';base64,'.base64_encode($binary);
+                    $disksToCheck = array_unique(array_filter([$diskName, config('filesystems.default'), 's3', 'public', 'local']));
+
+                    foreach ($disksToCheck as $candidateDisk) {
+                        try {
+                            $disk = Storage::disk($candidateDisk);
+                            if ($disk->exists($d->file_path)) {
+                                $candidateBinary = $disk->get($d->file_path);
+                                if ($candidateBinary && strlen($candidateBinary) <= 12 * 1024 * 1024) {
+                                    $binary = $candidateBinary;
+                                    break;
+                                }
                             }
-                        } elseif (Storage::disk('public')->exists($d->file_path)) {
-                            $binary = Storage::disk('public')->get($d->file_path);
-                            if ($binary && strlen($binary) <= 12 * 1024 * 1024) {
-                                $deliverableData['data_url'] = 'data:'.($d->file_mime ?: 'image/jpeg').';base64,'.base64_encode($binary);
+                        } catch (\Throwable) {
+                            // Continuar con el siguiente disco candidato
+                        }
+                    }
+                }
+
+                // Si no se obtuvo de almacenamiento S3/disco, pero es una URL externa http(s), intentar descarga
+                if (! $binary && ! empty($url) && (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) && ! str_contains($url, '/deliverables/')) {
+                    try {
+                        $response = Http::timeout(3)->get($url);
+                        if ($response->successful()) {
+                            $externalBody = $response->body();
+                            if (strlen($externalBody) <= 12 * 1024 * 1024) {
+                                $binary = $externalBody;
+                                $mimeType = $response->header('Content-Type') ?: $mimeType;
                             }
                         }
                     } catch (\Throwable $e) {
-                        Log::warning('Error resolving deliverable image data uri: '.$e->getMessage());
+                        Log::warning('Error downloading external deliverable image: '.$e->getMessage());
                     }
                 }
+
+                if ($binary) {
+                    $deliverableData['data_url'] = 'data:'.explode(';', $mimeType)[0].';base64,'.base64_encode($binary);
+                }
+
                 $images[] = $deliverableData;
             } elseif ($isPdf) {
                 $pdfs[] = $deliverableData;

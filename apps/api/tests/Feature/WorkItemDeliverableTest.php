@@ -233,6 +233,70 @@ it('allows creator to delete their deliverable and cleans up storage', function 
     Storage::disk($disk)->assertMissing($path);
 });
 
+it('uploads multiple file deliverables in batch successfully', function () {
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
+
+    $file1 = UploadedFile::fake()->image('evidencia_1.png', 800, 600);
+    $file2 = UploadedFile::fake()->image('evidencia_2.jpg', 1024, 768);
+
+    $res = $this->actingAs($this->user)
+        ->withHeaders(['X-Workspace-Id' => $this->workspace->id])
+        ->postJson("/api/v1/projects/{$this->project->id}/work-items/{$this->workItem->id}/deliverables/batch", [
+            'type' => 'QA_EVIDENCE',
+            'files' => [$file1, $file2],
+        ]);
+
+    $res->assertStatus(201);
+    expect($res->json('data'))->toHaveCount(2);
+
+    $path1 = $res->json('data.0.attributes.file_path');
+    $path2 = $res->json('data.1.attributes.file_path');
+
+    Storage::disk($disk)->assertExists($path1);
+    Storage::disk($disk)->assertExists($path2);
+
+    $this->assertDatabaseHas('work_item_deliverables', [
+        'work_item_id' => $this->workItem->id,
+        'file_name' => 'evidencia_1.png',
+    ]);
+    $this->assertDatabaseHas('work_item_deliverables', [
+        'work_item_id' => $this->workItem->id,
+        'file_name' => 'evidencia_2.jpg',
+    ]);
+});
+
+it('allows workspace owner to delete any deliverable in the workspace', function () {
+    $disk = config('filesystems.default');
+    Storage::fake($disk);
+    $path = 'projects/test/owner_delete.png';
+    Storage::disk($disk)->put($path, 'dummy content');
+
+    $otherUser = User::factory()->create();
+
+    $deliverable = WorkItemDeliverable::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'work_item_id' => $this->workItem->id,
+        'created_by' => $otherUser->id,
+        'title' => 'Captura de otro usuario',
+        'type' => 'QA_EVIDENCE',
+        'disk' => $disk,
+        'file_path' => $path,
+        'file_name' => 'owner_delete.png',
+        'status' => 'PENDING_REVIEW',
+    ]);
+
+    // $this->user es owner_id del workspace
+    $res = $this->actingAs($this->user)
+        ->withHeaders(['X-Workspace-Id' => $this->workspace->id])
+        ->deleteJson("/api/v1/projects/{$this->project->id}/work-items/{$this->workItem->id}/deliverables/{$deliverable->id}");
+
+    $res->assertStatus(200);
+    $this->assertDatabaseMissing('work_item_deliverables', ['id' => $deliverable->id]);
+    Storage::disk($disk)->assertMissing($path);
+});
+
 it('manages dod items: create, toggle and delete', function () {
     // 1. Create
     $createRes = $this->actingAs($this->user)

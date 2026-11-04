@@ -60,6 +60,37 @@ class WorkItemDeliverableController extends Controller
     }
 
     /**
+     * Create multiple deliverables in batch (uploading multiple files to S3).
+     */
+    public function storeBatch(
+        Request $request,
+        Project $project,
+        WorkItem $workItem
+    ): JsonResponse {
+        $request->validate([
+            'files' => ['required', 'array', 'min:1'],
+            'files.*' => ['required', 'file', 'max:51200'],
+            'type' => ['nullable', 'string', 'in:PREVIEW_URL,PULL_REQUEST,DESIGN,DOCUMENT,QA_EVIDENCE'],
+        ]);
+
+        $files = $request->file('files');
+        $type = $request->input('type', 'QA_EVIDENCE');
+
+        $deliverables = $this->deliverableService->createMultipleDeliverables(
+            $workItem,
+            $project,
+            $request->user(),
+            $files,
+            $type
+        );
+
+        return response()->json([
+            'data' => WorkItemDeliverableResource::collection($deliverables),
+            'message' => count($deliverables).' evidencias cargadas correctamente a S3.',
+        ], 201);
+    }
+
+    /**
      * Delete an existing deliverable and clean up storage
      */
     public function destroy(

@@ -35,7 +35,9 @@ class GenerateReportExportJob implements ShouldQueue
         public readonly WorkspaceReport $report,
         public readonly User $user,
         public readonly string $format = 'pdf'
-    ) {}
+    ) {
+        $this->onQueue('reports');
+    }
 
     /**
      * Ejecuta la generación del reporte y notifica al usuario cuando esté listo.

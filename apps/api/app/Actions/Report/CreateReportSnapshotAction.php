@@ -22,11 +22,11 @@ class CreateReportSnapshotAction
         return DB::transaction(function () use ($report, $userId, $data) {
             $report->load('blocks');
 
-            // Resolver los datos actuales de todos los bloques visibles
+            // Resolver los datos actuales de todos los bloques visibles con datos frescos
             $allData = $this->resolverService->resolveAll($report, [
                 'workspace_id' => $report->workspace_id,
                 'user_id' => $userId,
-            ]);
+            ], forceFresh: true);
 
             $frozenBlocks = $report->blocks->map(function ($block) use ($allData) {
                 return [

@@ -234,6 +234,7 @@ Route::middleware(['auth.sdi'])->group(function () {
             // Entregables y Criterios DoD de la Historia de Usuario
             Route::get('projects/{project}/work-items/{workItem}/deliverables', [WorkItemDeliverableController::class, 'index']);
             Route::post('projects/{project}/work-items/{workItem}/deliverables', [WorkItemDeliverableController::class, 'store']);
+            Route::post('projects/{project}/work-items/{workItem}/deliverables/batch', [WorkItemDeliverableController::class, 'storeBatch']);
             Route::get('projects/{project}/work-items/{workItem}/deliverables/{deliverable}/download', [WorkItemDeliverableController::class, 'download']);
             Route::delete('projects/{project}/work-items/{workItem}/deliverables/{deliverable}', [WorkItemDeliverableController::class, 'destroy']);
             Route::patch('projects/{project}/work-items/{workItem}/deliverables/{deliverable}/review', [WorkItemDeliverableController::class, 'review']);

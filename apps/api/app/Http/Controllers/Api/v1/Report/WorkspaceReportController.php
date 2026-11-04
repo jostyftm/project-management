@@ -232,7 +232,7 @@ class WorkspaceReportController extends Controller
             abort(401, 'Usuario no autenticado');
         }
 
-        GenerateReportExportJob::dispatch($workspaceReport, $user, $format);
+        GenerateReportExportJob::dispatch($workspaceReport, $user, $format)->onQueue('reports');
 
         return response()->json([
             'message' => 'Generación de reporte encolada con éxito. Recibirás una notificación cuando esté listo para descargar.',

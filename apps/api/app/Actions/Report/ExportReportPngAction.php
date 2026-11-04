@@ -27,7 +27,7 @@ class ExportReportPngAction
             'workspace_id' => $report->workspace_id,
             'user_id' => auth()->id() ?? $report->owner_id,
         ];
-        $resolvedData = $this->resolverService->resolveAll($report, $scope);
+        $resolvedData = $this->resolverService->resolveAll($report, $scope, forceFresh: true);
 
         // 2. Renderizar el HTML optimizado con pie de página en flujo para captura de imagen completa
         $html = $this->htmlRenderer->render($report, $resolvedData, true);
