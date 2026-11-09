@@ -24,10 +24,13 @@ use App\Mcp\Tools\Releases\CreateReleaseTool;
 use App\Mcp\Tools\Releases\ListReleasesTool;
 use App\Mcp\Tools\Workflow\ListProjectLabelsTool;
 use App\Mcp\Tools\Workflow\ListProjectStatesTool;
+use App\Mcp\Tools\WorkItems\CreateWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\CreateWorkItemTool;
+use App\Mcp\Tools\WorkItems\DeleteWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\DeleteWorkItemTool;
 use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
+use App\Mcp\Tools\WorkItems\ToggleWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
 use App\Mcp\Tools\Workspaces\AddWorkspaceMemberTool;
 use App\Mcp\Tools\Workspaces\CreateWorkspaceTool;
@@ -44,6 +47,7 @@ use App\Models\ProjectMember;
 use App\Models\State;
 use App\Models\User;
 use App\Models\WorkItem;
+use App\Models\WorkItemDodItem;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
 
@@ -112,6 +116,9 @@ it('discovers all registered tools, resources, and prompts on the MCP server', f
         CreateWorkItemTool::class,
         UpdateWorkItemTool::class,
         DeleteWorkItemTool::class,
+        CreateWorkItemDodItemTool::class,
+        ToggleWorkItemDodItemTool::class,
+        DeleteWorkItemDodItemTool::class,
         ListCyclesTool::class,
         ListModulesTool::class,
         ListMilestonesTool::class,
@@ -288,6 +295,100 @@ it('manages work items lifecycle via MCP tools', function () {
     $this->assertDatabaseMissing('work_items', [
         'project_id' => $this->project->id,
         'sequence_id' => 1,
+    ]);
+});
+
+it('manages work item acceptance criteria (DoD items) via MCP tools', function () {
+    // 1. Crear WorkItem con criterios de aceptación iniciales en bloque
+    $createResponse = ProjectManagementServer::tool(CreateWorkItemTool::class, [
+        'project' => 'ENG',
+        'title' => 'Historia con Criterios de Aceptación',
+        'acceptance_criteria' => [
+            'Cobertura de pruebas unitarias >= 80%',
+            'Endpoints documentados en OpenAPI',
+        ],
+    ]);
+
+    $createResponse->assertOk()
+        ->assertSee('ENG-1')
+        ->assertSee('Cobertura de pruebas unitarias >= 80%')
+        ->assertSee('Endpoints documentados en OpenAPI');
+
+    $item = WorkItem::where('project_id', $this->project->id)->where('sequence_id', 1)->first();
+    expect($item->dodItems)->toHaveCount(2);
+
+    // 2. Crear un nuevo criterio individual mediante CreateWorkItemDodItemTool
+    $addDodResponse = ProjectManagementServer::tool(CreateWorkItemDodItemTool::class, [
+        'item' => 'ENG-1',
+        'title' => 'Pruebas de estrés superadas con 500 RPS',
+    ]);
+
+    $addDodResponse->assertOk()
+        ->assertSee('Criterio de aceptación (DoD) creado exitosamente')
+        ->assertSee('Pruebas de estrés superadas con 500 RPS');
+
+    $this->assertDatabaseHas('work_item_dod_items', [
+        'work_item_id' => $item->id,
+        'title' => 'Pruebas de estrés superadas con 500 RPS',
+        'is_completed' => false,
+    ]);
+
+    $newDod = WorkItemDodItem::where('work_item_id', $item->id)
+        ->where('title', 'Pruebas de estrés superadas con 500 RPS')
+        ->first();
+
+    // 3. Consultar con GetWorkItemTool y validar atributos corregidos (title, is_completed)
+    $getResponse = ProjectManagementServer::tool(GetWorkItemTool::class, [
+        'item' => 'ENG-1',
+    ]);
+
+    $getResponse->assertOk()
+        ->assertSee('Pruebas de estrés superadas con 500 RPS')
+        ->assertSee('"is_completed": false', false);
+
+    // 4. Alternar a completado con ToggleWorkItemDodItemTool
+    $toggleResponse1 = ProjectManagementServer::tool(ToggleWorkItemDodItemTool::class, [
+        'item' => 'ENG-1',
+        'dod_item_id' => $newDod->id,
+    ]);
+
+    $toggleResponse1->assertOk()
+        ->assertSee('Criterio de aceptación marcado como completado')
+        ->assertSee('"is_completed": true', false);
+
+    $this->assertDatabaseHas('work_item_dod_items', [
+        'id' => $newDod->id,
+        'is_completed' => true,
+        'completed_by' => $this->user->id,
+    ]);
+
+    // 5. Alternar de nuevo a pendiente
+    $toggleResponse2 = ProjectManagementServer::tool(ToggleWorkItemDodItemTool::class, [
+        'item' => 'ENG-1',
+        'dod_item_id' => $newDod->id,
+    ]);
+
+    $toggleResponse2->assertOk()
+        ->assertSee('Criterio de aceptación marcado como pendiente')
+        ->assertSee('"is_completed": false', false);
+
+    $this->assertDatabaseHas('work_item_dod_items', [
+        'id' => $newDod->id,
+        'is_completed' => false,
+        'completed_by' => null,
+    ]);
+
+    // 6. Eliminar el criterio con DeleteWorkItemDodItemTool
+    $deleteDodResponse = ProjectManagementServer::tool(DeleteWorkItemDodItemTool::class, [
+        'item' => 'ENG-1',
+        'dod_item_id' => $newDod->id,
+    ]);
+
+    $deleteDodResponse->assertOk()
+        ->assertSee('Criterio de aceptación (DoD) eliminado exitosamente');
+
+    $this->assertDatabaseMissing('work_item_dod_items', [
+        'id' => $newDod->id,
     ]);
 });
 

@@ -234,9 +234,10 @@ Crea una nueva tarea. Soporta texto plano, Markdown estándar o HTML puro. Si se
   - `title` (string, requerido): Título de la tarea.
   - `description` (string, opcional): Contenido descriptivo en HTML puro (`<p>...</p>`) o Markdown (`### Título\n- Item`).
   - `priority` (string, opcional): `'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'`.
+  - `acceptance_criteria` (array de strings o string, opcional): Lista de criterios de aceptación o Definition of Done (DoD) para inicializar el ítem.
   - `state_id`, `type_id`, `lead_id`, `cycle_id`, `module_id`, `milestone_id`, `estimate_points`.
 
-#### Ejemplo de Llamada JSON-RPC 2.0:
+#### Ejemplo de Llamada JSON-RPC 2.0 con Criterios de Aceptación:
 ```json
 {
   "jsonrpc": "2.0",
@@ -247,9 +248,14 @@ Crea una nueva tarea. Soporta texto plano, Markdown estándar o HTML puro. Si se
     "arguments": {
       "project": "ENG",
       "title": "Optimizar latencia de caché Redis",
-      "description": "<h3>Objetivo</h3><p>Reducir tiempo de respuesta en un 30%.</p><ul><li>Validar tags</li><li>Configurar TTL</li></ul>",
+      "description": "<h3>Objetivo</h3><p>Reducir tiempo de respuesta en un 30%.</p>",
       "priority": "HIGH",
-      "estimate_points": 3
+      "estimate_points": 3,
+      "acceptance_criteria": [
+        "Cobertura de pruebas unitarias superior al 85%",
+        "Tiempo de respuesta p99 inferior a 120ms",
+        "Documentación actualizada en OpenAPI"
+      ]
     }
   }
 }
@@ -257,7 +263,51 @@ Crea una nueva tarea. Soporta texto plano, Markdown estándar o HTML puro. Si se
 
 ---
 
-#### 2. `update_work_item`
+#### 2. `create_work_item_dod_item`
+Añade un criterio de aceptación o Definition of Done (DoD) a un Work Item existente.
+
+- **Parámetros:**
+  - `item` (string, requerido): Clave de la tarea (ej: `"ENG-101"`) o ID numérico.
+  - `title` (string, requerido): Texto del criterio de aceptación.
+  - `project` (string, opcional): Prefijo o ID del proyecto.
+
+#### Ejemplo de Llamada JSON-RPC 2.0:
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "create_work_item_dod_item",
+    "arguments": {
+      "item": "ENG-101",
+      "title": "Pruebas de estrés superadas con 500 RPS concurrentes"
+    }
+  }
+}
+```
+
+---
+
+#### 3. `toggle_work_item_dod_item`
+Alterna el estado completado (`is_completed`) de un criterio DoD, registrando automáticamente el usuario y la fecha/hora de completado.
+
+- **Parámetros:**
+  - `item` (string, requerido): Clave de la tarea (ej: `"ENG-101"`).
+  - `dod_item_id` (integer, requerido): ID numérico del criterio DoD.
+
+---
+
+#### 4. `delete_work_item_dod_item`
+Elimina un criterio DoD específico de un Work Item.
+
+- **Parámetros:**
+  - `item` (string, requerido): Clave de la tarea (ej: `"ENG-101"`).
+  - `dod_item_id` (integer, requerido): ID numérico del criterio DoD a eliminar.
+
+---
+
+#### 5. `update_work_item`
 Actualiza el estado, prioridad o descripción de una tarea existente.
 
 - **Parámetros clave:**
