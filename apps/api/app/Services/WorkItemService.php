@@ -54,8 +54,12 @@ class WorkItemService
                     });
                 }
 
-                if ($request->has('lead_id')) {
-                    $builder->where('lead_id', $request->lead_id);
+                if ($request->has('lead_id') || $request->has('assignee_id')) {
+                    $targetUserId = $request->get('assignee_id') ?? $request->get('lead_id');
+                    $builder->where(function ($q) use ($targetUserId) {
+                        $q->where('lead_id', $targetUserId)
+                            ->orWhereHas('assignees', fn ($aq) => $aq->where('users.id', $targetUserId));
+                    });
                 }
 
                 if ($request->has('is_blocked')) {

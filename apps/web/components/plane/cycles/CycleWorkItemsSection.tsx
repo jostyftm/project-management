@@ -238,6 +238,11 @@ export function CycleWorkItemsSection({
           {workItems.map((item) => {
             const priorityInfo = getPriorityBadge(item.priority);
             const currentStateId = item.state ? String(item.state.id) : "";
+            const itemAssignees = item.assignees && item.assignees.length > 0
+              ? item.assignees
+              : item.lead
+              ? [item.lead]
+              : [];
 
             return (
               <div
@@ -272,11 +277,34 @@ export function CycleWorkItemsSection({
                   )}
                 </div>
 
-                {/* Derecha: Selector de Estado, Puntos, Prioridad y Acciones */}
+                {/* Derecha: Selector de Estado, Puntos, Prioridad, Asignados y Acciones */}
                 <div
                   className="flex items-center flex-wrap gap-2.5 shrink-0"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {/* Asignados Avatar Stack */}
+                  {itemAssignees.length > 0 && (
+                    <div
+                      className="flex items-center -space-x-1.5 overflow-hidden"
+                      title={`Asignados: ${itemAssignees.map((a) => a.name).join(", ")}`}
+                    >
+                      {itemAssignees.slice(0, 3).map((a) => (
+                        <span
+                          key={a.id}
+                          className="size-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 ring-2 ring-white dark:ring-slate-900 text-[10px] font-bold flex items-center justify-center shrink-0"
+                          title={a.name}
+                        >
+                          {a.name?.charAt(0).toUpperCase() || "?"}
+                        </span>
+                      ))}
+                      {itemAssignees.length > 3 && (
+                        <span className="size-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 ring-2 ring-white dark:ring-slate-900 text-[9px] font-bold flex items-center justify-center shrink-0">
+                          +{itemAssignees.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Selector interactivo de estado */}
                   <Select
                     value={currentStateId}

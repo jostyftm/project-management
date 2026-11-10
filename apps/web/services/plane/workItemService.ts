@@ -10,6 +10,14 @@ interface JsonApiItem<T> {
 }
 
 function formatWorkItemResponse(item: JsonApiItem<WorkItem>): WorkItem {
+  const rawAssignees = item.relationships?.assignees ?? (item.attributes as any)?.assignees ?? [];
+  const rawLead = (item.relationships?.lead as any)?.data
+    ? (item.relationships.lead as any).data
+    : (item.attributes as any)?.lead ?? undefined;
+  const resolvedAssignees = Array.isArray(rawAssignees) && rawAssignees.length > 0
+    ? rawAssignees
+    : (rawLead ? [rawLead] : []);
+
   return {
     id: item.id,
     ...item.attributes,
@@ -19,13 +27,11 @@ function formatWorkItemResponse(item: JsonApiItem<WorkItem>): WorkItem {
     type: item.relationships?.type?.attributes
       ? { id: item.relationships.type.id, ...item.relationships.type.attributes }
       : undefined,
-    lead: (item.relationships?.lead as any)?.data
-      ? (item.relationships.lead as any).data
-      : undefined,
+    lead: rawLead,
     milestone: (item.relationships?.milestone as any)?.data
       ? (item.relationships.milestone as any).data
       : undefined,
-    assignees: item.relationships?.assignees ?? [],
+    assignees: resolvedAssignees,
     labels: (item.relationships?.labels ?? []).map((l: any) => ({
       id: l.id,
       ...(l.attributes || l),

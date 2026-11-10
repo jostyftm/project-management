@@ -68,6 +68,7 @@ export function WorkItemSubtasksSection({
   const [selectedStateId, setSelectedStateId] = useState<string | number>("");
   const [selectedPriority, setSelectedPriority] = useState<string>("NONE");
   const [selectedLeadId, setSelectedLeadId] = useState<string | number>("");
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<(string | number)[]>([]);
   const [startDate, setStartDate] = useState<string>("");
   const [targetDate, setTargetDate] = useState<string>("");
   const [isCreating, setIsCreating] = useState(false);
@@ -107,14 +108,15 @@ export function WorkItemSubtasksSection({
         priority: selectedPriority,
         start_date: startDate || undefined,
         target_date: targetDate || undefined,
-        lead_id: selectedLeadId || undefined,
-        assignee_ids: selectedLeadId ? [selectedLeadId] : [],
+        lead_id: selectedAssigneeIds.length > 0 ? selectedAssigneeIds[0] : (selectedLeadId || undefined),
+        assignee_ids: selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (selectedLeadId ? [selectedLeadId] : []),
       });
       toast.success("Subtarea agregada");
       setNewTitle("");
       setSelectedStateId("");
       setSelectedPriority("NONE");
       setSelectedLeadId("");
+      setSelectedAssigneeIds([]);
       setStartDate("");
       setTargetDate("");
       onRefreshParent();
@@ -297,11 +299,17 @@ export function WorkItemSubtasksSection({
                       type="button"
                       className={cn(
                         "rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs",
-                        activeLead && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
+                        (selectedAssigneeIds.length > 0 || activeLead) && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
                       )}
                     >
                       <UserIcon className="size-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                      <span>{activeLead ? activeLead.name : "Asignar"}</span>
+                      <span>
+                        {selectedAssigneeIds.length === 0
+                          ? (activeLead ? activeLead.name : "Asignar")
+                          : selectedAssigneeIds.length === 1
+                          ? members.find((m) => String(m.id) === String(selectedAssigneeIds[0]))?.name || "1 asignado"
+                          : `${selectedAssigneeIds.length} asignados`}
+                      </span>
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-56 p-1.5 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800">
@@ -311,14 +319,17 @@ export function WorkItemSubtasksSection({
                         <div className="text-xs text-slate-400 px-2 py-2 text-center">No hay miembros disponibles</div>
                       ) : (
                         members.map((m) => {
-                          const isSelected = String(m.id) === String(selectedLeadId);
+                          const isSelected = selectedAssigneeIds.map(String).includes(String(m.id)) || String(m.id) === String(selectedLeadId);
                           return (
                             <button
                               key={m.id}
                               type="button"
                               onClick={() => {
-                                setSelectedLeadId(isSelected ? "" : m.id);
-                                setAssigneePopoverOpen(false);
+                                const nextIds = isSelected
+                                  ? selectedAssigneeIds.filter((id) => String(id) !== String(m.id))
+                                  : [...selectedAssigneeIds.filter((id) => String(id) !== String(m.id)), m.id];
+                                setSelectedAssigneeIds(nextIds);
+                                setSelectedLeadId(nextIds.length > 0 ? nextIds[0] : "");
                               }}
                               className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-left"
                             >
@@ -484,6 +495,11 @@ function SubtaskItemRow({
   const currentState = states.find((s) => String(s.id) === String(sub.state?.id || sub.state_id)) || sub.state;
   const currentPriority = PRIORITY_OPTIONS.find((p) => p.value === sub.priority) || PRIORITY_OPTIONS[4];
   const currentLead = members.find((m) => String(m.id) === String(sub.lead_id || sub.lead?.id)) || sub.lead;
+  const subAssignees = (sub.assignees && sub.assignees.length > 0)
+    ? sub.assignees
+    : currentLead
+    ? [currentLead]
+    : [];
 
   const isSubtaskAssignee = !!currentUser && (
     String(sub.lead_id) === String(currentUser.id) ||
@@ -647,11 +663,37 @@ function SubtaskItemRow({
               disabled={!isAdmin}
               className={cn(
                 "rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-75 disabled:cursor-not-allowed",
-                currentLead && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
+                subAssignees.length > 0 && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
               )}
             >
-              <UserIcon className="size-3 text-slate-500 dark:text-slate-400 shrink-0" />
-              <span className="truncate max-w-[80px]">{currentLead ? currentLead.name : "Asignar"}</span>
+              {subAssignees.length === 0 ? (
+                <>
+                  <UserIcon className="size-3 text-slate-500 dark:text-slate-400 shrink-0" />
+                  <span>Asignar</span>
+                </>
+              ) : subAssignees.length === 1 ? (
+                <>
+                  <span className="size-4 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[8px] font-bold flex items-center justify-center shrink-0">
+                    {subAssignees[0].name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate max-w-[80px]">{subAssignees[0].name}</span>
+                </>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <div className="flex items-center -space-x-1 overflow-hidden">
+                    {subAssignees.slice(0, 2).map((a) => (
+                      <span
+                        key={a.id}
+                        className="size-4 rounded-full bg-indigo-200 text-indigo-800 text-[8px] font-bold flex items-center justify-center shrink-0 ring-1 ring-white"
+                        title={a.name}
+                      >
+                        {a.name.charAt(0).toUpperCase()}
+                      </span>
+                    ))}
+                  </div>
+                  <span>{subAssignees.length}</span>
+                </div>
+              )}
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-56 p-1.5 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 z-[100]">
@@ -661,16 +703,19 @@ function SubtaskItemRow({
                 <div className="text-xs text-slate-400 px-2 py-2 text-center">No hay miembros disponibles</div>
               ) : (
                 members.map((m) => {
-                  const isSelected = String(m.id) === String(sub.lead_id || sub.lead?.id);
+                  const currentIds = subAssignees.map((a) => String(a.id));
+                  const isSelected = currentIds.includes(String(m.id));
                   return (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => {
-                        setAssigneeOpen(false);
+                        const nextIds = isSelected
+                          ? currentIds.filter((id) => id !== String(m.id))
+                          : [...currentIds, m.id];
                         handleUpdateField({
-                          lead_id: isSelected ? null : m.id,
-                          assignee_ids: isSelected ? [] : [m.id],
+                          assignee_ids: nextIds,
+                          lead_id: nextIds.length > 0 ? nextIds[0] : null,
                         });
                       }}
                       className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-left"

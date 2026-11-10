@@ -392,6 +392,50 @@ it('manages work item acceptance criteria (DoD items) via MCP tools', function (
     ]);
 });
 
+it('supports multiple assignees on work items via MCP tools', function () {
+    $user2 = User::factory()->create();
+    $user3 = User::factory()->create();
+
+    // 1. Crear WorkItem con múltiples asignados
+    $createResponse = ProjectManagementServer::tool(CreateWorkItemTool::class, [
+        'project' => 'ENG',
+        'title' => 'Implementar soporte multi-responsables',
+        'assignee_ids' => [$this->user->id, $user2->id, $user3->id],
+    ]);
+
+    $createResponse->assertOk()
+        ->assertSee('ENG-1')
+        ->assertSee($this->user->name)
+        ->assertSee($user2->name)
+        ->assertSee($user3->name);
+
+    $item = WorkItem::where('project_id', $this->project->id)->where('sequence_id', 1)->first();
+    expect($item->assignees)->toHaveCount(3);
+    expect($item->lead_id)->toBe($this->user->id);
+
+    // 2. Actualizar asignados
+    $updateResponse = ProjectManagementServer::tool(UpdateWorkItemTool::class, [
+        'item' => 'ENG-1',
+        'assignee_ids' => [$user2->id, $user3->id],
+    ]);
+
+    $updateResponse->assertOk()
+        ->assertSee($user2->name)
+        ->assertSee($user3->name);
+
+    $item->refresh();
+    expect($item->assignees)->toHaveCount(2);
+
+    // 3. Consultar mediante GetWorkItemTool
+    $getResponse = ProjectManagementServer::tool(GetWorkItemTool::class, [
+        'item' => 'ENG-1',
+    ]);
+
+    $getResponse->assertOk()
+        ->assertSee($user2->name)
+        ->assertSee($user3->name);
+});
+
 it('manages cycles, modules, milestones and releases via MCP tools', function () {
     // Ciclo
     $createCycle = ProjectManagementServer::tool(CreateCycleTool::class, [

@@ -388,6 +388,10 @@ export function WorkItemCreateModal({
   const activeType = useMemo(() => types.find((t) => String(t.id) === String(selectedTypeId)), [types, selectedTypeId]);
   const activePriority = useMemo(() => PRIORITY_OPTIONS.find((p) => p.value === selectedPriority), [selectedPriority]);
   const activeLead = useMemo(() => members.find((m) => String(m.id) === String(selectedLeadId)), [members, selectedLeadId]);
+  const selectedMembers = useMemo(
+    () => members.filter((m) => selectedAssigneeIds.map(String).includes(String(m.id)) || String(m.id) === String(selectedLeadId)),
+    [members, selectedAssigneeIds, selectedLeadId]
+  );
   const activeCycle = useMemo(() => cycles.find((c) => String(c.id) === String(selectedCycleId)), [cycles, selectedCycleId]);
   const activeModule = useMemo(() => modules.find((m) => String(m.id) === String(selectedModuleId)), [modules, selectedModuleId]);
   const activeParent = useMemo(() => availableItems.find((i) => String(i.id) === String(selectedParentId)), [availableItems, selectedParentId]);
@@ -604,50 +608,73 @@ export function WorkItemCreateModal({
                   type="button"
                   className={cn(
                     "rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 px-3 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs",
-                    (selectedLeadId || selectedAssigneeIds.length > 0) && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
+                    selectedMembers.length > 0 && "border-indigo-200 bg-indigo-50/50 text-indigo-900 dark:text-indigo-200"
                   )}
                 >
                   <User className="size-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                  <span>
-                    {activeLead
-                      ? activeLead.name
-                      : selectedAssigneeIds.length > 0
-                      ? `${selectedAssigneeIds.length} asignados`
-                      : "Asignados"}
-                  </span>
+                  {selectedMembers.length === 0 ? (
+                    <span>Asignar</span>
+                  ) : selectedMembers.length === 1 ? (
+                    <span className="truncate max-w-[120px]">{selectedMembers[0].name}</span>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center -space-x-1 overflow-hidden">
+                        {selectedMembers.slice(0, 2).map((m) => (
+                          <span
+                            key={m.id}
+                            className="size-4 rounded-full bg-indigo-200 text-indigo-800 font-bold text-[8px] flex items-center justify-center shrink-0 ring-1 ring-white dark:ring-slate-900"
+                            title={m.name}
+                          >
+                            {m.name.charAt(0).toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                      <span>{selectedMembers.length} asignados</span>
+                    </div>
+                  )}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-56 p-1.5 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800">
-                <div className="text-[11px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">Miembros del Proyecto</div>
-                <div className="space-y-0.5 mt-1 max-h-48 overflow-y-auto">
+              <PopoverContent align="start" className="w-64 p-2 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 z-[100]">
+                <div className="text-[11px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">
+                  Miembros del Proyecto ({selectedMembers.length} seleccionados)
+                </div>
+                <div className="space-y-0.5 mt-1 max-h-56 overflow-y-auto">
                   {members.length === 0 ? (
                     <div className="text-xs text-slate-400 px-2 py-2 text-center">No hay miembros disponibles</div>
                   ) : (
                     members.map((m) => {
-                      const isSelected = String(m.id) === String(selectedLeadId) || selectedAssigneeIds.map(String).includes(String(m.id));
+                      const isSelected = selectedAssigneeIds.map(String).includes(String(m.id)) || String(m.id) === String(selectedLeadId);
                       return (
                         <button
                           key={m.id}
                           type="button"
                           onClick={() => {
+                            let nextIds: (string | number)[];
                             if (isSelected) {
-                              setSelectedLeadId("");
-                              setSelectedAssigneeIds((prev) => prev.filter((id) => String(id) !== String(m.id)));
+                              nextIds = selectedAssigneeIds.filter((id) => String(id) !== String(m.id));
+                              if (String(selectedLeadId) === String(m.id)) {
+                                setSelectedLeadId(nextIds.length > 0 ? nextIds[0] : "");
+                              }
                             } else {
-                              setSelectedLeadId(m.id);
-                              setSelectedAssigneeIds([m.id]);
+                              nextIds = [...selectedAssigneeIds.filter((id) => String(id) !== String(m.id)), m.id];
+                              if (!selectedLeadId) {
+                                setSelectedLeadId(m.id);
+                              }
                             }
-                            setAssigneePopoverOpen(false);
+                            setSelectedAssigneeIds(nextIds);
                           }}
-                          className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-left"
+                          className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-left transition-colors"
                         >
                           <div className="flex items-center gap-2 truncate">
-                            <span className="size-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                            <span className="size-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px] shrink-0">
                               {m.name.charAt(0).toUpperCase()}
                             </span>
-                            <span className="truncate">{m.name}</span>
+                            <div className="truncate">
+                              <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
+                              {m.email && <p className="text-[10px] text-slate-400 truncate">{m.email}</p>}
+                            </div>
                           </div>
-                          {isSelected && <Check className="size-3.5 text-blue-600 shrink-0" />}
+                          {isSelected && <Check className="size-3.5 text-indigo-600 shrink-0" />}
                         </button>
                       );
                     })

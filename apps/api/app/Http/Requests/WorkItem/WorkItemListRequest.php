@@ -62,6 +62,14 @@ class WorkItemListRequest extends FormRequest
              * @example false
              */
             'filter.is_draft' => ['sometimes', 'boolean'],
+
+            /**
+             * Filtrar por responsable o asignado
+             */
+            'lead_id' => ['sometimes', 'integer'],
+            'assignee_id' => ['sometimes', 'integer'],
+            'filter.lead_id' => ['sometimes', 'integer'],
+            'filter.assignee_id' => ['sometimes', 'integer'],
         ];
     }
 }

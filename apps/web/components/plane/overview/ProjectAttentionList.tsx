@@ -108,7 +108,11 @@ export function ProjectAttentionList({
           {criticalItems.map((item) => {
             const isOverdue =
               item.target_date && new Date(item.target_date).getTime() < Date.now();
-            const assignee = item.assignees && item.assignees.length > 0 ? item.assignees[0] : null;
+            const itemAssignees = item.assignees && item.assignees.length > 0
+              ? item.assignees
+              : item.lead
+              ? [item.lead]
+              : [];
 
             return (
               <div
@@ -157,13 +161,26 @@ export function ProjectAttentionList({
                     {item.priority === "URGENT" ? "Urgente" : item.priority === "HIGH" ? "Alta" : item.priority}
                   </span>
 
-                  {/* Assignee Avatar */}
-                  {assignee ? (
+                  {/* Assignees Avatar Stack */}
+                  {itemAssignees.length > 0 ? (
                     <div
-                      title={`Asignado a: ${assignee.name}`}
-                      className="size-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9px] flex items-center justify-center"
+                      className="flex items-center -space-x-1.5 overflow-hidden"
+                      title={`Asignados: ${itemAssignees.map((a) => a.name).join(", ")}`}
                     >
-                      {assignee.name.charAt(0).toUpperCase()}
+                      {itemAssignees.slice(0, 2).map((a) => (
+                        <div
+                          key={a.id}
+                          title={`Asignado a: ${a.name}`}
+                          className="size-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9px] flex items-center justify-center ring-1 ring-white"
+                        >
+                          {a.name.charAt(0).toUpperCase()}
+                        </div>
+                      ))}
+                      {itemAssignees.length > 2 && (
+                        <div className="size-5 rounded-full bg-slate-200 text-slate-700 font-bold text-[8px] flex items-center justify-center ring-1 ring-white">
+                          +{itemAssignees.length - 2}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div

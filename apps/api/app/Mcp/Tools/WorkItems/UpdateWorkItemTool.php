@@ -42,6 +42,9 @@ class UpdateWorkItemTool extends Tool
                 ->description('Puntos de historia o estimación de esfuerzo'),
             'lead_id' => $schema->integer()
                 ->description('ID del nuevo usuario responsable / asignado principal'),
+            'assignee_ids' => $schema->array()
+                ->items($schema->integer())
+                ->description('Lista de IDs de usuarios asignados/responsables de la tarea (reemplaza las asignaciones actuales)'),
             'cycle_id' => $schema->integer()
                 ->description('Asignar a un ciclo / sprint específico'),
             'module_id' => $schema->integer()
@@ -117,6 +120,19 @@ class UpdateWorkItemTool extends Tool
                 $updates['lead_id'] = $request->get('lead_id');
             }
 
+            if ($request->has('assignee_ids')) {
+                $assigneeIds = $request->get('assignee_ids') ?? [];
+                $workItem->assignees()->sync($assigneeIds);
+                if (! empty($assigneeIds) && ! $request->has('lead_id') && ! $workItem->lead_id) {
+                    $updates['lead_id'] = $assigneeIds[0];
+                }
+            } elseif ($request->has('lead_id')) {
+                $newLead = $request->get('lead_id');
+                if ($newLead) {
+                    $workItem->assignees()->syncWithoutDetaching([$newLead]);
+                }
+            }
+
             if ($request->has('milestone_id')) {
                 $updates['milestone_id'] = $request->get('milestone_id');
                 if ($milestoneId = $request->get('milestone_id')) {
@@ -159,7 +175,7 @@ class UpdateWorkItemTool extends Tool
             }
         });
 
-        $workItem->load(['state:id,name,group,color', 'lead:id,name,email', 'project:id,identifier']);
+        $workItem->load(['state:id,name,group,color', 'lead:id,name,email', 'assignees:id,name,email', 'project:id,identifier']);
 
         return Response::text($this->formatJson([
             'message' => "Work item {$workItem->project?->identifier}-{$workItem->sequence_id} actualizado exitosamente.",
@@ -179,6 +195,11 @@ class UpdateWorkItemTool extends Tool
                     'id' => $workItem->lead->id,
                     'name' => $workItem->lead->name,
                 ] : null,
+                'assignees' => $workItem->assignees->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                ]),
             ],
         ]));
     }
