@@ -15,6 +15,7 @@ interface WorkItemsListBlockProps {
       priority: string;
       state: { name: string; group: string };
       lead?: { name: string; avatar?: string } | null;
+      assignees?: Array<{ id?: string | number; name: string }>;
       target_date?: string | null;
     }>;
     count?: number;
@@ -107,8 +108,10 @@ export function WorkItemsListBlock({ block, data }: WorkItemsListBlockProps) {
               </div>
 
               <div className="flex items-center gap-2.5 shrink-0 text-[11px]">
-                <span className="text-neutral-500">
-                  {item.lead?.name || <span className="text-neutral-300 dark:text-neutral-600">Sin asignar</span>}
+                <span className="text-neutral-500 truncate max-w-[150px]" title={item.assignees && item.assignees.length > 0 ? item.assignees.map((a) => a.name).join(", ") : (item.lead?.name || "Sin asignar")}>
+                  {item.assignees && item.assignees.length > 0
+                    ? item.assignees.map((a) => a.name).join(", ")
+                    : (item.lead?.name || <span className="text-neutral-300 dark:text-neutral-600">Sin asignar</span>)}
                 </span>
                 {item.target_date && (
                   <span className="text-neutral-400 text-[10px]">

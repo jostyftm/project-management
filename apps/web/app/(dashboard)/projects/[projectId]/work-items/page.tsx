@@ -135,6 +135,12 @@ function KanbanCard({
     (item.age_in_state_days ?? 0) >= (agingThresholdDays || 5) &&
     item.state?.group === "STARTED";
 
+  const itemAssignees = item.assignees && item.assignees.length > 0
+    ? item.assignees
+    : item.lead
+    ? [item.lead]
+    : [];
+
   if (isDragging) {
     return (
       <div
@@ -258,11 +264,35 @@ function KanbanCard({
           )}
         </div>
 
-        {item.created_at && (
-          <span className="text-[11px] text-slate-400">
-            {new Date(item.created_at).toLocaleDateString()}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {itemAssignees.length > 0 && (
+            <div
+              className="flex items-center -space-x-1.5 overflow-hidden"
+              title={`Asignados: ${itemAssignees.map((a) => a.name).join(", ")}`}
+            >
+              {itemAssignees.slice(0, 3).map((a) => (
+                <span
+                  key={a.id}
+                  className="size-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 ring-2 ring-white dark:ring-slate-900 text-[9px] font-bold flex items-center justify-center shrink-0"
+                  title={a.name}
+                >
+                  {a.name?.charAt(0).toUpperCase() || "?"}
+                </span>
+              ))}
+              {itemAssignees.length > 3 && (
+                <span className="size-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 ring-2 ring-white dark:ring-slate-900 text-[8px] font-bold flex items-center justify-center shrink-0">
+                  +{itemAssignees.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+
+          {item.created_at && (
+            <span className="text-[11px] text-slate-400">
+              {new Date(item.created_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -270,6 +300,11 @@ function KanbanCard({
 
 function KanbanCardPreview({ item }: { item: WorkItem }) {
   const priorityInfo = getPriorityBadge(item.priority);
+  const itemAssignees = item.assignees && item.assignees.length > 0
+    ? item.assignees
+    : item.lead
+    ? [item.lead]
+    : [];
 
   return (
     <div className="w-[280px] bg-white border-2 border-indigo-500 rounded-lg p-3.5 shadow-2xl rotate-1 scale-105 pointer-events-none cursor-grabbing z-[9999]">
@@ -316,11 +351,31 @@ function KanbanCardPreview({ item }: { item: WorkItem }) {
           )}
         </div>
 
-        {item.created_at && (
-          <span className="text-[11px] text-slate-400">
-            {new Date(item.created_at).toLocaleDateString()}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {itemAssignees.length > 0 && (
+            <div className="flex items-center -space-x-1.5 overflow-hidden">
+              {itemAssignees.slice(0, 3).map((a) => (
+                <span
+                  key={a.id}
+                  className="size-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 ring-2 ring-white dark:ring-slate-900 text-[9px] font-bold flex items-center justify-center shrink-0"
+                >
+                  {a.name?.charAt(0).toUpperCase() || "?"}
+                </span>
+              ))}
+              {itemAssignees.length > 3 && (
+                <span className="size-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 ring-2 ring-white dark:ring-slate-900 text-[8px] font-bold flex items-center justify-center shrink-0">
+                  +{itemAssignees.length - 3}
+                </span>
+              )}
+            </div>
+          )}
+
+          {item.created_at && (
+            <span className="text-[11px] text-slate-400">
+              {new Date(item.created_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

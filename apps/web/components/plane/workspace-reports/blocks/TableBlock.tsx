@@ -13,6 +13,7 @@ interface TableBlockProps {
       state: { name: string; group: string };
       priority: string;
       lead?: { name: string; avatar?: string } | null;
+      assignees?: Array<{ id?: string | number; name: string }>;
       target_date?: string | null;
       created_at?: string;
     }>;
@@ -121,7 +122,9 @@ export function TableBlock({ block, data }: TableBlockProps) {
                 <td className="py-2.5 px-4">{stateBadge(row.state)}</td>
                 <td className="py-2.5 px-4">{priorityBadge(row.priority)}</td>
                 <td className="py-2.5 px-4 text-neutral-600 dark:text-neutral-400">
-                  {row.lead?.name || <span className="text-neutral-300 dark:text-neutral-600">—</span>}
+                  {row.assignees && row.assignees.length > 0
+                    ? row.assignees.map((a) => a.name).join(", ")
+                    : (row.lead?.name || <span className="text-neutral-300 dark:text-neutral-600">—</span>)}
                 </td>
                 <td className="py-2.5 px-4 text-neutral-500 text-[11px]">
                   {row.target_date || <span className="text-neutral-300 dark:text-neutral-600">—</span>}

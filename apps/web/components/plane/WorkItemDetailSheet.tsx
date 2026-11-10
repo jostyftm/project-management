@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sheet,
@@ -46,6 +46,9 @@ import {
   Loader2,
   Flag,
   User as UserIcon,
+  Users,
+  UserPlus,
+  X,
   CircleDashed,
   CircleSlash,
   RefreshCw,
@@ -127,6 +130,8 @@ export function WorkItemDetailSheet({
   const [moduleId, setModuleId] = useState<string>("");
   const [milestoneId, setMilestoneId] = useState<string>("");
   const [leadId, setLeadId] = useState<string>("");
+  const [assigneeIds, setAssigneeIds] = useState<(string | number)[]>([]);
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
   const [startDate, setStartDate] = useState<string>("");
   const [targetDate, setTargetDate] = useState<string>("");
   const [startCalOpen, setStartCalOpen] = useState(false);
@@ -270,6 +275,10 @@ export function WorkItemDetailSheet({
 
         const rawLeadId = (itemData as any).lead_id || (itemData as any).lead?.id || "";
         setLeadId(rawLeadId ? String(rawLeadId) : "");
+        const rawAssignees = itemData.assignees && itemData.assignees.length > 0
+          ? itemData.assignees.map((a: any) => a.id)
+          : (rawLeadId ? [rawLeadId] : []);
+        setAssigneeIds(rawAssignees);
 
         setStartDate(itemData.start_date ? itemData.start_date.substring(0, 10) : "");
         setTargetDate(itemData.target_date ? itemData.target_date.substring(0, 10) : "");
@@ -359,6 +368,19 @@ export function WorkItemDetailSheet({
       });
     }
   };
+
+  const assignedMembers = useMemo<{ id: string | number; name: string; email?: string }[]>(() => {
+    if (members.length > 0) {
+      return members.filter((m) => assigneeIds.map(String).includes(String(m.id)));
+    }
+    if (item?.assignees && item.assignees.length > 0) {
+      return item.assignees;
+    }
+    if (item?.lead) {
+      return [item.lead];
+    }
+    return [];
+  }, [members, assigneeIds, item?.assignees, item?.lead]);
 
   const formatDateDisplay = (dateStr?: string | null, fallback = "Sin definir") => {
     if (!dateStr) return fallback;
@@ -861,32 +883,110 @@ export function WorkItemDetailSheet({
             </Select>
           </div>
 
-          {/* 5. Responsable */}
-          <div className="flex items-center justify-between gap-3 p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-800 shadow-2xs">
-            <span className="text-slate-500 dark:text-slate-400 font-medium shrink-0 w-28 flex items-center gap-1.5">
-              <UserIcon className="size-3 text-slate-400" /> Responsable:
-            </span>
-            <Select
-              value={leadId}
-              disabled={!isAdmin}
-              onValueChange={(val) => {
-                const next = val === "none" ? "" : val;
-                setLeadId(next);
-                handleUpdateField({ lead_id: next || null });
-              }}
-            >
-              <SelectTrigger className="h-8 flex-1 bg-slate-50/50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-xs disabled:opacity-75 disabled:cursor-not-allowed">
-                <SelectValue placeholder="Sin asignar" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin asignar</SelectItem>
-                {members.map((u) => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* 5. Responsables (Asignados) */}
+          <div className="flex flex-col gap-2 p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                <Users className="size-3.5 text-slate-400" /> Responsables ({assignedMembers.length}):
+              </span>
+
+              {isAdmin && (
+                <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                    >
+                      <UserPlus className="size-3" />
+                      <span>Gestionar</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-64 p-2 bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800 z-[100]">
+                    <div className="text-[11px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider">
+                      Asignar Miembros
+                    </div>
+                    <div className="space-y-0.5 mt-1 max-h-56 overflow-y-auto">
+                      {members.length === 0 ? (
+                        <div className="p-2 text-center text-slate-400 text-xs">
+                          No hay miembros disponibles
+                        </div>
+                      ) : (
+                        members.map((m) => {
+                          const isAssigned = assigneeIds.map(String).includes(String(m.id));
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                const nextIds = isAssigned
+                                  ? assigneeIds.filter((id) => String(id) !== String(m.id))
+                                  : [...assigneeIds, m.id];
+                                setAssigneeIds(nextIds);
+                                setLeadId(nextIds.length > 0 ? String(nextIds[0]) : "");
+                                handleUpdateField({
+                                  assignee_ids: nextIds,
+                                  lead_id: nextIds.length > 0 ? nextIds[0] : null,
+                                });
+                              }}
+                              className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer text-left transition-colors"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="size-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                  {m.name.charAt(0).toUpperCase()}
+                                </span>
+                                <div className="truncate">
+                                  <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
+                                  {m.email && <p className="text-[10px] text-slate-400 truncate">{m.email}</p>}
+                                </div>
+                              </div>
+                              {isAssigned && <Check className="size-4 text-indigo-600 shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            {/* Chips de personas asignadas */}
+            <div className="flex flex-wrap items-center gap-1.5 min-h-[28px]">
+              {assignedMembers.length === 0 ? (
+                <span className="text-xs text-slate-400 italic">Sin personas asignadas</span>
+              ) : (
+                assignedMembers.map((m) => (
+                  <span
+                    key={m.id}
+                    className="inline-flex items-center gap-1.5 pl-1.5 pr-1 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                  >
+                    <span className="size-4 rounded-full bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 text-[9px] font-bold flex items-center justify-center shrink-0">
+                      {m.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="truncate max-w-[120px]">{m.name}</span>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextIds = assigneeIds.filter((id) => String(id) !== String(m.id));
+                          setAssigneeIds(nextIds);
+                          setLeadId(nextIds.length > 0 ? String(nextIds[0]) : "");
+                          handleUpdateField({
+                            assignee_ids: nextIds,
+                            lead_id: nextIds.length > 0 ? nextIds[0] : null,
+                          });
+                        }}
+                        className="size-3.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                        title={`Desasignar a ${m.name}`}
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    )}
+                  </span>
+                ))
+              )}
+            </div>
           </div>
 
           {/* 6. Módulo */}

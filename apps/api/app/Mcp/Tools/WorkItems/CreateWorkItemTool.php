@@ -54,6 +54,9 @@ class CreateWorkItemTool extends Tool
                 ->description('ID del hito (milestone) al que pertenecerá'),
             'lead_id' => $schema->integer()
                 ->description('ID del usuario responsable / líder'),
+            'assignee_ids' => $schema->array()
+                ->items($schema->integer())
+                ->description('Lista opcional de IDs de usuarios asignados/responsables de la tarea'),
             'start_date' => $schema->string()
                 ->description('Fecha de inicio (formato YYYY-MM-DD)'),
             'target_date' => $schema->string()
@@ -192,6 +195,16 @@ class CreateWorkItemTool extends Tool
                 $item->milestones()->syncWithoutDetaching([$milestoneId]);
             }
 
+            $assigneeIds = $request->get('assignee_ids');
+            if (! empty($assigneeIds)) {
+                $item->assignees()->sync($assigneeIds);
+                if (! $item->lead_id && count($assigneeIds) > 0) {
+                    $item->update(['lead_id' => $assigneeIds[0]]);
+                }
+            } elseif ($item->lead_id) {
+                $item->assignees()->syncWithoutDetaching([$item->lead_id]);
+            }
+
             $criteriaRaw = $request->get('acceptance_criteria');
             if (! empty($criteriaRaw)) {
                 $criteriaList = [];
@@ -221,7 +234,7 @@ class CreateWorkItemTool extends Tool
             return $item;
         });
 
-        $createdItem->load(['state:id,name,group,color', 'type:id,name', 'lead:id,name', 'dodItems']);
+        $createdItem->load(['state:id,name,group,color', 'type:id,name', 'lead:id,name', 'assignees:id,name,email', 'dodItems']);
 
         return Response::text($this->formatJson([
             'message' => 'Work item creado exitosamente.',
@@ -242,6 +255,11 @@ class CreateWorkItemTool extends Tool
                     'id' => $createdItem->lead->id,
                     'name' => $createdItem->lead->name,
                 ] : null,
+                'assignees' => $createdItem->assignees->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                ]),
                 'dod_items' => $createdItem->dodItems->map(fn ($d) => [
                     'id' => $d->id,
                     'title' => $d->title,
