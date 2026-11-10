@@ -35,10 +35,13 @@ use App\Mcp\Tools\Releases\ListReleasesTool;
 use App\Mcp\Tools\Releases\UpdateReleaseTool;
 use App\Mcp\Tools\Workflow\ListProjectLabelsTool;
 use App\Mcp\Tools\Workflow\ListProjectStatesTool;
+use App\Mcp\Tools\WorkItems\CreateWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\CreateWorkItemTool;
+use App\Mcp\Tools\WorkItems\DeleteWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\DeleteWorkItemTool;
 use App\Mcp\Tools\WorkItems\GetWorkItemTool;
 use App\Mcp\Tools\WorkItems\ListWorkItemsTool;
+use App\Mcp\Tools\WorkItems\ToggleWorkItemDodItemTool;
 use App\Mcp\Tools\WorkItems\UpdateWorkItemTool;
 use App\Mcp\Tools\Workspaces\AddWorkspaceMemberTool;
 use App\Mcp\Tools\Workspaces\CreateWorkspaceTool;
@@ -82,12 +85,15 @@ class ProjectManagementServer extends Server
         UpdateProjectTool::class,
         DeleteProjectTool::class,
 
-        // WorkItems
+        // WorkItems & Criterios DoD / Aceptación
         ListWorkItemsTool::class,
         GetWorkItemTool::class,
         CreateWorkItemTool::class,
         UpdateWorkItemTool::class,
         DeleteWorkItemTool::class,
+        CreateWorkItemDodItemTool::class,
+        ToggleWorkItemDodItemTool::class,
+        DeleteWorkItemDodItemTool::class,
 
         // Cycles / Sprints
         ListCyclesTool::class,

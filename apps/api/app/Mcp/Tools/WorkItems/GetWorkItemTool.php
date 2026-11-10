@@ -60,7 +60,7 @@ class GetWorkItemTool extends Tool
             'milestone:id,title,target_date,status',
             'milestones:id,title,target_date,status',
             'subItems.state:id,name,group,color',
-            'dodItems',
+            'dodItems.completedBy:id,name',
             'deliverables',
             'outwardRelations.target.state',
             'inwardRelations.source.state',
@@ -129,8 +129,14 @@ class GetWorkItemTool extends Tool
             ] : null,
             'dod_items' => $workItem->dodItems->map(fn ($d) => [
                 'id' => $d->id,
-                'description' => $d->description,
-                'completed' => (bool) $d->completed,
+                'title' => $d->title,
+                'description' => $d->title,
+                'is_completed' => (bool) $d->is_completed,
+                'completed' => (bool) $d->is_completed,
+                'completed_by' => $d->completedBy ? [
+                    'id' => $d->completedBy->id,
+                    'name' => $d->completedBy->name,
+                ] : null,
                 'completed_at' => $d->completed_at?->toIso8601String(),
             ]),
             'deliverables' => $workItem->deliverables->map(fn ($del) => [

@@ -5,6 +5,7 @@ namespace App\Mcp\Tools\WorkItems;
 use App\Mcp\Tools\Concerns\ResolvesWorkspaceContext;
 use App\Models\State;
 use App\Models\WorkItem;
+use App\Models\WorkItemDodItem;
 use App\Models\WorkItemType;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -65,6 +66,9 @@ class CreateWorkItemTool extends Tool
                 ->description('Nombre del tipo de ítem (ej: "Épica", "Historia", "Tarea", "Bug" o "Epic", "Task") como alternativa a type_id'),
             'completed_at' => $schema->string()
                 ->description('Fecha/hora histórica de finalización en formato ISO 8601 (opcional)'),
+            'acceptance_criteria' => $schema->array()
+                ->items($schema->string())
+                ->description('Lista opcional de criterios de aceptación o Definition of Done (DoD) para la tarea'),
         ];
     }
 
@@ -188,10 +192,36 @@ class CreateWorkItemTool extends Tool
                 $item->milestones()->syncWithoutDetaching([$milestoneId]);
             }
 
+            $criteriaRaw = $request->get('acceptance_criteria');
+            if (! empty($criteriaRaw)) {
+                $criteriaList = [];
+                if (is_array($criteriaRaw)) {
+                    $criteriaList = $criteriaRaw;
+                } elseif (is_string($criteriaRaw)) {
+                    $decoded = json_decode($criteriaRaw, true);
+                    if (is_array($decoded)) {
+                        $criteriaList = $decoded;
+                    } else {
+                        $criteriaList = explode("\n", $criteriaRaw);
+                    }
+                }
+
+                foreach ($criteriaList as $crit) {
+                    $critTitle = trim(ltrim((string) $crit, "-*• \t\r\n"));
+                    if (! empty($critTitle)) {
+                        WorkItemDodItem::create([
+                            'work_item_id' => $item->id,
+                            'title' => $critTitle,
+                            'is_completed' => false,
+                        ]);
+                    }
+                }
+            }
+
             return $item;
         });
 
-        $createdItem->load(['state:id,name,group,color', 'type:id,name', 'lead:id,name']);
+        $createdItem->load(['state:id,name,group,color', 'type:id,name', 'lead:id,name', 'dodItems']);
 
         return Response::text($this->formatJson([
             'message' => 'Work item creado exitosamente.',
@@ -212,6 +242,11 @@ class CreateWorkItemTool extends Tool
                     'id' => $createdItem->lead->id,
                     'name' => $createdItem->lead->name,
                 ] : null,
+                'dod_items' => $createdItem->dodItems->map(fn ($d) => [
+                    'id' => $d->id,
+                    'title' => $d->title,
+                    'is_completed' => (bool) $d->is_completed,
+                ]),
             ],
         ]));
     }
