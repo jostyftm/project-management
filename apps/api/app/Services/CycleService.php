@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Mail\CycleCompletedMail;
+use App\Models\Activity;
 use App\Models\Cycle;
 use App\Models\CycleWorkItem;
 use App\Models\Project;
@@ -14,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -159,6 +161,275 @@ class CycleService
         }
 
         return $updatedCount;
+    }
+
+    /**
+     * Reconstruye pivotes, timestamps de estado y puntos de los work items de un ciclo según sus fechas.
+     */
+    public function rebuildCycleTimelineData(Cycle $cycle, bool $dryRun = false): array
+    {
+        $stats = [
+            'pivots_adjusted' => 0,
+            'completion_dates_fixed' => 0,
+            'state_dates_fixed' => 0,
+            'points_synced' => 0,
+            'completion_snapshots_updated' => 0,
+        ];
+
+        $cycle->load(['workItems.state']);
+        $workItems = $cycle->workItems;
+
+        if ($workItems->isEmpty()) {
+            return $stats;
+        }
+
+        $now = now();
+        $cycleStart = $cycle->start_date
+            ? Carbon::parse($cycle->start_date)->startOfDay()
+            : ($cycle->created_at ? $cycle->created_at->copy()->startOfDay() : $now->copy()->startOfDay());
+        $cycleEnd = $cycle->end_date
+            ? Carbon::parse($cycle->end_date)->endOfDay()
+            : $cycleStart->copy()->addDays(13)->endOfDay();
+
+        if ($cycleEnd->lessThanOrEqualTo($cycleStart)) {
+            $cycleEnd = $cycleStart->copy()->addDays(13)->endOfDay();
+        }
+
+        $cycleEnded = $cycle->status === 'COMPLETED' || $cycleEnd->lt($now);
+        $upperBound = $cycleEnded ? $cycleEnd : $now;
+
+        $stateGroups = State::where('project_id', $cycle->project_id)
+            ->pluck('group', 'id')
+            ->map(fn ($g) => strtoupper((string) $g))
+            ->all();
+
+        $activitiesByItem = Activity::withoutGlobalScopes()
+            ->where('entity_type', 'WORK_ITEM')
+            ->where('action', 'STATE_CHANGED')
+            ->whereIn('entity_id', $workItems->pluck('id')->all())
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('entity_id');
+
+        foreach ($workItems as $item) {
+            $group = strtoupper($item->state?->group ?? 'UNSTARTED');
+            $itemActivities = $activitiesByItem->get($item->id, collect());
+            $itemDirty = false;
+            $pivotUpdates = [];
+
+            // 1. Sincronizar estimate_points desde estimate_value si falta
+            if ($item->estimate_points === null && $item->estimate_value !== null && trim((string) $item->estimate_value) !== '') {
+                $item->estimate_points = $item->effective_estimate_points;
+                $stats['points_synced']++;
+                $itemDirty = true;
+            }
+
+            // 2. Reconstruir fecha de incorporación en cycle_work_items si falta o excede el rango efectivo
+            $rawPivotCreatedAt = $item->pivot?->created_at ? Carbon::parse($item->pivot->created_at) : null;
+            if (! $rawPivotCreatedAt || $rawPivotCreatedAt->gt($upperBound)) {
+                $resolvedPivotDate = $this->resolvePivotAddedDate($item, $cycleStart, $upperBound);
+                $pivotUpdates['created_at'] = $resolvedPivotDate;
+                $pivotUpdates['updated_at'] = $resolvedPivotDate;
+                $stats['pivots_adjusted']++;
+            }
+
+            // 3. Reconstruir completed_at y state_changed_at según grupo y fechas del ciclo
+            if (in_array($group, ['COMPLETED', 'CANCELLED'], true)) {
+                $currentComp = $item->completed_at ? Carbon::parse($item->completed_at) : null;
+                $needsCompFix = ! $currentComp || ($cycleEnded && $currentComp->gt($upperBound));
+
+                if ($needsCompFix) {
+                    $resolvedComp = $this->resolveWorkItemGroupTransitionDate(
+                        $item,
+                        $group,
+                        $itemActivities,
+                        $stateGroups,
+                        $cycleStart,
+                        $upperBound,
+                        $cycleEnded
+                    );
+                    if ($resolvedComp) {
+                        $item->completed_at = $resolvedComp;
+                        $stats['completion_dates_fixed']++;
+                        $itemDirty = true;
+                    }
+                }
+
+                $currentStateChanged = $item->state_changed_at ? Carbon::parse($item->state_changed_at) : null;
+                $targetStateChanged = $item->completed_at ? Carbon::parse($item->completed_at) : null;
+                if (! $currentStateChanged || ($cycleEnded && $currentStateChanged->gt($upperBound))) {
+                    if ($targetStateChanged) {
+                        $item->state_changed_at = $targetStateChanged;
+                        $stats['state_dates_fixed']++;
+                        $itemDirty = true;
+                    }
+                }
+            } elseif ($group === 'STARTED') {
+                if ($item->completed_at !== null) {
+                    $item->completed_at = null;
+                    $stats['completion_dates_fixed']++;
+                    $itemDirty = true;
+                }
+
+                $currentStateChanged = $item->state_changed_at ? Carbon::parse($item->state_changed_at) : null;
+                if (! $currentStateChanged || ($cycleEnded && $currentStateChanged->gt($upperBound))) {
+                    $resolvedStarted = $this->resolveWorkItemGroupTransitionDate(
+                        $item,
+                        'STARTED',
+                        $itemActivities,
+                        $stateGroups,
+                        $cycleStart,
+                        $upperBound,
+                        $cycleEnded
+                    );
+                    if ($resolvedStarted) {
+                        $item->state_changed_at = $resolvedStarted;
+                        $stats['state_dates_fixed']++;
+                        $itemDirty = true;
+                    }
+                }
+            } else {
+                if ($item->completed_at !== null) {
+                    $item->completed_at = null;
+                    $stats['completion_dates_fixed']++;
+                    $itemDirty = true;
+                }
+            }
+
+            // 4. Sincronizar status_at_completion en cycle_work_items según estado del ciclo
+            $currentSnapshot = $item->pivot?->status_at_completion;
+            if ($cycle->status === 'COMPLETED') {
+                $expectedSnapshot = in_array($group, ['COMPLETED', 'CANCELLED'], true)
+                    ? 'COMPLETED'
+                    : 'TRANSFERRED_TO_BACKLOG';
+
+                if ($currentSnapshot !== $expectedSnapshot) {
+                    $pivotUpdates['status_at_completion'] = $expectedSnapshot;
+                    $stats['completion_snapshots_updated']++;
+                }
+            } elseif ($currentSnapshot !== null) {
+                $pivotUpdates['status_at_completion'] = null;
+                $stats['completion_snapshots_updated']++;
+            }
+
+            if (! $dryRun) {
+                if ($itemDirty) {
+                    $item->timestamps = false;
+                    $item->save();
+                }
+
+                if (! empty($pivotUpdates)) {
+                    DB::table('cycle_work_items')
+                        ->where('cycle_id', $cycle->id)
+                        ->where('work_item_id', $item->id)
+                        ->update($pivotUpdates);
+                }
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Limpia las cachés de analíticas y modelos asociadas a un proyecto.
+     */
+    public function clearProjectAnalyticsCache(Project $project): void
+    {
+        try {
+            Cache::tags(['projects', 'work_items', 'cycles', 'project_'.$project->id])->flush();
+        } catch (Throwable) {
+            // Ignorar si el driver de caché configurado no soporta tags
+        }
+    }
+
+    /**
+     * Determina la fecha de incorporación más coherente de un work item al ciclo dentro del rango permitido.
+     */
+    private function resolvePivotAddedDate(WorkItem $item, Carbon $cycleStart, Carbon $upperBound): Carbon
+    {
+        if ($item->created_at) {
+            $created = Carbon::parse($item->created_at);
+            if ($created->between($cycleStart, $upperBound)) {
+                return $created;
+            }
+        }
+
+        if ($item->start_date) {
+            $itemStart = Carbon::parse($item->start_date)->startOfDay();
+            if ($itemStart->between($cycleStart, $upperBound)) {
+                return $itemStart;
+            }
+        }
+
+        return $cycleStart->copy();
+    }
+
+    /**
+     * Resuelve la fecha histórica más fiel para la transición al grupo de estado actual del ítem.
+     */
+    private function resolveWorkItemGroupTransitionDate(
+        WorkItem $item,
+        string $targetGroup,
+        Collection $activities,
+        array $stateGroups,
+        Carbon $cycleStart,
+        Carbon $upperBound,
+        bool $cycleEnded
+    ): ?Carbon {
+        foreach ($activities as $activity) {
+            $diff = is_array($activity->changes_diff) ? $activity->changes_diff : [];
+            $toStateId = $diff['state_id']['to'] ?? $diff['state_id']['new'] ?? $diff['state_id'] ?? null;
+            if (is_numeric($toStateId) && ($stateGroups[(int) $toStateId] ?? null) === $targetGroup) {
+                $actDate = Carbon::parse($activity->created_at);
+                if ($actDate->lte($upperBound)) {
+                    return $actDate;
+                }
+            }
+        }
+
+        if ($targetGroup !== 'STARTED' && $item->completed_at) {
+            $compDate = Carbon::parse($item->completed_at);
+            if ($compDate->lte($upperBound)) {
+                return $compDate;
+            }
+        }
+
+        if ($item->state_changed_at) {
+            $changedAt = Carbon::parse($item->state_changed_at);
+            if ($changedAt->lte($upperBound)) {
+                return $changedAt;
+            }
+        }
+
+        if ($targetGroup === 'STARTED' && $item->start_date) {
+            $itemStart = Carbon::parse($item->start_date)->startOfDay();
+            if ($itemStart->lte($upperBound)) {
+                return $itemStart;
+            }
+        }
+
+        if ($targetGroup !== 'STARTED' && $item->target_date) {
+            $target = Carbon::parse($item->target_date)->endOfDay();
+            if ($target->between($cycleStart, $upperBound)) {
+                return $target;
+            }
+        }
+
+        if ($item->updated_at) {
+            $updated = Carbon::parse($item->updated_at);
+            if ($updated->lte($upperBound)) {
+                return $updated;
+            }
+        }
+
+        if ($targetGroup === 'STARTED' && $item->created_at) {
+            $created = Carbon::parse($item->created_at);
+            if ($created->lte($upperBound)) {
+                return $created;
+            }
+        }
+
+        return $cycleEnded ? $upperBound->copy() : now();
     }
 
     /**
@@ -592,7 +863,8 @@ class CycleService
                     return false;
                 }
                 if (strtoupper($item->state?->group ?? '') === 'CANCELLED') {
-                    $cancelledAt = $item->updated_at ? Carbon::parse($item->updated_at) : null;
+                    $rawCancelledAt = $item->completed_at ?? $item->state_changed_at ?? $item->updated_at;
+                    $cancelledAt = $rawCancelledAt ? Carbon::parse($rawCancelledAt) : null;
                     if ($cancelledAt && $cancelledAt->lessThanOrEqualTo($currentDayEnd)) {
                         return false;
                     }
@@ -663,9 +935,10 @@ class CycleService
                     if (strtoupper($item->state?->group ?? '') !== 'STARTED') {
                         return false;
                     }
-                    $startDate = Carbon::parse($item->updated_at ?? $item->created_at);
+                    $rawStartDate = $item->state_changed_at ?? $item->start_date ?? $item->updated_at ?? $item->created_at;
+                    $startDate = $rawStartDate ? Carbon::parse($rawStartDate) : null;
 
-                    return $startDate->lessThanOrEqualTo($currentDayEnd);
+                    return $startDate ? $startDate->lessThanOrEqualTo($currentDayEnd) : true;
                 });
 
                 $dayStarted = $startedOnDay->count();
