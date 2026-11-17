@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\v1\Page\PageAnalyticsController;
 use App\Http\Controllers\Api\v1\Page\PageController;
 use App\Http\Controllers\Api\v1\Project\ProjectAnalyticsController;
 use App\Http\Controllers\Api\v1\Project\ProjectController;
+use App\Http\Controllers\Api\v1\Project\ProjectExportImportController;
 use App\Http\Controllers\Api\v1\Project\ProjectMemberController;
 use App\Http\Controllers\Api\v1\Release\ReleaseController;
 use App\Http\Controllers\Api\v1\Report\ReportBlockController;
@@ -202,16 +203,18 @@ Route::middleware(['auth.sdi'])->group(function () {
         Route::get('import/csv/template', [WorkItemImportController::class, 'downloadTemplate']);
         Route::post('integrations/github/simulate', [GitHubWebhookController::class, 'simulate']);
 
-        // Proyectos: Listado global y Creación
+        // Proyectos: Listado global, Creación e Importación
         Route::get('projects', [ProjectController::class, 'index']);
         Route::post('projects', [ProjectController::class, 'store']);
+        Route::post('projects/import', [ProjectExportImportController::class, 'import']);
 
         // =========================================================================
         // RUTAS ACCESIBLES PARA CUALQUIER MIEMBRO DEL PROYECTO (o Admin / Dueño)
         // =========================================================================
         Route::middleware(['project.member'])->group(function () {
-            // Visualización de Proyecto y Catálogos
+            // Visualización y Exportación de Proyecto y Catálogos
             Route::get('projects/{project}', [ProjectController::class, 'show']);
+            Route::get('projects/{project}/export', [ProjectExportImportController::class, 'export']);
             Route::get('projects/{project}/states', [ProjectController::class, 'states']);
             Route::get('projects/{project}/labels', [ProjectController::class, 'labels']);
             Route::get('projects/{project}/work-item-types', [WorkItemTypeController::class, 'index']);

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "skills": {
+    "caveman": {
+      "source": "juliusbrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "71b600c88c8d1d36f18c4875db23b53c5d6cb9ba3195e19451d6b1bb67db07c4"
+    },
+    "context-mode": {
+      "source": "mksglu/context-mode",
+      "ref": "v1.0.117",
+      "sourceType": "github",
+      "skillPath": "skills/context-mode/SKILL.md",
+      "computedHash": "f3870052f510d416984aa64e4675a2e2da437d6f0bfab73b439bfa57af0a754d"
+    },
+    "ponytail": {
+      "source": "dietrichgebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "061f887d9e3e735f85db3be3655a8936a00f24d5fb65ac4ab74a968a770fe342"
+    },
+    "rtk": {
+      "source": "akillness/jeo-skills",
+      "sourceType": "github",
+      "skillPath": ".agent-skills/rtk/SKILL.md",
+      "computedHash": "2386bca6a9b46a529c4f523dc013b399732a6d2f9bbacf8658603d3151fb99d9"
+    },
+    "frontend-expert": {
+      "source": "antigravityskills/skill-frontend-expert-1b313720",
+      "sourceType": "antigravityskills",
+      "skillPath": ".agents/skills/frontend-expert/SKILL.md",
+      "computedHash": "cb81d33012d12d90a2cf705219d1f2a5a7399adcaed05af5af56d323fc87c1ac"
+    },
+    "uiux-designer": {
+      "source": "antigravityskills/skill-uiux-designer-914f95c8",
+      "sourceType": "antigravityskills",
+      "skillPath": ".agents/skills/uiux-designer/SKILL.md",
+      "computedHash": "e2dc02f0728694c6886f840e01d8d100d4f5fac4f9ddd3774790341591890326"
+    }
+  }
+}

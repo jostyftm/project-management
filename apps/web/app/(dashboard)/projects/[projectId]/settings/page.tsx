@@ -37,6 +37,7 @@ import {
   Settings,
   AlertTriangle,
   Target,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,7 @@ export default function ProjectSettingsPage() {
   useDocumentTitle(`Configuración - ${project?.name || "Proyecto"}`);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -288,6 +290,55 @@ export default function ProjectSettingsPage() {
               </CardFooter>
             </Card>
           </form>
+
+          {/* Export Data Card */}
+          <Card className="border-slate-200 bg-white">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2 text-indigo-600">
+                <Download className="size-5 shrink-0" />
+                <CardTitle className="text-base font-semibold text-slate-900">
+                  Exportar Datos del Proyecto
+                </CardTitle>
+              </div>
+              <CardDescription className="text-slate-500 text-xs">
+                Descarga una copia completa en formato JSON con la totalidad de los ciclos, módulos, tareas, estados, etiquetas, criterios DoD y relaciones de este proyecto.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    Copia Canónica JSON ({project?.identifier})
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5 max-w-xl">
+                    El archivo resultante es compatible con la herramienta de importación de cualquier otro espacio de trabajo o instancia.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!project) return;
+                    setIsExporting(true);
+                    try {
+                      toast.info(`Generando exportación de "${project.name}"...`);
+                      await projectService.exportProject(project.id, project.identifier);
+                      toast.success("Exportación JSON descargada exitosamente");
+                    } catch {
+                      toast.error("Error al exportar el proyecto");
+                    } finally {
+                      setIsExporting(false);
+                    }
+                  }}
+                  disabled={isExporting}
+                  className="shrink-0 border-slate-200 hover:bg-slate-100 text-slate-700 shadow-xs cursor-pointer"
+                >
+                  {isExporting ? <Loader2 className="size-4 animate-spin mr-2" /> : <Download className="size-4 mr-2 text-indigo-600" />}
+                  Exportar Proyecto (JSON)
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Danger Zone */}
           <Card className="border-rose-200 bg-rose-50/20 shadow-xs">

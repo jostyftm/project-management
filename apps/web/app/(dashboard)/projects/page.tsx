@@ -19,7 +19,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DeleteProjectModal } from "@/components/plane/projects/DeleteProjectModal";
-import { Plus, Search, FolderKanban, ArrowRight, Layers, Loader2, Hash, MoreVertical, Settings, Trash2 } from "lucide-react";
+import { ImportProjectModal } from "@/components/plane/projects/ImportProjectModal";
+import { Plus, Search, FolderKanban, ArrowRight, Layers, Loader2, Hash, MoreVertical, Settings, Trash2, FileUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Project } from "@/types/plane-types";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -31,6 +32,7 @@ export default function ProjectsPage() {
   useDocumentTitle("Proyectos");
   const [search, setSearch] = useState("");
   const [openModal, setOpenModal] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedProjectToDelete, setSelectedProjectToDelete] = useState<Project | null>(null);
@@ -101,13 +103,23 @@ export default function ProjectsPage() {
             Gestiona los proyectos de tu workspace {currentWorkspace?.name ? `"${currentWorkspace.name}"` : ""}
           </p>
         </div>
-        <Button
-          onClick={() => setOpenModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
-        >
-          <Plus className="mr-2 size-4" />
-          Nuevo Proyecto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setImportModalOpen(true)}
+            className="border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer shadow-xs"
+          >
+            <FileUp className="mr-2 size-4 text-indigo-600" />
+            Importar Proyecto
+          </Button>
+          <Button
+            onClick={() => setOpenModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs cursor-pointer"
+          >
+            <Plus className="mr-2 size-4" />
+            Nuevo Proyecto
+          </Button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -199,7 +211,7 @@ export default function ProjectsPage() {
                             <span className="sr-only">Opciones del proyecto</span>
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 bg-white shadow-md">
+                        <DropdownMenuContent align="end" className="w-52 bg-white shadow-md">
                           <DropdownMenuItem asChild>
                             <Link
                               href={`/projects/${proj.id}/settings`}
@@ -208,6 +220,21 @@ export default function ProjectsPage() {
                               <Settings className="size-4 mr-2 text-slate-500" />
                               <span>Configuración</span>
                             </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              try {
+                                toast.info(`Generando exportación de "${proj.name}"...`);
+                                await projectService.exportProject(proj.id, proj.identifier);
+                                toast.success("Exportación descargada exitosamente");
+                              } catch {
+                                toast.error("Error al exportar el proyecto");
+                              }
+                            }}
+                            className="cursor-pointer text-slate-700"
+                          >
+                            <Download className="size-4 mr-2 text-slate-500" />
+                            <span>Exportar Proyecto (JSON)</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -320,6 +347,13 @@ export default function ProjectsPage() {
           setDeleteModalOpen(open);
           if (!open) setSelectedProjectToDelete(null);
         }}
+        onSuccess={() => fetchProjects()}
+      />
+
+      {/* Modal Importar Proyecto */}
+      <ImportProjectModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
         onSuccess={() => fetchProjects()}
       />
     </div>

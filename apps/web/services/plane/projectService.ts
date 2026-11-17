@@ -132,4 +132,38 @@ export const projectService = {
       ...res.data.attributes,
     };
   },
+
+  exportProject: async (projectId: string | number, defaultIdentifier?: string) => {
+    const res = await httpRequestService<Blob>({
+      url: `${API_BASE_URL}/projects/${projectId}/export`,
+      method: "GET",
+      responseType: "blob",
+    });
+    const blob = new Blob([res as any], { type: "application/json" });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `${defaultIdentifier || "project"}-export.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  importProject: async (file: File, options?: { name?: string; identifier?: string; force?: boolean }) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (options?.name) formData.append("name", options.name);
+    if (options?.identifier) formData.append("identifier", options.identifier);
+    if (options?.force) formData.append("force", "1");
+
+    return await httpRequestService<any>({
+      url: `${API_BASE_URL}/projects/import`,
+      method: "POST",
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
 };
