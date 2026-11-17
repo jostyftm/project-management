@@ -41,6 +41,8 @@ class WorkItem extends Model
         'blocked_at',
         'blocked_by_user_id',
         'created_by',
+        'created_at',
+        'updated_at',
     ];
 
     protected function casts(): array

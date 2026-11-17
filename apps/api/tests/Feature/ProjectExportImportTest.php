@@ -3,6 +3,7 @@
 use App\Mcp\Servers\ProjectManagementServer;
 use App\Mcp\Tools\Projects\ExportProjectTool;
 use App\Mcp\Tools\Projects\ImportProjectTool;
+use App\Models\Activity;
 use App\Models\Cycle;
 use App\Models\Label;
 use App\Models\Milestone;
@@ -16,6 +17,7 @@ use App\Models\WorkItemDodItem;
 use App\Models\WorkItemRelation;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Services\CycleService;
 use App\Services\ProjectExportService;
 use App\Services\ProjectImportService;
 use Illuminate\Http\UploadedFile;
@@ -143,6 +145,27 @@ beforeEach(function () {
     $this->itemTask->cycles()->attach($this->cycle->id);
     $this->itemTask->modules()->attach($this->module->id);
     $this->itemTask->labels()->attach($this->labelCore->id);
+    $this->itemTask->assignees()->attach($this->user->id);
+
+    $this->itemTask->timestamps = false;
+    $this->itemTask->created_at = \Carbon\Carbon::parse('2026-03-02 10:00:00');
+    $this->itemTask->completed_at = \Carbon\Carbon::parse('2026-03-05 15:00:00');
+    $this->itemTask->save();
+
+    \Illuminate\Support\Facades\DB::table('cycle_work_items')
+        ->where('cycle_id', $this->cycle->id)
+        ->where('work_item_id', $this->itemTask->id)
+        ->update(['created_at' => '2026-03-01 09:00:00', 'updated_at' => '2026-03-01 09:00:00']);
+
+    Activity::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'actor_id' => $this->user->id,
+        'entity_type' => 'WORK_ITEM',
+        'entity_id' => $this->itemTask->id,
+        'action' => 'COMPLETED',
+        'created_at' => '2026-03-05 15:00:00',
+    ]);
 
     WorkItemDodItem::create([
         'work_item_id' => $this->itemTask->id,
@@ -172,11 +195,14 @@ it('exports a complete project with all related entities in canonical format', f
     expect(count($exported['modules']))->toBe(1);
     expect(count($exported['milestones']))->toBe(1);
     expect(count($exported['work_items']))->toBe(2);
+    expect(count($exported['members']))->toBe(1);
+    expect(count($exported['activities']))->toBe(1);
 
     $taskData = collect($exported['work_items'])->firstWhere('sequence_id', 2);
     expect($taskData)->not->toBeNull();
     expect($taskData['parent_sequence_id'])->toBe(1);
-    expect($taskData['cycles'])->toContain('Sprint 1');
+    expect(collect($taskData['cycles'])->pluck('name'))->toContain('Sprint 1');
+    expect($taskData['assignee_emails'])->toContain($this->user->email);
     expect($taskData['modules'])->toContain('Autenticación');
     expect($taskData['labels'])->toContain('Core');
     expect(count($taskData['dod_items']))->toBe(1);
@@ -227,6 +253,28 @@ it('imports an exported project into another workspace with full fidelity', func
     expect($importedTask->modules()->count())->toBe(1);
     expect($importedTask->labels()->count())->toBe(1);
     expect($importedTask->dodItems()->count())->toBe(1);
+    expect($importedTask->assignees()->count())->toBe(1);
+    expect($importedTask->created_at->format('Y-m-d H:i:s'))->toBe('2026-03-02 10:00:00');
+    expect($importedTask->completed_at->format('Y-m-d H:i:s'))->toBe('2026-03-05 15:00:00');
+
+    // Verificar que el timestamp del pivot de ciclo se preservó para las analíticas
+    $importedPivot = \Illuminate\Support\Facades\DB::table('cycle_work_items')->where('work_item_id', $importedTask->id)->first();
+    expect($importedPivot->created_at)->toBe('2026-03-01 09:00:00');
+
+    // Verificar generación de analíticas y burndown del Sprint en el proyecto importado
+    $cycleService = app(CycleService::class);
+    $importedCycle = Cycle::withoutGlobalScopes()->where('project_id', $importedProject->id)->first();
+    $analytics = $cycleService->getAnalytics($importedCycle);
+
+    expect($analytics['metrics']['total_items'])->toBe(1);
+    expect($analytics['metrics']['completed_items'])->toBe(1);
+    expect($analytics['metrics']['completion_rate'])->toBe(100.0);
+    expect($analytics['timeline']['work_items'][0]['scope'])->toBe(1);
+    expect($analytics['timeline']['work_items'][0]['pending'])->toBe(1);
+
+    // Verificar actividades en el proyecto importado
+    $activities = Activity::where('project_id', $importedProject->id)->get();
+    expect($activities->count())->toBeGreaterThan(1);
 
     $relation = WorkItemRelation::where('source_id', $importedEpic->id)->first();
     expect($relation)->not->toBeNull();
