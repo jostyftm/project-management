@@ -14,6 +14,8 @@ class CycleWorkItem extends Pivot
         'work_item_id',
         'status_at_completion',
         'transferred_to_cycle_id',
+        'created_at',
+        'updated_at',
     ];
 
     public function cycle(): BelongsTo
