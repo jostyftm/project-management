@@ -127,4 +127,24 @@ class Project extends Model
     {
         return $this->hasMany(RecurringWorkItem::class);
     }
+
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(Milestone::class);
+    }
+
+    public function releases(): HasMany
+    {
+        return $this->hasMany(Release::class);
+    }
+
+    public function pages(): HasMany
+    {
+        return $this->hasMany(Page::class);
+    }
+
+    public function views(): HasMany
+    {
+        return $this->hasMany(View::class);
+    }
 }

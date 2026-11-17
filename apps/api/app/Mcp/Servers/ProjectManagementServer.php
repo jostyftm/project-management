@@ -25,8 +25,10 @@ use App\Mcp\Tools\Modules\ListModulesTool;
 use App\Mcp\Tools\Modules\UpdateModuleTool;
 use App\Mcp\Tools\Projects\CreateProjectTool;
 use App\Mcp\Tools\Projects\DeleteProjectTool;
+use App\Mcp\Tools\Projects\ExportProjectTool;
 use App\Mcp\Tools\Projects\GetDailyStandupTool;
 use App\Mcp\Tools\Projects\GetProjectTool;
+use App\Mcp\Tools\Projects\ImportProjectTool;
 use App\Mcp\Tools\Projects\ListProjectsTool;
 use App\Mcp\Tools\Projects\UpdateProjectTool;
 use App\Mcp\Tools\Releases\CreateReleaseTool;
@@ -84,6 +86,8 @@ class ProjectManagementServer extends Server
         CreateProjectTool::class,
         UpdateProjectTool::class,
         DeleteProjectTool::class,
+        ExportProjectTool::class,
+        ImportProjectTool::class,
 
         // WorkItems & Criterios DoD / Aceptación
         ListWorkItemsTool::class,
