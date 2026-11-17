@@ -188,6 +188,23 @@ class WorkItem extends Model
     }
 
     /**
+     * Resuelve los puntos de estimación efectivos considerando estimate_points, estimate_value y tallas T-shirt.
+     */
+    public function getEffectiveEstimatePointsAttribute(): float
+    {
+        if ($this->estimate_points !== null) {
+            return (float) $this->estimate_points;
+        }
+        if ($this->estimate_value !== null && is_numeric($this->estimate_value)) {
+            return (float) $this->estimate_value;
+        }
+        $tshirtMap = ['XS' => 1.0, 'S' => 2.0, 'M' => 3.0, 'L' => 5.0, 'XL' => 8.0, 'XXL' => 13.0];
+        $val = strtoupper(trim((string) ($this->estimate_value ?? '')));
+
+        return $tshirtMap[$val] ?? 0.0;
+    }
+
+    /**
      * Accesor para description_html con fallback a description_json legado.
      */
     public function getDescriptionHtmlAttribute(?string $value): ?string

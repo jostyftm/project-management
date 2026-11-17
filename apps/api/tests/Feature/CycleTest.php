@@ -213,11 +213,17 @@ test('it computes dynamic burndown analytics reflecting work item status changes
 
     // Verificar que la serie temporal tiene datos progresivos
     $workItemsTimeline = $analytics->json('data.timeline.work_items');
+    $estimatesTimeline = $analytics->json('data.timeline.estimates');
     expect($workItemsTimeline)->not->toBeEmpty();
+    expect($estimatesTimeline)->not->toBeEmpty();
     $todayIndex = $analytics->json('data.today_index');
     expect($workItemsTimeline[$todayIndex]['completed'])->toBe(1);
     expect($workItemsTimeline[$todayIndex]['pending'])->toBe(2);
     expect($workItemsTimeline[$todayIndex]['started'])->toBe(1);
+
+    expect((float) $estimatesTimeline[$todayIndex]['completed'])->toBe(3.0);
+    expect((float) $estimatesTimeline[$todayIndex]['pending'])->toBe(7.0);
+    expect((float) $estimatesTimeline[$todayIndex]['started'])->toBe(5.0);
 
     // Actualizar Item 2 a Done a través de la API
     $updateResponse = $this->actingAs($this->user)
@@ -239,6 +245,10 @@ test('it computes dynamic burndown analytics reflecting work item status changes
     $updatedAnalytics->assertJsonPath('data.metrics.completed_points', 8);
     $updatedAnalytics->assertJsonPath('data.breakdown.done', 2);
     $updatedAnalytics->assertJsonPath('data.breakdown.pending', 1);
+
+    $updatedEstimatesTimeline = $updatedAnalytics->json('data.timeline.estimates');
+    expect((float) $updatedEstimatesTimeline[$todayIndex]['completed'])->toBe(8.0);
+    expect((float) $updatedEstimatesTimeline[$todayIndex]['pending'])->toBe(2.0);
 
     // Desvincular Item 3 del ciclo
     $deleteResponse = $this->actingAs($this->user)
@@ -286,4 +296,66 @@ test('it deletes cycle and all associated work items', function () {
     $response->assertStatus(200);
     $this->assertDatabaseMissing('cycles', ['id' => $cycle->id]);
     $this->assertDatabaseMissing('work_items', ['id' => $item1->id]);
+});
+
+test('it correctly computes timeline estimates completed and pending points with case-insensitive states and estimate values', function () {
+    // Estado con group en minúscula para verificar insensibilidad
+    $doneLowercaseState = State::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Done Lowercase',
+        'group' => 'completed',
+        'color' => '#10B981',
+        'sequence' => 10,
+    ]);
+
+    $cycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Estimates Completed Test',
+        'status' => 'CURRENT',
+        'start_date' => now()->subDays(3)->format('Y-m-d'),
+        'end_date' => now()->addDays(4)->format('Y-m-d'),
+    ]);
+
+    // Item con estimate_value numérico en lugar de estimate_points explícito
+    $itemDone = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 30,
+        'title' => 'Task Done with string estimate',
+        'state_id' => $doneLowercaseState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => null,
+        'estimate_value' => '5',
+        'completed_at' => now()->subDay(),
+    ]);
+
+    $itemPending = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 31,
+        'title' => 'Task Pending with numeric points',
+        'state_id' => $this->backlogState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => 3,
+    ]);
+
+    $cycle->workItems()->attach([$itemDone->id, $itemPending->id]);
+
+    $analytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$cycle->id}/analytics");
+
+    $analytics->assertStatus(200);
+    $todayIndex = $analytics->json('data.today_index');
+    $estimatesTimeline = $analytics->json('data.timeline.estimates');
+
+    expect($estimatesTimeline)->not->toBeEmpty();
+    // Scope total: 5 + 3 = 8 pts
+    expect((float) $estimatesTimeline[$todayIndex]['scope'])->toBe(8.0);
+    // Completado: 5 pts de la tarea finalizada (a pesar de tener group en minúscula y estimate_value)
+    expect((float) $estimatesTimeline[$todayIndex]['completed'])->toBe(5.0);
+    // Pendiente: 8 - 5 = 3 pts
+    expect((float) $estimatesTimeline[$todayIndex]['pending'])->toBe(3.0);
 });

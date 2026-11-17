@@ -458,9 +458,22 @@ class CycleService
 
         $classifiedItems = [];
 
+        $getPoints = function ($item): float {
+            if ($item->estimate_points !== null) {
+                return (float) $item->estimate_points;
+            }
+            if ($item->estimate_value !== null && is_numeric($item->estimate_value)) {
+                return (float) $item->estimate_value;
+            }
+            $tshirtMap = ['XS' => 1.0, 'S' => 2.0, 'M' => 3.0, 'L' => 5.0, 'XL' => 8.0, 'XXL' => 13.0];
+            $val = strtoupper(trim((string) ($item->estimate_value ?? '')));
+
+            return $tshirtMap[$val] ?? 0.0;
+        };
+
         foreach ($workItems as $item) {
             $group = strtoupper($item->state?->group ?? 'UNSTARTED');
-            $points = (float) ($item->estimate_points ?? 0);
+            $points = $getPoints($item);
             $pivotAddedAt = $item->pivot?->created_at ? Carbon::parse($item->pivot->created_at) : ($item->created_at ? Carbon::parse($item->created_at) : null);
             $itemUpdatedAt = $item->updated_at ? Carbon::parse($item->updated_at) : null;
             $statusAtComp = $item->pivot?->status_at_completion;
@@ -578,7 +591,7 @@ class CycleService
                 if ($pivotAdded && $pivotAdded->greaterThan($currentDayEnd)) {
                     return false;
                 }
-                if ($item->state?->group === 'CANCELLED') {
+                if (strtoupper($item->state?->group ?? '') === 'CANCELLED') {
                     $cancelledAt = $item->updated_at ? Carbon::parse($item->updated_at) : null;
                     if ($cancelledAt && $cancelledAt->lessThanOrEqualTo($currentDayEnd)) {
                         return false;
@@ -589,7 +602,7 @@ class CycleService
             });
 
             $dayScope = max(0, $itemsPresentOnDay->count());
-            $dayScopePoints = (float) $itemsPresentOnDay->sum('estimate_points');
+            $dayScopePoints = (float) $itemsPresentOnDay->sum($getPoints);
 
             // Conteo de tareas agregadas ese día
             $addedThatDay = $workItems->filter(function ($item) use ($currentDayStart, $currentDayEnd) {
@@ -625,21 +638,29 @@ class CycleService
                 $dayCompletedPoints = 0;
             } elseif ($i <= $todayIndex) {
                 // Tareas completadas hasta este día
-                $completedOnDay = $itemsPresentOnDay->filter(function ($item) use ($currentDayEnd) {
-                    if ($item->state?->group !== 'COMPLETED') {
+                $completedOnDay = $itemsPresentOnDay->filter(function ($item) use ($currentDayEnd, $endDate) {
+                    if (strtoupper($item->state?->group ?? '') !== 'COMPLETED') {
                         return false;
                     }
-                    $compDate = $item->completed_at ? Carbon::parse($item->completed_at) : Carbon::parse($item->updated_at);
+                    $rawCompDate = $item->completed_at ?? $item->state_changed_at ?? $item->updated_at;
+                    if (! $rawCompDate) {
+                        return true;
+                    }
+                    $compDate = Carbon::parse($rawCompDate);
+
+                    if ($currentDayEnd->gte($endDate) && ($item->pivot?->status_at_completion === 'COMPLETED' || $compDate->greaterThan($endDate))) {
+                        return true;
+                    }
 
                     return $compDate->lessThanOrEqualTo($currentDayEnd);
                 });
 
                 $dayCompleted = $completedOnDay->count();
-                $dayCompletedPoints = (float) $completedOnDay->sum('estimate_points');
+                $dayCompletedPoints = (float) $completedOnDay->sum($getPoints);
 
                 // Tareas en progreso hasta este día
                 $startedOnDay = $itemsPresentOnDay->filter(function ($item) use ($currentDayEnd) {
-                    if ($item->state?->group !== 'STARTED') {
+                    if (strtoupper($item->state?->group ?? '') !== 'STARTED') {
                         return false;
                     }
                     $startDate = Carbon::parse($item->updated_at ?? $item->created_at);
@@ -648,7 +669,7 @@ class CycleService
                 });
 
                 $dayStarted = $startedOnDay->count();
-                $dayStartedPoints = (float) $startedOnDay->sum('estimate_points');
+                $dayStartedPoints = (float) $startedOnDay->sum($getPoints);
 
                 $dayPending = max(0, $dayScope - $dayCompleted);
                 $dayPendingPoints = max(0, $dayScopePoints - $dayCompletedPoints);
@@ -657,7 +678,7 @@ class CycleService
                 $dayCompleted = $done;
                 $dayCompletedPoints = $completedPoints;
                 $dayStarted = $started;
-                $dayStartedPoints = (float) $workItems->filter(fn ($it) => $it->state?->group === 'STARTED')->sum('estimate_points');
+                $dayStartedPoints = (float) $workItems->filter(fn ($it) => strtoupper($it->state?->group ?? '') === 'STARTED')->sum($getPoints);
                 $dayPending = $pending;
                 $dayPendingPoints = max(0, $totalPoints - $completedPoints);
                 $dayScope = $scope;
@@ -680,10 +701,10 @@ class CycleService
             $estimatesSeries[] = [
                 'date' => $dateLabel,
                 'full_date' => $fullDate,
-                'scope' => round($dayScopePoints),
-                'pending' => round($dayPendingPoints),
-                'started' => round($dayStartedPoints),
-                'completed' => round($dayCompletedPoints),
+                'scope' => round($dayScopePoints, 1),
+                'pending' => round($dayPendingPoints, 1),
+                'started' => round($dayStartedPoints, 1),
+                'completed' => round($dayCompletedPoints, 1),
                 'ideal_pending' => $idealPendingPoints,
                 'ideal_completed' => $idealCompletedPoints,
                 'added_today' => $addedThatDay,
