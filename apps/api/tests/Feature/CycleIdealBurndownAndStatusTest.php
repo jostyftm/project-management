@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -294,4 +295,179 @@ test('it executes cycles:sync-ideal artisan command updating projects cleanly', 
     ]);
 
     expect($exitCode)->toBe(0);
+});
+
+test('it reconstructs past cycle graphs, pivots, timestamps and points according to cycle dates', function () {
+    $cycleStart = now()->subDays(14)->startOfDay();
+    $cycleEnd = now()->subDays(4)->endOfDay();
+
+    $pastCycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Sprint Pasado Desfasado',
+        'start_date' => $cycleStart->format('Y-m-d'),
+        'end_date' => $cycleEnd->format('Y-m-d'),
+        'status' => 'CURRENT', // Aún marcado CURRENT aunque ya expiró
+    ]);
+
+    $originalUpdatedAt = now()->subHours(2);
+
+    // Tarea completada sin completed_at y con estimate_value numérico pero estimate_points null
+    $doneTask = new WorkItem;
+    $doneTask->timestamps = false;
+    $doneTask->fill([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 201,
+        'title' => 'Completed Legacy Task',
+        'state_id' => $this->doneState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => null,
+        'estimate_value' => '5',
+        'completed_at' => null,
+        'state_changed_at' => null,
+        'target_date' => now()->subDays(8)->format('Y-m-d'),
+    ]);
+    $doneTask->created_at = $cycleStart->copy()->addDay();
+    $doneTask->updated_at = $originalUpdatedAt;
+    $doneTask->save();
+
+    // Tarea en progreso con updated_at posterior al cierre del ciclo
+    $startedTask = new WorkItem;
+    $startedTask->timestamps = false;
+    $startedTask->fill([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 202,
+        'title' => 'Pending Legacy Task',
+        'state_id' => $this->inProgressState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => 3,
+        'completed_at' => now()->subDays(1), // Residuo inválido para tarea no completada
+    ]);
+    $startedTask->created_at = $cycleStart->copy()->addDays(2);
+    $startedTask->updated_at = now();
+    $startedTask->save();
+
+    // Pivotes insertados hoy (después de end_date) simulando importación o vinculación tardía
+    DB::table('cycle_work_items')->insert([
+        ['cycle_id' => $pastCycle->id, 'work_item_id' => $doneTask->id, 'created_at' => now(), 'updated_at' => now()],
+        ['cycle_id' => $pastCycle->id, 'work_item_id' => $startedTask->id, 'created_at' => now(), 'updated_at' => now()],
+    ]);
+
+    // Antes de reconstruir: los pivotes están fuera de rango y la gráfica aparece vacía en el rango del ciclo
+    $beforeAnalytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$pastCycle->id}/analytics");
+
+    $beforeItems = $beforeAnalytics->json('data.timeline.work_items');
+    expect($beforeItems[0]['scope'])->toBe(0);
+
+    // Ejecutar reconstrucción
+    $exitCode = Artisan::call('cycles:sync-ideal', [
+        '--project' => $this->project->id,
+        '--cycle' => $pastCycle->id,
+    ]);
+    expect($exitCode)->toBe(0);
+
+    // Verificar transición de estado y reconstrucción en BD
+    expect($pastCycle->fresh()->status)->toBe('COMPLETED');
+
+    $freshDone = $doneTask->fresh();
+    expect((float) $freshDone->estimate_points)->toBe(5.0);
+    expect($freshDone->completed_at)->not->toBeNull();
+    expect($freshDone->completed_at->lte($cycleEnd))->toBeTrue();
+    expect($freshDone->updated_at->format('Y-m-d H:i:s'))->toBe($originalUpdatedAt->format('Y-m-d H:i:s'));
+
+    $freshStarted = $startedTask->fresh();
+    expect($freshStarted->completed_at)->toBeNull();
+    expect($freshStarted->state_changed_at)->not->toBeNull();
+
+    $this->assertDatabaseHas('cycle_work_items', [
+        'cycle_id' => $pastCycle->id,
+        'work_item_id' => $doneTask->id,
+        'status_at_completion' => 'COMPLETED',
+    ]);
+    $this->assertDatabaseHas('cycle_work_items', [
+        'cycle_id' => $pastCycle->id,
+        'work_item_id' => $startedTask->id,
+        'status_at_completion' => 'TRANSFERRED_TO_BACKLOG',
+    ]);
+
+    // Verificar gráfica reconstruida por fechas
+    $afterAnalytics = $this->actingAs($this->user)
+        ->withHeader('X-Workspace-Id', (string) $this->workspace->id)
+        ->getJson("/api/v1/cycles/{$pastCycle->id}/analytics");
+
+    $afterAnalytics->assertStatus(200);
+    $afterItems = $afterAnalytics->json('data.timeline.work_items');
+    $afterEstimates = $afterAnalytics->json('data.timeline.estimates');
+    $lastIdx = count($afterItems) - 1;
+
+    // Día final del ciclo: alcance = 2 items / 8 pts, completadas = 1 item / 5 pts, pendientes = 1 item / 3 pts
+    expect($afterItems[$lastIdx]['scope'])->toBe(2);
+    expect($afterItems[$lastIdx]['completed'])->toBe(1);
+    expect($afterItems[$lastIdx]['pending'])->toBe(1);
+    expect((float) $afterItems[$lastIdx]['ideal_pending'])->toBe(0.0);
+
+    expect((float) $afterEstimates[$lastIdx]['scope'])->toBe(8.0);
+    expect((float) $afterEstimates[$lastIdx]['completed'])->toBe(5.0);
+    expect((float) $afterEstimates[$lastIdx]['pending'])->toBe(3.0);
+    expect((float) $afterEstimates[$lastIdx]['ideal_pending'])->toBe(0.0);
+});
+
+test('it supports dry-run and preserves genuine mid-cycle scope additions in CURRENT cycles', function () {
+    $cycleStart = now()->subDays(5)->startOfDay();
+    $cycleEnd = now()->addDays(5)->endOfDay();
+    $midCycleAddedAt = now()->subDays(2)->startOfDay();
+
+    $currentCycle = Cycle::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'name' => 'Sprint Actual Scope Creep',
+        'start_date' => $cycleStart->format('Y-m-d'),
+        'end_date' => $cycleEnd->format('Y-m-d'),
+        'status' => 'CURRENT',
+    ]);
+
+    $midTask = WorkItem::create([
+        'workspace_id' => $this->workspace->id,
+        'project_id' => $this->project->id,
+        'sequence_id' => 210,
+        'title' => 'Mid Cycle Legit Task',
+        'state_id' => $this->doneState->id,
+        'created_by' => $this->user->id,
+        'estimate_points' => null,
+        'estimate_value' => '8',
+    ]);
+
+    DB::table('cycle_work_items')->insert([
+        [
+            'cycle_id' => $currentCycle->id,
+            'work_item_id' => $midTask->id,
+            'created_at' => $midCycleAddedAt,
+            'updated_at' => $midCycleAddedAt,
+        ],
+    ]);
+
+    // 1. Dry-run no debe modificar BD
+    $dryCode = Artisan::call('cycles:sync-ideal', [
+        '--cycle' => $currentCycle->id,
+        '--dry-run' => true,
+    ]);
+    expect($dryCode)->toBe(0);
+    expect($midTask->fresh()->estimate_points)->toBeNull();
+
+    // 2. Ejecución real sincroniza estimate_points pero respeta el pivot mid-cycle intacto
+    $realCode = Artisan::call('cycles:sync-ideal', [
+        '--cycle' => $currentCycle->id,
+    ]);
+    expect($realCode)->toBe(0);
+    expect((float) $midTask->fresh()->estimate_points)->toBe(8.0);
+
+    $pivot = DB::table('cycle_work_items')
+        ->where('cycle_id', $currentCycle->id)
+        ->where('work_item_id', $midTask->id)
+        ->first();
+    expect(Carbon::parse($pivot->created_at)->format('Y-m-d'))->toBe($midCycleAddedAt->format('Y-m-d'));
 });
