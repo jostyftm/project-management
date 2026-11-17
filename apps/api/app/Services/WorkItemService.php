@@ -148,6 +148,18 @@ class WorkItemService
                 abort(422, 'La fecha de inicio no puede ser posterior a la fecha de vencimiento.');
             }
 
+            $estimatePoints = $data['estimate_points'] ?? null;
+            $estimateValue = $data['estimate_value'] ?? null;
+            if ($estimatePoints === null && $estimateValue !== null && is_numeric($estimateValue)) {
+                $estimatePoints = (float) $estimateValue;
+            } elseif ($estimatePoints === null && $estimateValue !== null) {
+                $tshirtMap = ['XS' => 1.0, 'S' => 2.0, 'M' => 3.0, 'L' => 5.0, 'XL' => 8.0, 'XXL' => 13.0];
+                $val = strtoupper(trim((string) $estimateValue));
+                if (isset($tshirtMap[$val])) {
+                    $estimatePoints = $tshirtMap[$val];
+                }
+            }
+
             $workItem = WorkItem::create([
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
@@ -162,8 +174,8 @@ class WorkItemService
                 'parent_id' => $data['parent_id'] ?? null,
                 'lead_id' => $data['lead_id'] ?? null,
                 'milestone_id' => $data['milestone_id'] ?? null,
-                'estimate_points' => $data['estimate_points'] ?? null,
-                'estimate_value' => $data['estimate_value'] ?? null,
+                'estimate_points' => $estimatePoints,
+                'estimate_value' => $estimateValue,
                 'start_date' => $data['start_date'] ?? null,
                 'target_date' => $data['target_date'] ?? null,
                 'completed_at' => $completedAt,
@@ -345,6 +357,19 @@ class WorkItemService
                         if (! $hasDeliverable && ! $hasEvidenceComment) {
                             abort(422, 'No se puede completar la tarea: la configuración del proyecto exige adjuntar al menos una evidencia (entregable formal o captura con descripción en la sección de actividad).');
                         }
+                    }
+                }
+            }
+
+            if (array_key_exists('estimate_value', $data) && (! array_key_exists('estimate_points', $data) || $data['estimate_points'] === null)) {
+                $val = $data['estimate_value'];
+                if ($val !== null && is_numeric($val)) {
+                    $data['estimate_points'] = (float) $val;
+                } elseif ($val !== null) {
+                    $tshirtMap = ['XS' => 1.0, 'S' => 2.0, 'M' => 3.0, 'L' => 5.0, 'XL' => 8.0, 'XXL' => 13.0];
+                    $tVal = strtoupper(trim((string) $val));
+                    if (isset($tshirtMap[$tVal])) {
+                        $data['estimate_points'] = $tshirtMap[$tVal];
                     }
                 }
             }

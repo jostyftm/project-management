@@ -33,6 +33,16 @@ class State extends Model
         ];
     }
 
+    public function setGroupAttribute($value): void
+    {
+        $this->attributes['group'] = strtoupper((string) ($value ?? 'UNSTARTED'));
+    }
+
+    public function getGroupAttribute($value): string
+    {
+        return strtoupper((string) ($value ?? 'UNSTARTED'));
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

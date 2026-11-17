@@ -353,10 +353,9 @@ export function WorkItemCreateModal({
       };
 
       if (estimateValue) {
-        if (currentProject.estimate_system === "NUMERIC") {
+        payload.estimate_value = estimateValue;
+        if (currentProject.estimate_system === "NUMERIC" || currentProject.estimate_system === "FIBONACCI" || !isNaN(Number(estimateValue))) {
           payload.estimate_points = Number(estimateValue);
-        } else {
-          payload.estimate_value = estimateValue;
         }
       }
 

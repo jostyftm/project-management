@@ -86,7 +86,7 @@ class ProjectImportService
         // 3. Crear Proyecto preservando timestamps históricos
         $projectCreatedAt = ! empty($projectMeta['created_at']) ? Carbon::parse($projectMeta['created_at']) : null;
 
-        $project = new Project();
+        $project = new Project;
         $project->timestamps = false;
         $project->fill([
             'workspace_id' => $workspace->id,
@@ -321,7 +321,7 @@ class ProjectImportService
             $createdAt = ! empty($itemData['created_at']) ? Carbon::parse($itemData['created_at']) : now();
             $updatedAt = ! empty($itemData['updated_at']) ? Carbon::parse($itemData['updated_at']) : now();
 
-            $workItem = new WorkItem();
+            $workItem = new WorkItem;
             $workItem->timestamps = false;
             $workItem->fill([
                 'workspace_id' => $workspace->id,
@@ -485,11 +485,11 @@ class ProjectImportService
 
         if (empty($statesData)) {
             $defaultStates = [
-                ['name' => 'Backlog', 'color' => '#94A3B8', 'group' => 'backlog', 'sequence' => 0, 'is_default' => true],
-                ['name' => 'To Do', 'color' => '#60A5FA', 'group' => 'unstarted', 'sequence' => 1, 'is_default' => true],
-                ['name' => 'In Progress', 'color' => '#F59E0B', 'group' => 'started', 'sequence' => 2, 'is_default' => true],
-                ['name' => 'Done', 'color' => '#10B981', 'group' => 'completed', 'sequence' => 3, 'is_default' => true],
-                ['name' => 'Cancelled', 'color' => '#EF4444', 'group' => 'cancelled', 'sequence' => 4, 'is_default' => true],
+                ['name' => 'Backlog', 'color' => '#94A3B8', 'group' => 'BACKLOG', 'sequence' => 0, 'is_default' => true],
+                ['name' => 'To Do', 'color' => '#60A5FA', 'group' => 'UNSTARTED', 'sequence' => 1, 'is_default' => true],
+                ['name' => 'In Progress', 'color' => '#F59E0B', 'group' => 'STARTED', 'sequence' => 2, 'is_default' => true],
+                ['name' => 'Done', 'color' => '#10B981', 'group' => 'COMPLETED', 'sequence' => 3, 'is_default' => true],
+                ['name' => 'Cancelled', 'color' => '#EF4444', 'group' => 'CANCELLED', 'sequence' => 4, 'is_default' => true],
             ];
             $statesData = $defaultStates;
         }
@@ -499,7 +499,7 @@ class ProjectImportService
                 'workspace_id' => $project->workspace_id,
                 'project_id' => $project->id,
                 'name' => $st['name'],
-                'group' => strtolower($st['group'] ?? 'unstarted'),
+                'group' => strtoupper($st['group'] ?? 'UNSTARTED'),
                 'color' => $st['color'] ?? '#60A5FA',
                 'sequence' => $st['sequence'] ?? count($map),
                 'is_default' => ! empty($st['is_default']),
@@ -575,7 +575,7 @@ class ProjectImportService
             $createdAt = ! empty($c['created_at']) ? Carbon::parse($c['created_at']) : null;
             $updatedAt = ! empty($c['updated_at']) ? Carbon::parse($c['updated_at']) : null;
 
-            $cycle = new Cycle();
+            $cycle = new Cycle;
             $cycle->timestamps = false;
             $cycle->fill([
                 'workspace_id' => $project->workspace_id,
@@ -615,7 +615,7 @@ class ProjectImportService
             $createdAt = ! empty($m['created_at']) ? Carbon::parse($m['created_at']) : null;
             $updatedAt = ! empty($m['updated_at']) ? Carbon::parse($m['updated_at']) : null;
 
-            $module = new Module();
+            $module = new Module;
             $module->timestamps = false;
             $module->fill([
                 'workspace_id' => $project->workspace_id,
@@ -652,7 +652,7 @@ class ProjectImportService
             $createdAt = ! empty($m['created_at']) ? Carbon::parse($m['created_at']) : null;
             $updatedAt = ! empty($m['updated_at']) ? Carbon::parse($m['updated_at']) : null;
 
-            $milestone = new Milestone();
+            $milestone = new Milestone;
             $milestone->timestamps = false;
             $milestone->fill([
                 'workspace_id' => $project->workspace_id,
@@ -688,7 +688,7 @@ class ProjectImportService
             $createdAt = ! empty($r['created_at']) ? Carbon::parse($r['created_at']) : null;
             $updatedAt = ! empty($r['updated_at']) ? Carbon::parse($r['updated_at']) : null;
 
-            $release = new Release();
+            $release = new Release;
             $release->timestamps = false;
             $release->fill([
                 'workspace_id' => $project->workspace_id,
@@ -725,7 +725,7 @@ class ProjectImportService
             $createdAt = ! empty($p['created_at']) ? Carbon::parse($p['created_at']) : null;
             $updatedAt = ! empty($p['updated_at']) ? Carbon::parse($p['updated_at']) : null;
 
-            $page = new Page();
+            $page = new Page;
             $page->timestamps = false;
             $page->fill([
                 'workspace_id' => $project->workspace_id,
@@ -828,7 +828,7 @@ class ProjectImportService
             $completedAt = ! empty($itemData['completed_at']) ? Carbon::parse($itemData['completed_at']) : null;
             $stateChangedAt = ! empty($itemData['state_changed_at']) ? Carbon::parse($itemData['state_changed_at']) : null;
 
-            $workItem = new WorkItem();
+            $workItem = new WorkItem;
             $workItem->timestamps = false;
             $workItem->fill([
                 'workspace_id' => $workspace->id,
@@ -942,7 +942,7 @@ class ProjectImportService
             // Deliverables
             if (! empty($itemData['deliverables']) && is_array($itemData['deliverables'])) {
                 foreach ($itemData['deliverables'] as $del) {
-                    $delModel = new WorkItemDeliverable();
+                    $delModel = new WorkItemDeliverable;
                     $delModel->timestamps = false;
                     $delModel->fill([
                         'workspace_id' => $workspace->id,
@@ -1050,7 +1050,7 @@ class ProjectImportService
                 }
             }
 
-            $activity = new Activity();
+            $activity = new Activity;
             $activity->timestamps = false;
             $activity->fill([
                 'workspace_id' => $workspace->id,
@@ -1072,7 +1072,7 @@ class ProjectImportService
         }
 
         // Registrar actividad de importación del proyecto
-        $importActivity = new Activity();
+        $importActivity = new Activity;
         $importActivity->fill([
             'workspace_id' => $workspace->id,
             'project_id' => $project->id,
